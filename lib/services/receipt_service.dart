@@ -41,6 +41,9 @@ class ReceiptService {
 
     buffer.writeln();
     buffer.writeln(
+      'Items: ${bill.items.length}',
+    );
+    buffer.writeln(
       'Total Qty: ${_money(bill.totalQty)}${' ' * 30}${_money(bill.grandTotal)}',
     );
     buffer.writeln('CGST: ${_money(bill.totalCgst)}');

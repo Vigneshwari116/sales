@@ -690,7 +690,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         printerName: _printer,
       );
       if (!mounted) return;
-      _showMessage('Printing Bill $_billNo');
+      _showMessage('Printing Bill $_billNo (${bill.items.length} items)');
     } catch (e) {
       if (!mounted) return;
       _showMessage('Print failed: $e');
@@ -701,7 +701,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     }
   }
 
-  Future<void> _printBill() async {
+  void _openLedger() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SalesLedgerScreen(location: _selectedLocation),
@@ -1116,27 +1116,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Widget _buildTopArea() {
-    return SizedBox(
-      height: 112,
-
-      child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.stretch,
-
-        children: [
-          Expanded(
-            flex: 4,
-            child: _buildBillDetails(),
-          ),
-
-          const SizedBox(width: 6),
-
-          Expanded(
-            flex: 6,
-            child: _buildCustomerDetails(),
-          ),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 4,
+          child: _buildBillDetails(),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 6,
+          child: _buildCustomerDetails(),
+        ),
+      ],
     );
   }
 
@@ -1320,7 +1312,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             ],
           ),
 
-          const Spacer(),
+          const SizedBox(height: 4),
 
           _buildButtons(),
         ],
@@ -1382,75 +1374,20 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       );
     }
 
-    return SizedBox(
-      height: 25,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            button(
-              'PRINT',
-              _printBill,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'NEW',
-              _newBill,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'NEXT',
-              _nextBill,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'PREVIOUS',
-              _previousBill,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'SAVE',
-              _saveBill,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'EDIT',
-              _modifyItem,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'DELETE',
-              _deleteItem,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'LEDGER',
-              _openLedger,
-            ),
-
-            const SizedBox(width: 2),
-
-            button(
-              'EXIT',
-              _exitScreen,
-            ),
-          ],
-        ),
-      ),
+    return Wrap(
+      spacing: 2,
+      runSpacing: 2,
+      children: [
+        button('PRINT', _printBill),
+        button('NEW', _newBill),
+        button('NEXT', _nextBill),
+        button('PREVIOUS', _previousBill),
+        button('SAVE', _saveBill),
+        button('EDIT', _modifyItem),
+        button('DELETE', _deleteItem),
+        button('LEDGER', _openLedger),
+        button('EXIT', _exitScreen),
+      ],
     );
   }
 
@@ -1568,85 +1505,73 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Widget _buildRateQtyAmount() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: constraints.maxWidth,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _buildBigNumberField(
-                    label: 'RATE',
-                    controller: _rateController,
-                    focusNode: _rateFocus,
-                    onChanged: _rateChanged,
-                    onSubmitted: _rateSubmitted,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 3,
-                  child: _buildBigNumberField(
-                    label: 'QTY',
-                    controller: _qtyController,
-                    focusNode: _qtyFocus,
-                    onChanged: _qtyChanged,
-                    onSubmitted: _qtySubmitted,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(
-                        height: 18,
-                        child: Align(
-                          alignment: Alignment.bottomLeft,
-                          child: Text(
-                            'AMOUNT',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              height: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        height: 40,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 9),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Text(
-                          _format(_currentAmount),
-                          style: const TextStyle(fontSize: 15, height: 1),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                _topActionButton('MODIFY', _modifyItem),
-                const SizedBox(width: 4),
-                _topActionButton('DELETE', _deleteItem),
-              ],
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _buildBigNumberField(
+            label: 'RATE',
+            controller: _rateController,
+            focusNode: _rateFocus,
+            onChanged: _rateChanged,
+            onSubmitted: _rateSubmitted,
           ),
-        );
-      },
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 3,
+          child: _buildBigNumberField(
+            label: 'QTY',
+            controller: _qtyController,
+            focusNode: _qtyFocus,
+            onChanged: _qtyChanged,
+            onSubmitted: _qtySubmitted,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 4,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(
+                height: 18,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    'AMOUNT',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                height: 40,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: borderColor),
+                ),
+                child: Text(
+                  _format(_currentAmount),
+                  style: const TextStyle(fontSize: 15, height: 1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        _topActionButton('MODIFY', _modifyItem),
+        const SizedBox(width: 4),
+        _topActionButton('DELETE', _deleteItem),
+      ],
     );
   }
 
@@ -1798,18 +1723,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Widget _buildMainArea() {
-    final bool showTax = _items.isNotEmpty;
-    final double tableWidth = showTax ? 595.0 : 385.0;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: tableWidth,
-          child: _buildItemTable(),
+        Expanded(
+          flex: 3,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: _buildItemTable(),
+          ),
         ),
         const SizedBox(width: 7),
         Expanded(
+          flex: 2,
           child: _buildTotals(),
         ),
       ],
@@ -1828,22 +1754,25 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
   Widget _buildItemTable() {
     final bool showTax = _items.isNotEmpty;
+    final double minWidth = showTax ? 595.0 : 385.0;
 
-    return Container(
-      width: showTax ? 595.0 : 385.0,
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildTableHeader(showTax),
-          ...List.generate(
-            _items.length,
-            (index) => _buildTableRow(index, showTax),
-          ),
-        ],
+    return SizedBox(
+      width: minWidth,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTableHeader(showTax),
+            ...List.generate(
+              _items.length,
+              (index) => _buildTableRow(index, showTax),
+            ),
+          ],
+        ),
       ),
     );
   }  // ============================================================
@@ -1852,7 +1781,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildTableHeader(bool showTax) {
     return Container(
-      height: 30,
+      height: 32,
       color: headerColor,
       child: Row(
         children: [
@@ -1860,43 +1789,38 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           _tableHeaderCell('Qty', 65),
           _tableHeaderCell('RATE', 75),
           _tableHeaderCell('AMOUNT', 95),
-          _tableHeaderCell('t amt', 95),
+          _tableHeaderCell('t amt', 95, last: !showTax),
           if (showTax) ...[
             _tableHeaderCell('CGST %', 70),
             _tableHeaderCell('SGST %', 70),
-            _tableHeaderCell('IGST', 65),
+            _tableHeaderCell('IGST', 65, last: true),
           ],
         ],
       ),
     );
   }
 
-  // ============================================================
-  // TABLE HEADER CELL
-  // ============================================================
-
-  Widget _tableHeaderCell(String text, int flex) {
+  Widget _tableHeaderCell(String text, int flex, {bool last = false}) {
     return Expanded(
       flex: flex,
       child: Container(
-        height: 30,
+        height: 32,
         decoration: BoxDecoration(
           border: Border(
-            right: BorderSide(
-              color: borderColor,
-              width: 0.6,
-            ),
+            right: last
+                ? BorderSide.none
+                : BorderSide(color: borderColor, width: 0.6),
           ),
         ),
         alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-            ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            height: 1,
           ),
         ),
       ),
@@ -1936,46 +1860,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
         child: Row(
           children: [
-            _tableDataCell(
-              '${index + 1}',
-              55,
-            ),
-
-            _tableDataCell(
-              _format(item.qty),
-              65,
-            ),
-
-            _tableDataCell(
-              _format(item.rate),
-              75,
-            ),
-
-            _tableDataCell(
-              _format(item.amount),
-              95,
-            ),
-
-            _tableDataCell(
-              _format(item.grossAmt),
-              95,
-            ),
-
+            _tableDataCell('${index + 1}', 55),
+            _tableDataCell(_format(item.qty), 65),
+            _tableDataCell(_format(item.rate), 75),
+            _tableDataCell(_format(item.amount), 95),
+            _tableDataCell(_format(item.grossAmt), 95, last: !showTax),
             if (showTax) ...[
-              _tableDataCell(
-                _format(item.cgstPct),
-                70,
-              ),
-
-              _tableDataCell(
-                _format(item.sgstPct),
-                70,
-              ),
-
-              _tableDataCell(
-                _format(item.igst),
-                65,
-              ),
+              _tableDataCell(_format(item.cgstPct), 70),
+              _tableDataCell(_format(item.sgstPct), 70),
+              _tableDataCell(_format(item.igst), 65, last: true),
             ],
           ],
         ),
@@ -1987,30 +1880,25 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // TABLE DATA CELL
   // ============================================================
 
-  Widget _tableDataCell(String text, int flex) {
+  Widget _tableDataCell(String text, int flex, {bool last = false}) {
     return Expanded(
       flex: flex,
       child: Container(
         height: 34,
         decoration: BoxDecoration(
           border: Border(
-            right: BorderSide(
-              color: borderColor,
-              width: 0.6,
-            ),
-            bottom: BorderSide(
-              color: borderColor,
-              width: 0.6,
-            ),
+            right: last
+                ? BorderSide.none
+                : BorderSide(color: borderColor, width: 0.6),
+            bottom: BorderSide(color: borderColor, width: 0.6),
           ),
         ),
         alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 10),
-          ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 10, height: 1),
         ),
       ),
     );

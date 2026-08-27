@@ -21,20 +21,19 @@ class BillPrintService {
   static Future<void> printReceipt(SaleBill bill, {String? printerName}) async {
     final text = ReceiptService.buildReceiptText(bill);
     final doc = pw.Document();
+    final style = pw.TextStyle(
+      font: pw.Font.courier(),
+      fontSize: 8,
+      lineSpacing: 1.2,
+    );
 
     doc.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.roll80,
         margin: const pw.EdgeInsets.all(8),
-        build: (context) {
-          return pw.Text(
-            text,
-            style: pw.TextStyle(
-              font: pw.Font.courier(),
-              fontSize: 8,
-            ),
-          );
-        },
+        build: (context) => [
+          pw.Text(text, style: style),
+        ],
       ),
     );
 
