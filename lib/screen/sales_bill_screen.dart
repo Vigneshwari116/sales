@@ -1117,7 +1117,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildTopArea() {
     return SizedBox(
-      height: 106,
+      height: 112,
 
       child: Row(
         crossAxisAlignment:
@@ -1153,11 +1153,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       ),
 
       padding:
-      const EdgeInsets.all(6),
+      const EdgeInsets.all(5),
 
       child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
 
         children: [
           Row(
@@ -1270,7 +1271,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             ],
           ),
 
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
 
           Row(
             children: [
@@ -1381,69 +1382,75 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       );
     }
 
-    return Row(
-      children: [
-        button(
-          'PRINT',
-          _printBill,
+    return SizedBox(
+      height: 25,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            button(
+              'PRINT',
+              _printBill,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'NEW',
+              _newBill,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'NEXT',
+              _nextBill,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'PREVIOUS',
+              _previousBill,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'SAVE',
+              _saveBill,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'EDIT',
+              _modifyItem,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'DELETE',
+              _deleteItem,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'LEDGER',
+              _openLedger,
+            ),
+
+            const SizedBox(width: 2),
+
+            button(
+              'EXIT',
+              _exitScreen,
+            ),
+          ],
         ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'NEW',
-          _newBill,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'NEXT',
-          _nextBill,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'PREVIOUS',
-          _previousBill,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'SAVE',
-          _saveBill,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'EDIT',
-          _modifyItem,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'DELETE',
-          _deleteItem,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'LEDGER',
-          _openLedger,
-        ),
-
-        const SizedBox(width: 2),
-
-        button(
-          'EXIT',
-          _exitScreen,
-        ),
-      ],
+      ),
     );
   }
 
@@ -1566,7 +1573,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       CrossAxisAlignment.end,
 
       children: [
-        const Spacer(flex: 2),
+        const Spacer(flex: 1),
 
         Expanded(
           flex: 3,
@@ -1582,7 +1589,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ),
 
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
 
         Expanded(
           flex: 3,
@@ -1598,29 +1605,37 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ),
 
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
 
         Expanded(
           flex: 4,
 
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment:
             CrossAxisAlignment.start,
 
             children: [
-              const Text(
-                'AMOUNT',
-                style: TextStyle(
-                  fontWeight:
-                  FontWeight.bold,
-                  fontSize: 18,
+              const SizedBox(
+                height: 18,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    'AMOUNT',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.bold,
+                      fontSize: 16,
+                      height: 1,
+                    ),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
 
               Container(
-                height: 42,
+                height: 40,
 
                 alignment:
                 Alignment.centerRight,
@@ -1649,6 +1664,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                   style:
                   const TextStyle(
                     fontSize: 15,
+                    height: 1,
                   ),
                 ),
               ),
@@ -1656,11 +1672,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ),
 
-        const SizedBox(width: 8),
-
-        // ========================================================
-        // MODIFY
-        // ========================================================
+        const SizedBox(width: 6),
 
         _topActionButton(
           'MODIFY',
@@ -1668,10 +1680,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         ),
 
         const SizedBox(width: 4),
-
-        // ========================================================
-        // DELETE
-        // ========================================================
 
         _topActionButton(
           'DELETE',
@@ -1690,8 +1698,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       VoidCallback onPressed,
       ) {
     return SizedBox(
-      width: 70,
-      height: 42,
+      width: 64,
+      height: 40,
 
       child: ElevatedButton(
         onPressed: onPressed,
@@ -1740,24 +1748,32 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     required VoidCallback onSubmitted,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment:
       CrossAxisAlignment.start,
 
       children: [
-        Text(
-          label,
-          style:
-          const TextStyle(
-            fontWeight:
-            FontWeight.bold,
-            fontSize: 18,
+        SizedBox(
+          height: 18,
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              label,
+              style:
+              const TextStyle(
+                fontWeight:
+                FontWeight.bold,
+                fontSize: 16,
+                height: 1,
+              ),
+            ),
           ),
         ),
 
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
 
         SizedBox(
-          height: 42,
+          height: 40,
 
           child: TextField(
             controller: controller,
@@ -1790,6 +1806,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
             decoration:
             const InputDecoration(
+              isDense: true,
               filled: true,
               fillColor:
               Colors.white,
@@ -1798,15 +1815,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               OutlineInputBorder(),
 
               contentPadding:
-              EdgeInsets
-                  .symmetric(
+              EdgeInsets.symmetric(
                 horizontal: 8,
+                vertical: 10,
               ),
             ),
 
             style:
             const TextStyle(
               fontSize: 15,
+              height: 1,
             ),
           ),
         ),
