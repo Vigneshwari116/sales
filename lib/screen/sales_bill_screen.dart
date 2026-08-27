@@ -1749,9 +1749,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ),
         const SizedBox(width: 6),
-        SizedBox(
-          width: 185,
-          child: _buildTotals(),
+        Expanded(
+          child: SizedBox(
+            width: 185,
+            child: _buildTotals(),
+          ),
         ),
       ],
     );
@@ -1929,8 +1931,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildTotals() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
       children: [
+        const Spacer(),
         _totalField('', _format(_totalQty)),
         const SizedBox(height: 3),
         _totalField('Total Amt', _format(_totalAmount)),
@@ -1940,7 +1942,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         _totalField('SGST', _format(_totalSgst)),
         const SizedBox(height: 3),
         _totalField('IGST', _format(_totalIgst)),
-        const Spacer(),
+        const SizedBox(height: 8),
         const Text(
           'Grand Total',
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -2084,6 +2086,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateController.dispose();
 
     _qtyController.dispose();
+
+    _amountController.dispose();
 
     _rateFocus.dispose();
 
