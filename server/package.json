@@ -1,7 +1,7 @@
 {
   "name": "sales-bill-api",
   "version": "1.0.0",
-  "description": "Sales Bill API — bills, ledger, login",
+  "description": "Sales Bill API — bills, ledger, login (PostgreSQL)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,9 +9,8 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "pg": "^8.13.1"
+    "pg": "^8.23.0"
   }
 }
