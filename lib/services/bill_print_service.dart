@@ -11,9 +11,9 @@ import 'package:sales/services/receipt_service.dart';
 class BillPrintService {
   static Future<String> saveReceiptToDesktop(SaleBill bill) async {
     final text = ReceiptService.buildReceiptText(bill);
-    final desktop = await _desktopPath();
+    final saveDir = await _receiptSaveDirectory();
     final fileName = 'Bill_${bill.billNo}.txt';
-    final file = File('$desktop${Platform.pathSeparator}$fileName');
+    final file = File('$saveDir${Platform.pathSeparator}$fileName');
     await file.writeAsString(text);
     return file.path;
   }
@@ -49,12 +49,21 @@ class BillPrintService {
     );
   }
 
-  static Future<String> _desktopPath() async {
+  static Future<String> _receiptSaveDirectory() async {
     if (!kIsWeb && Platform.isWindows) {
       final userProfile = Platform.environment['USERPROFILE'];
       if (userProfile != null && userProfile.isNotEmpty) {
         return '$userProfile\\Desktop';
       }
+    }
+
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) {
+        return downloads.path;
+      }
+      final docs = await getApplicationDocumentsDirectory();
+      return docs.path;
     }
 
     if (!kIsWeb && Platform.isLinux) {

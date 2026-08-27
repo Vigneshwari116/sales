@@ -33,6 +33,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   static const Color billNoColor = Color(0xFF7FE8E8);
   static const double _entryBoxWidth = 100;
   static const double _entryBoxHeight = 42;
+  static const double _desktopBreakpoint = 900;
 
   // ============================================================
   // LOCATIONS
@@ -987,61 +988,94 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget build(BuildContext context) {
     _updateAmountDisplay();
 
+    if (MediaQuery.sizeOf(context).width < _desktopBreakpoint) {
+      return _buildMobileScaffold(context);
+    }
+
+    return _buildDesktopScaffold(context);
+  }
+
+  // ============================================================
+  // DESKTOP (WINDOWS) — unchanged layout
+  // ============================================================
+
+  Widget _buildDesktopScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
-
-      // ========================================================
-      // NO "SALES BILL" TITLE
-      // ========================================================
-
       appBar: AppBar(
         toolbarHeight: 52,
-
         title: const SizedBox.shrink(),
-
-        backgroundColor:
-        const Color(0xFFD5D8D5),
-
+        backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
-
         elevation: 0,
-
         actions: [
           _buildLocationDropdown(),
-
           const SizedBox(width: 8),
-
           _buildPrinterDropdown(),
-
           const SizedBox(width: 10),
         ],
       ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+        child: Column(
+          children: [
+            _buildTopArea(),
+            const SizedBox(height: 6),
+            Expanded(child: _buildMainArea()),
+          ],
+        ),
+      ),
+    );
+  }
 
-      body: LayoutBuilder(
-        builder: (
-            context,
-            constraints,
-            ) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+  // ============================================================
+  // MOBILE — stacked scroll layout, same features
+  // ============================================================
 
-            child: Column(
+  Widget _buildMobileScaffold(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        title: const Text(
+          'Sales Bill',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color(0xFFD5D8D5),
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildLocationDropdown(fullWidth: true),
+            const SizedBox(height: 6),
+            _buildPrinterDropdown(fullWidth: true),
+            const SizedBox(height: 8),
+            _buildBillDetails(mobile: true),
+            const SizedBox(height: 8),
+            _buildCustomerDetails(),
+            const SizedBox(height: 10),
+            _buildRateQtyAmount(mobile: true),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ==================================================
-                // TOP AREA
-                // ==================================================
-
-                _buildTopArea(),
-
-                const SizedBox(height: 6),
-
-                Expanded(
-                  child: _buildMainArea(),
-                ),
+                _topActionButton('MODIFY', _modifyItem, mobile: true),
+                const SizedBox(width: 8),
+                _topActionButton('DELETE', _deleteItem, mobile: true),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 10),
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.28,
+              child: _buildItemTable(mobile: true),
+            ),
+            const SizedBox(height: 10),
+            _buildTotals(pinToBottom: false),
+          ],
+        ),
       ),
     );
   }
@@ -1050,9 +1084,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // LOCATION DROPDOWN
   // ============================================================
 
-  Widget _buildLocationDropdown() {
+  Widget _buildLocationDropdown({bool fullWidth = false}) {
     return SizedBox(
-      width: 145,
+      width: fullWidth ? double.infinity : 145,
       height: 40,
       child: DropdownButtonFormField<String>(
         value: _selectedLocation,
@@ -1105,9 +1139,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // PRINTER DROPDOWN
   // ============================================================
 
-  Widget _buildPrinterDropdown() {
+  Widget _buildPrinterDropdown({bool fullWidth = false}) {
     return SizedBox(
-      width: 205,
+      width: fullWidth ? double.infinity : 205,
       height: 40,
       child: DropdownButtonFormField<String>(
         value: _printer,
@@ -1179,7 +1213,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // BILL DETAILS
   // ============================================================
 
-  Widget _buildBillDetails() {
+  Widget _buildBillDetails({bool mobile = false}) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
@@ -1357,7 +1391,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
           const SizedBox(height: 4),
 
-          _buildButtons(),
+          _buildButtons(mobile: mobile),
         ],
       ),
     );
@@ -1367,13 +1401,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // BUTTONS
   // ============================================================
 
-  Widget _buildButtons() {
+  Widget _buildButtons({bool mobile = false}) {
+    final buttonHeight = mobile ? 32.0 : 25.0;
+    final fontSize = mobile ? 10.0 : 8.5;
+    final horizontalPadding = mobile ? 10.0 : 7.0;
+
     Widget button(
         String text,
         VoidCallback onPressed,
         ) {
       return SizedBox(
-        height: 25,
+        height: buttonHeight,
 
         child: ElevatedButton(
           onPressed: onPressed,
@@ -1387,19 +1425,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             Colors.white,
 
             padding:
-            const EdgeInsets
+            EdgeInsets
                 .symmetric(
-              horizontal: 7,
+              horizontal: horizontalPadding,
             ),
 
             minimumSize:
-            const Size(0, 25),
+            Size(0, buttonHeight),
 
             shape:
             RoundedRectangleBorder(
               borderRadius:
               BorderRadius.circular(
-                2,
+                mobile ? 4 : 2,
               ),
             ),
           ),
@@ -1407,8 +1445,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           child: Text(
             text,
             style:
-            const TextStyle(
-              fontSize: 8.5,
+            TextStyle(
+              fontSize: fontSize,
               fontWeight:
               FontWeight.bold,
             ),
@@ -1418,8 +1456,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     }
 
     return Wrap(
-      spacing: 2,
-      runSpacing: 2,
+      spacing: mobile ? 4 : 2,
+      runSpacing: mobile ? 4 : 2,
+      alignment: mobile ? WrapAlignment.center : WrapAlignment.start,
       children: [
         button('PRINT', _printBill),
         button('NEW', _newBill),
@@ -1575,9 +1614,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     ValueChanged<String>? onChanged,
     VoidCallback? onSubmitted,
     bool readOnly = false,
+    bool fullWidth = false,
   }) {
     return _buildEntryBox(
       label: label,
+      fullWidth: fullWidth,
       child: TextField(
         controller: controller,
         focusNode: focusNode,
@@ -1599,7 +1640,45 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  Widget _buildRateQtyAmount() {
+  Widget _buildRateQtyAmount({bool mobile = false}) {
+    if (mobile) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: _buildEntryField(
+              label: 'RATE',
+              controller: _rateController,
+              focusNode: _rateFocus,
+              onChanged: _rateChanged,
+              onSubmitted: _rateSubmitted,
+              fullWidth: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildEntryField(
+              label: 'QTY',
+              controller: _qtyController,
+              focusNode: _qtyFocus,
+              onChanged: _qtyChanged,
+              onSubmitted: _qtySubmitted,
+              fullWidth: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildEntryField(
+              label: 'AMOUNT',
+              controller: _amountController,
+              readOnly: true,
+              fullWidth: true,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1632,9 +1711,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildEntryBox({
     required String label,
     required Widget child,
+    bool fullWidth = false,
   }) {
     return SizedBox(
-      width: _entryBoxWidth,
+      width: fullWidth ? double.infinity : _entryBoxWidth,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1655,7 +1735,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           const SizedBox(height: 2),
           SizedBox(
             height: _entryBoxHeight,
-            width: _entryBoxWidth,
+            width: fullWidth ? double.infinity : _entryBoxWidth,
             child: ClipRect(
               child: child,
             ),
@@ -1671,11 +1751,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _topActionButton(
       String text,
-      VoidCallback onPressed,
-      ) {
+      VoidCallback onPressed, {
+        bool mobile = false,
+      }) {
     return SizedBox(
-      width: 64,
-      height: _entryBoxHeight,
+      width: mobile ? 88 : 64,
+      height: mobile ? 44 : _entryBoxHeight,
 
       child: ElevatedButton(
         onPressed: onPressed,
@@ -1702,8 +1783,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         child: Text(
           text,
           style:
-          const TextStyle(
-            fontSize: 8.5,
+          TextStyle(
+            fontSize: mobile ? 10 : 8.5,
             fontWeight:
             FontWeight.bold,
           ),
@@ -1769,10 +1850,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // S.NO | QTY | RATE | AMOUNT | T AMT |
   // CGST % | SGST % | IGST
   // ============================================================
-  Widget _buildItemTable() {
+  Widget _buildItemTable({bool mobile = false}) {
     final bool showTax = _items.isNotEmpty;
+    const double mobileTableWidth = 590;
 
-    return Container(
+    Widget table = Container(
       decoration: BoxDecoration(
         border: Border.all(color: borderColor),
         color: backgroundColor,
@@ -1794,6 +1876,23 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ],
       ),
+    );
+
+    if (!mobile) {
+      return table;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: mobileTableWidth,
+            height: constraints.maxHeight,
+            child: table,
+          ),
+        );
+      },
     );
   }  // ============================================================
   // TABLE HEADER
@@ -1928,11 +2027,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // TOTALS
   // ============================================================
 
-  Widget _buildTotals() {
+  Widget _buildTotals({bool pinToBottom = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Spacer(),
+        if (pinToBottom) const Spacer(),
         _totalField('', _format(_totalQty)),
         const SizedBox(height: 3),
         _totalField('Total Amt', _format(_totalAmount)),
