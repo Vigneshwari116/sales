@@ -93,6 +93,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final TextEditingController _qtyController =
   TextEditingController(text: '0');
 
+  final TextEditingController _amountController =
+  TextEditingController(text: '0');
+
   final FocusNode _rateFocus = FocusNode();
 
   final FocusNode _qtyFocus = FocusNode();
@@ -982,6 +985,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _updateAmountDisplay();
+
     return Scaffold(
       backgroundColor: backgroundColor,
 
@@ -1543,61 +1548,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // RATE / QTY / AMOUNT
   // ============================================================
 
-  Widget _buildRateQtyAmount() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        _buildEntryBox(
-          label: 'RATE',
-          child: TextField(
-            controller: _rateController,
-            focusNode: _rateFocus,
-            textAlign: TextAlign.center,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-            ],
-            onChanged: _rateChanged,
-            onSubmitted: (_) => _rateSubmitted(),
-            decoration: _entryDecoration(),
-            style: const TextStyle(fontSize: 15, height: 1),
-          ),
-        ),
-        const SizedBox(width: 12),
-        _buildEntryBox(
-          label: 'QTY',
-          child: TextField(
-            controller: _qtyController,
-            focusNode: _qtyFocus,
-            textAlign: TextAlign.center,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-            ],
-            onChanged: _qtyChanged,
-            onSubmitted: (_) => _qtySubmitted(),
-            decoration: _entryDecoration(),
-            style: const TextStyle(fontSize: 15, height: 1),
-          ),
-        ),
-        const SizedBox(width: 12),
-        _buildEntryBox(
-          label: 'AMOUNT',
-          child: Container(
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: borderColor),
-            ),
-            child: Text(
-              _format(_currentAmount),
-              style: const TextStyle(fontSize: 15, height: 1),
-            ),
-          ),
-        ),
-      ],
-    );
+  void _updateAmountDisplay() {
+    final text = _format(_currentAmount);
+    if (_amountController.text != text) {
+      _amountController.text = text;
+    }
   }
 
   InputDecoration _entryDecoration() {
@@ -1606,7 +1561,71 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       filled: true,
       fillColor: Colors.white,
       border: OutlineInputBorder(),
-      contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      enabledBorder: OutlineInputBorder(),
+      focusedBorder: OutlineInputBorder(),
+      disabledBorder: OutlineInputBorder(),
+      contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 11),
+    );
+  }
+
+  Widget _buildEntryField({
+    required String label,
+    required TextEditingController controller,
+    FocusNode? focusNode,
+    ValueChanged<String>? onChanged,
+    VoidCallback? onSubmitted,
+    bool readOnly = false,
+  }) {
+    return _buildEntryBox(
+      label: label,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        readOnly: readOnly,
+        showCursor: !readOnly,
+        enableInteractiveSelection: !readOnly,
+        textAlign: TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: readOnly
+            ? null
+            : [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              ],
+        onChanged: onChanged,
+        onSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
+        decoration: _entryDecoration(),
+        style: const TextStyle(fontSize: 15, height: 1),
+      ),
+    );
+  }
+
+  Widget _buildRateQtyAmount() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _buildEntryField(
+          label: 'RATE',
+          controller: _rateController,
+          focusNode: _rateFocus,
+          onChanged: _rateChanged,
+          onSubmitted: _rateSubmitted,
+        ),
+        const SizedBox(width: 12),
+        _buildEntryField(
+          label: 'QTY',
+          controller: _qtyController,
+          focusNode: _qtyFocus,
+          onChanged: _qtyChanged,
+          onSubmitted: _qtySubmitted,
+        ),
+        const SizedBox(width: 12),
+        _buildEntryField(
+          label: 'AMOUNT',
+          controller: _amountController,
+          readOnly: true,
+        ),
+      ],
     );
   }
 
@@ -1637,47 +1656,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           SizedBox(
             height: _entryBoxHeight,
             width: _entryBoxWidth,
-            child: child,
+            child: ClipRect(
+              child: child,
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAmountDisplayField() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(
-          height: 18,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: Text(
-              'AMOUNT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                height: 1,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          height: _entryBoxHeight,
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: borderColor),
-          ),
-          child: Text(
-            _format(_currentAmount),
-            style: const TextStyle(fontSize: 15, height: 1),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1725,102 +1709,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  // ============================================================
-  // BIG NUMBER FIELD
-  // ============================================================
-
-  Widget _buildBigNumberField({
-    required String label,
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required ValueChanged<String> onChanged,
-    required VoidCallback onSubmitted,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-
-      children: [
-        SizedBox(
-          height: 18,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: Text(
-              label,
-              style:
-              const TextStyle(
-                fontWeight:
-                FontWeight.bold,
-                fontSize: 16,
-                height: 1,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 2),
-
-        SizedBox(
-          height: _entryBoxHeight,
-
-          child: TextField(
-            controller: controller,
-
-            focusNode: focusNode,
-
-            textAlign:
-            TextAlign.right,
-
-            keyboardType:
-            const TextInputType
-                .numberWithOptions(
-              decimal: true,
-            ),
-
-            inputFormatters: [
-              FilteringTextInputFormatter
-                  .allow(
-                RegExp(
-                  r'^\d*\.?\d*',
-                ),
-              ),
-            ],
-
-            onChanged: onChanged,
-
-            onSubmitted: (_) {
-              onSubmitted();
-            },
-
-            decoration:
-            const InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor:
-              Colors.white,
-
-              border:
-              OutlineInputBorder(),
-
-              contentPadding:
-              EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 10,
-              ),
-            ),
-
-            style:
-            const TextStyle(
-              fontSize: 15,
-              height: 1,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
