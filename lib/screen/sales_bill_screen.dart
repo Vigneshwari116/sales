@@ -78,7 +78,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   final TextEditingController _customerNameController =
-  TextEditingController(text: 'CASH');
+  TextEditingController();
 
   final TextEditingController _mobileController =
   TextEditingController();
@@ -562,7 +562,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     _paymentMode = 'CASH';
 
-    _customerNameController.text = 'CASH';
+    _customerNameController.text = '';
 
     _mobileController.clear();
 
@@ -842,7 +842,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _rateController.text = '0';
       _qtyController.text = '0';
 
-      _customerNameController.text = 'CASH';
+      _customerNameController.text = '';
       _mobileController.clear();
 
       _paymentMode = 'CASH';
@@ -1018,12 +1018,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             constraints,
             ) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(
-              8,
-              6,
-              8,
-              5,
-            ),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
 
             child: Column(
               children: [
@@ -1453,16 +1448,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildCustomerDetails() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(
-          color: borderColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
-
-      padding:
-      const EdgeInsets.all(7),
-
+      padding: const EdgeInsets.all(7),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            'Customer Details',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 5),
           Row(
             children: [
               const SizedBox(
@@ -1563,7 +1559,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Spacer(flex: 4),
         SizedBox(
           width: _entryBoxWidth,
           child: _buildBigNumberField(
@@ -1590,10 +1585,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           width: _entryBoxWidth,
           child: _buildAmountDisplayField(),
         ),
-        const SizedBox(width: 8),
-        _topActionButton('MODIFY', _modifyItem),
-        const SizedBox(width: 4),
-        _topActionButton('DELETE', _deleteItem),
       ],
     );
   }
@@ -1787,15 +1778,24 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return _buildItemTable(maxHeight: constraints.maxHeight);
-            },
+          flex: 6,
+          child: _buildItemTable(),
+        ),
+        const SizedBox(width: 6),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _topActionButton('MODIFY', _modifyItem),
+              const SizedBox(height: 4),
+              _topActionButton('DELETE', _deleteItem),
+            ],
           ),
         ),
-        const SizedBox(width: 7),
+        const SizedBox(width: 6),
         SizedBox(
-          width: 215,
+          width: 185,
           child: _buildTotals(),
         ),
       ],
@@ -1812,14 +1812,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // S.NO | QTY | RATE | AMOUNT | T AMT |
   // CGST % | SGST % | IGST
   // ============================================================
-  Widget _buildItemTable({required double maxHeight}) {
+  Widget _buildItemTable() {
     final bool showTax = _items.isNotEmpty;
-    const double headerHeight = 32;
-    const double rowHeight = 34;
-    final int usedRows = _items.length;
-    final int targetRows =
-        ((maxHeight - headerHeight) / rowHeight).floor().clamp(1, 30);
-    final int emptyRows = (targetRows - usedRows).clamp(0, 30);
 
     return Container(
       decoration: BoxDecoration(
@@ -1830,29 +1824,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       child: Column(
         children: [
           _buildTableHeader(showTax),
-          ...List.generate(usedRows, (index) => _buildTableRow(index, showTax)),
-          ...List.generate(emptyRows, (_) => _buildEmptyTableRow(showTax)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyTableRow(bool showTax) {
-    return Container(
-      height: 34,
-      color: backgroundColor,
-      child: Row(
-        children: [
-          _tableDataCell('', 55),
-          _tableDataCell('', 65),
-          _tableDataCell('', 75),
-          _tableDataCell('', 95),
-          _tableDataCell('', 95, last: !showTax),
-          if (showTax) ...[
-            _tableDataCell('', 70),
-            _tableDataCell('', 70),
-            _tableDataCell('', 65, last: true),
-          ],
+          Expanded(
+            child: _items.isEmpty
+                ? ColoredBox(color: backgroundColor)
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      return _buildTableRow(index, showTax);
+                    },
+                  ),
+          ),
         ],
       ),
     );
@@ -1991,137 +1973,55 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildTotals() {
     return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.stretch,
-
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _totalField(
-          '',
-          _format(_totalQty),
-        ),
-
-        const SizedBox(height: 4),
-
-        _totalField(
-          'Total Amt',
-          _format(_totalAmount),
-        ),
-
-        const SizedBox(height: 4),
-
-        _totalField(
-          'CGST',
-          _format(_totalCgst),
-        ),
-
-        const SizedBox(height: 4),
-
-        _totalField(
-          'SGST',
-          _format(_totalSgst),
-        ),
-
-        const SizedBox(height: 4),
-
-        _totalField(
-          'IGST',
-          _format(_totalIgst),
-        ),
-
-        const SizedBox(height: 5),
-
-        // ======================================================
-        // GRAND TOTAL
-        // ======================================================
-
+        _totalField('', _format(_totalQty)),
+        const SizedBox(height: 3),
+        _totalField('Total Amt', _format(_totalAmount)),
+        const SizedBox(height: 3),
+        _totalField('CGST', _format(_totalCgst)),
+        const SizedBox(height: 3),
+        _totalField('SGST', _format(_totalSgst)),
+        const SizedBox(height: 3),
+        _totalField('IGST', _format(_totalIgst)),
+        const Spacer(),
         const Text(
           'Grand Total',
-          style:
-          TextStyle(
-            fontSize: 12,
-            fontWeight:
-            FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
-
-        const SizedBox(height: 3),
-
+        const SizedBox(height: 2),
         SizedBox(
-          height: 68,
-
+          height: 60,
           child: Container(
             color: Colors.white,
-
-            alignment:
-            Alignment.centerRight,
-
-            padding:
-            const EdgeInsets
-                .symmetric(
-              horizontal: 12,
-            ),
-
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               _format(_grandTotal),
-
-              style:
-              const TextStyle(
-                fontSize: 29,
-                fontWeight:
-                FontWeight.bold,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ),
-
-        const SizedBox(height: 5),
-
-        // ======================================================
-        // AMOUNT IN WORDS
-        //
-        // SMALL / HALF WIDTH
-        // ======================================================
-
-        Align(
-          alignment:
-          Alignment.centerRight,
-
-          child: SizedBox(
-            width: 310,
-            height: 30,
-
-            child: Container(
-              color: Colors.white,
-
-              alignment:
-              Alignment.centerRight,
-
-              padding:
-              const EdgeInsets
-                  .symmetric(
-                horizontal: 7,
-              ),
-
-              child: FittedBox(
-                fit:
-                BoxFit.scaleDown,
-
-                alignment:
-                Alignment.centerRight,
-
-                child: Text(
-                  amountInWords(
-                    _grandTotal,
-                  ),
-
-                  maxLines: 1,
-
-                  style:
-                  const TextStyle(
-                    fontSize: 10,
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
+        const SizedBox(height: 3),
+        SizedBox(
+          height: 28,
+          child: Container(
+            color: Colors.white,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                amountInWords(_grandTotal),
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),

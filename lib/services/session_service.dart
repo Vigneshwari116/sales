@@ -90,7 +90,7 @@ class SessionService {
       billNo: prefs.getInt(_billNoKey) ?? 1,
       billDate: billDate,
       paymentMode: prefs.getString(_paymentModeKey) ?? 'CASH',
-      customerName: prefs.getString(_customerNameKey) ?? 'CASH',
+      customerName: prefs.getString(_customerNameKey) ?? '',
       mobile: prefs.getString(_mobileKey) ?? '',
       items: items,
       billSaved: prefs.getBool(_billSavedKey) ?? false,
