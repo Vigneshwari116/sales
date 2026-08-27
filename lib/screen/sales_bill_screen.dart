@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/bill_print_service.dart';
+import 'package:sales/services/session_service.dart';
 
 import 'bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
@@ -30,6 +31,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   static const Color headerColor = Color(0xFFFFF5C5);
   static const Color borderColor = Color(0xFF888888);
   static const Color billNoColor = Color(0xFF7FE8E8);
+  static const double _entryBoxWidth = 100;
+  static const double _entryBoxHeight = 42;
 
   // ============================================================
   // LOCATIONS
@@ -131,11 +134,51 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateController.text = '0';
     _qtyController.text = '0';
 
-    _loadBillNumber();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
+    _restoreSessionOrLoadBill().then((_) {
+      if (mounted) {
+        _focusRate();
+      }
     });
+  }
+
+  Future<void> _restoreSessionOrLoadBill() async {
+    final session = await SessionService.loadBillSession();
+
+    if (!mounted) return;
+
+    if (session != null) {
+      setState(() {
+        _selectedLocation = session.location;
+        _billNo = session.billNo;
+        _billDate = session.billDate;
+        _paymentMode = session.paymentMode;
+        _customerNameController.text = session.customerName;
+        _mobileController.text = session.mobile;
+        _items
+          ..clear()
+          ..addAll(session.items);
+        _billSaved = session.billSaved;
+        _selectedIndex = null;
+      });
+      return;
+    }
+
+    await _loadBillNumber();
+  }
+
+  Future<void> _persistSession() async {
+    await SessionService.saveBillSession(
+      location: _selectedLocation,
+      billNo: _billNo,
+      billDate: _billDate,
+      paymentMode: _paymentMode,
+      customerName: _customerNameController.text.trim().isEmpty
+          ? 'CASH'
+          : _customerNameController.text.trim(),
+      mobile: _mobileController.text.trim(),
+      items: List<BillItem>.from(_items),
+      billSaved: _billSaved,
+    );
   }
 
   // ============================================================
@@ -403,6 +446,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _qtyController.text = '0';
     });
 
+    _persistSession();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusRate();
     });
@@ -475,6 +520,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _rateController.text = '0';
       _qtyController.text = '0';
     });
+
+    _persistSession();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusRate();
@@ -554,6 +601,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _clearCurrentBill();
     });
 
+    _persistSession();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusRate();
     });
@@ -598,6 +647,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     }
 
     _applyBill(result.data!);
+    _persistSession();
     _showMessage('Loaded Bill ${result.data!.billNo}');
   }
 
@@ -663,6 +713,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     setState(() {
       _clearCurrentBill();
     });
+
+    _persistSession();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusRate();
@@ -750,12 +802,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // EXIT
   // ============================================================
 
-  void _exitScreen() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(),
-      ),
+  void _exitScreen() async {
+    await _persistSession();
+    await SessionService.clearLogin();
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
     );
   }
 
@@ -1508,8 +1563,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(
-          flex: 3,
+        const Spacer(flex: 4),
+        SizedBox(
+          width: _entryBoxWidth,
           child: _buildBigNumberField(
             label: 'RATE',
             controller: _rateController,
@@ -1518,9 +1574,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             onSubmitted: _rateSubmitted,
           ),
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          flex: 3,
+        const SizedBox(width: 8),
+        SizedBox(
+          width: _entryBoxWidth,
           child: _buildBigNumberField(
             label: 'QTY',
             controller: _qtyController,
@@ -1529,48 +1585,52 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             onSubmitted: _qtySubmitted,
           ),
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          flex: 4,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(
-                height: 18,
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Text(
-                    'AMOUNT',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                height: 40,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 9),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: borderColor),
-                ),
-                child: Text(
-                  _format(_currentAmount),
-                  style: const TextStyle(fontSize: 15, height: 1),
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: _entryBoxWidth,
+          child: _buildAmountDisplayField(),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
         _topActionButton('MODIFY', _modifyItem),
         const SizedBox(width: 4),
         _topActionButton('DELETE', _deleteItem),
+      ],
+    );
+  }
+
+  Widget _buildAmountDisplayField() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(
+          height: 18,
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              'AMOUNT',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          height: _entryBoxHeight,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: borderColor),
+          ),
+          child: Text(
+            _format(_currentAmount),
+            style: const TextStyle(fontSize: 15, height: 1),
+          ),
+        ),
       ],
     );
   }
@@ -1585,7 +1645,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       ) {
     return SizedBox(
       width: 64,
-      height: 40,
+      height: _entryBoxHeight,
 
       child: ElevatedButton(
         onPressed: onPressed,
@@ -1659,7 +1719,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         const SizedBox(height: 2),
 
         SizedBox(
-          height: 40,
+          height: _entryBoxHeight,
 
           child: TextField(
             controller: controller,
@@ -1724,18 +1784,18 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildMainArea() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          flex: 3,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: _buildItemTable(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return _buildItemTable(maxHeight: constraints.maxHeight);
+            },
           ),
         ),
         const SizedBox(width: 7),
-        Expanded(
-          flex: 2,
+        SizedBox(
+          width: 215,
           child: _buildTotals(),
         ),
       ],
@@ -1752,27 +1812,48 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // S.NO | QTY | RATE | AMOUNT | T AMT |
   // CGST % | SGST % | IGST
   // ============================================================
-  Widget _buildItemTable() {
+  Widget _buildItemTable({required double maxHeight}) {
     final bool showTax = _items.isNotEmpty;
-    final double minWidth = showTax ? 595.0 : 385.0;
+    const double headerHeight = 32;
+    const double rowHeight = 34;
+    final int usedRows = _items.length;
+    final int targetRows =
+        ((maxHeight - headerHeight) / rowHeight).floor().clamp(1, 30);
+    final int emptyRows = (targetRows - usedRows).clamp(0, 30);
 
-    return SizedBox(
-      width: minWidth,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: borderColor),
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTableHeader(showTax),
-            ...List.generate(
-              _items.length,
-              (index) => _buildTableRow(index, showTax),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor),
+        color: backgroundColor,
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        children: [
+          _buildTableHeader(showTax),
+          ...List.generate(usedRows, (index) => _buildTableRow(index, showTax)),
+          ...List.generate(emptyRows, (_) => _buildEmptyTableRow(showTax)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyTableRow(bool showTax) {
+    return Container(
+      height: 34,
+      color: backgroundColor,
+      child: Row(
+        children: [
+          _tableDataCell('', 55),
+          _tableDataCell('', 65),
+          _tableDataCell('', 75),
+          _tableDataCell('', 95),
+          _tableDataCell('', 95, last: !showTax),
+          if (showTax) ...[
+            _tableDataCell('', 70),
+            _tableDataCell('', 70),
+            _tableDataCell('', 65, last: true),
           ],
-        ),
+        ],
       ),
     );
   }  // ============================================================
@@ -2139,9 +2220,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void dispose() {
     _rateTimer?.cancel();
     _qtyTimer?.cancel();
+    _persistSession();
 
-    _customerNameController
-        .dispose();
+    _customerNameController.dispose();
 
     _mobileController.dispose();
 

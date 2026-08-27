@@ -27,13 +27,18 @@ class BillPrintService {
       lineSpacing: 1.2,
     );
 
+    final lineCount = text.split('\n').length;
+    final heightMm = (lineCount * 4.2 + 12).clamp(100.0, 600.0);
+    final pageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      heightMm * PdfPageFormat.mm,
+      marginAll: 4 * PdfPageFormat.mm,
+    );
+
     doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.roll80,
-        margin: const pw.EdgeInsets.all(8),
-        build: (context) => [
-          pw.Text(text, style: style),
-        ],
+      pw.Page(
+        pageFormat: pageFormat,
+        build: (context) => pw.Text(text, style: style),
       ),
     );
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sales/api/auth%20api.dart';
+import 'package:sales/services/session_service.dart';
 import 'sales_bill_screen.dart';
 
 /// Login gate in front of the Sales Bill screen.
@@ -41,6 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     if (result.ok) {
+      await SessionService.saveLogin(_userCtrl.text.trim());
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SalesBillScreen()),
       );
