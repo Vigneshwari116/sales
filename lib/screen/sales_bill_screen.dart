@@ -1030,18 +1030,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
                 const SizedBox(height: 6),
 
-                // ==================================================
-                // RATE QTY AMOUNT
-                // ==================================================
-
-                _buildRateQtyAmount(),
-
-                const SizedBox(height: 6),
-
-                // ==================================================
-                // MAIN AREA
-                // ==================================================
-
                 Expanded(
                   child: _buildMainArea(),
                 ),
@@ -1557,35 +1545,102 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildRateQtyAmount() {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        SizedBox(
-          width: _entryBoxWidth,
-          child: _buildBigNumberField(
-            label: 'RATE',
+        _buildEntryBox(
+          label: 'RATE',
+          child: TextField(
             controller: _rateController,
             focusNode: _rateFocus,
+            textAlign: TextAlign.center,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
             onChanged: _rateChanged,
-            onSubmitted: _rateSubmitted,
+            onSubmitted: (_) => _rateSubmitted(),
+            decoration: _entryDecoration(),
+            style: const TextStyle(fontSize: 15, height: 1),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: _entryBoxWidth,
-          child: _buildBigNumberField(
-            label: 'QTY',
+        const SizedBox(width: 12),
+        _buildEntryBox(
+          label: 'QTY',
+          child: TextField(
             controller: _qtyController,
             focusNode: _qtyFocus,
+            textAlign: TextAlign.center,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
             onChanged: _qtyChanged,
-            onSubmitted: _qtySubmitted,
+            onSubmitted: (_) => _qtySubmitted(),
+            decoration: _entryDecoration(),
+            style: const TextStyle(fontSize: 15, height: 1),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: _entryBoxWidth,
-          child: _buildAmountDisplayField(),
+        const SizedBox(width: 12),
+        _buildEntryBox(
+          label: 'AMOUNT',
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: borderColor),
+            ),
+            child: Text(
+              _format(_currentAmount),
+              style: const TextStyle(fontSize: 15, height: 1),
+            ),
+          ),
         ),
       ],
+    );
+  }
+
+  InputDecoration _entryDecoration() {
+    return const InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(),
+      contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+    );
+  }
+
+  Widget _buildEntryBox({
+    required String label,
+    required Widget child,
+  }) {
+    return SizedBox(
+      width: _entryBoxWidth,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 18,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            height: _entryBoxHeight,
+            width: _entryBoxWidth,
+            child: child,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1779,11 +1834,23 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       children: [
         Expanded(
           flex: 6,
-          child: _buildItemTable(),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Center(
+                  child: _buildRateQtyAmount(),
+                ),
+              ),
+              Expanded(
+                child: _buildItemTable(),
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: 6),
         Padding(
-          padding: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.only(top: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
