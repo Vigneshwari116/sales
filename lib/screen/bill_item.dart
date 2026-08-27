@@ -103,13 +103,36 @@ class BillItem {
   BillItem copyWith({
     double? qty,
     double? rate,
+    double? cgstPct,
+    double? sgstPct,
+    double? igstPct,
   }) {
     return BillItem(
       qty: qty ?? this.qty,
       rate: rate ?? this.rate,
-      cgstPct: cgstPct,
-      sgstPct: sgstPct,
-      igstPct: igstPct,
+      cgstPct: cgstPct ?? this.cgstPct,
+      sgstPct: sgstPct ?? this.sgstPct,
+      igstPct: igstPct ?? this.igstPct,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'qty': qty,
+      'rate': rate,
+      'cgstPct': cgstPct,
+      'sgstPct': sgstPct,
+      'igstPct': igstPct,
+    };
+  }
+
+  factory BillItem.fromJson(Map<String, dynamic> json) {
+    return BillItem(
+      qty: (json['qty'] as num).toDouble(),
+      rate: (json['rate'] as num).toDouble(),
+      cgstPct: (json['cgstPct'] as num?)?.toDouble() ?? 2.5,
+      sgstPct: (json['sgstPct'] as num?)?.toDouble() ?? 2.5,
+      igstPct: (json['igstPct'] as num?)?.toDouble() ?? 0,
     );
   }
 }

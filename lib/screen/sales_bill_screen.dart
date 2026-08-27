@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sales/api/sales_api.dart';
+import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/bill_print_service.dart';
+
 import 'bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
+import 'sales_ledger_screen.dart';
 
 class SalesBillScreen extends StatefulWidget {
   const SalesBillScreen({super.key});
@@ -44,6 +49,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   // Whether the bill has been saved/completed.
   bool _billSaved = false;
+
+  bool _busy = false;
 
   // ============================================================
   // BILL DATE
@@ -159,11 +166,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Future<void> _loadBillNumber() async {
+    final serverResult =
+        await SalesApi.getNextBillNumber(_selectedLocation);
+
+    if (serverResult.ok && serverResult.data != null) {
+      if (!mounted) return;
+      setState(() {
+        _billNo = serverResult.data!;
+      });
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
-
     final key = _billNumberKey(_selectedLocation);
-
-    // First bill for every location starts from 1.
     final lastBillNumber = prefs.getInt(key) ?? 0;
 
     if (!mounted) return;
@@ -559,18 +574,31 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Future<void> _previousBill() async {
-    if (_billNo <= 1) {
-      _showMessage('Already at first bill');
+    if (_busy) return;
+
+    if (_items.isNotEmpty && !_billSaved) {
+      _showMessage('Save the current bill before loading previous bill');
       return;
     }
 
-    setState(() {
-      _billNo--;
-    });
+    setState(() => _busy = true);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
+    final result = await SalesApi.getPreviousBill(
+      billNo: _billNo,
+      location: _selectedLocation,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _busy = false);
+
+    if (!result.ok || result.data == null) {
+      _showMessage(result.error ?? 'No previous bill found');
+      return;
+    }
+
+    _applyBill(result.data!);
+    _showMessage('Loaded Bill ${result.data!.billNo}');
   }
 
   // ============================================================
@@ -580,18 +608,25 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Future<void> _saveBill() async {
+    if (_busy) return;
+
     if (_items.isEmpty) {
-      _showMessage(
-        'Add at least one item before saving',
-      );
+      _showMessage('Add at least one item before saving');
       return;
     }
 
-    // Your actual database save can be placed here.
-    //
-    // Example:
-    //
-    // await DBHelper.instance.insertSale(...);
+    setState(() => _busy = true);
+
+    final bill = _buildCurrentBill();
+    final result = await SalesApi.saveBill(bill);
+
+    if (!mounted) return;
+
+    if (!result.ok) {
+      setState(() => _busy = false);
+      _showMessage(result.error ?? 'Failed to save bill');
+      return;
+    }
 
     await _saveBillNumber();
 
@@ -599,23 +634,33 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     final int savedBillNo = _billNo;
 
-    setState(() {
-      _billSaved = true;
-    });
+    try {
+      final path = await BillPrintService.saveReceiptToDesktop(bill);
+      setState(() {
+        _billSaved = true;
+        _busy = false;
+      });
 
-    _showMessage(
-      'Bill $savedBillNo saved for $_selectedLocation',
-    );
+      _showMessage(
+        'Bill $savedBillNo saved. Receipt: $path',
+      );
+    } catch (e) {
+      setState(() {
+        _billSaved = true;
+        _busy = false;
+      });
+      _showMessage('Bill $savedBillNo saved on server');
+    }
 
-    // Automatically prepare next bill.
-    await Future.delayed(
-      const Duration(milliseconds: 300),
-    );
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (!mounted) return;
+
+    await _loadBillNumber();
 
     if (!mounted) return;
 
     setState(() {
-      _billNo++;
       _clearCurrentBill();
     });
 
@@ -628,17 +673,77 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // PRINT
   // ============================================================
 
-  void _printBill() {
+  Future<void> _printBill() async {
+    if (_busy) return;
+
     if (_items.isEmpty) {
-      _showMessage(
-        'Add items before printing',
-      );
+      _showMessage('Add items before printing');
       return;
     }
 
-    _showMessage(
-      'Printing Bill $_billNo',
+    setState(() => _busy = true);
+
+    try {
+      final bill = _buildCurrentBill();
+      await BillPrintService.printReceipt(
+        bill,
+        printerName: _printer,
+      );
+      if (!mounted) return;
+      _showMessage('Printing Bill $_billNo');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Print failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _printBill() async {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SalesLedgerScreen(location: _selectedLocation),
+      ),
     );
+  }
+
+  SaleBill _buildCurrentBill() {
+    return SaleBill(
+      billNo: _billNo,
+      location: _selectedLocation,
+      billDate: _billDate,
+      paymentMode: _paymentMode,
+      customerName: _customerNameController.text.trim().isEmpty
+          ? 'CASH'
+          : _customerNameController.text.trim(),
+      mobile: _mobileController.text.trim(),
+      items: List<BillItem>.from(_items),
+      totalQty: _totalQty,
+      totalAmount: _totalAmount,
+      totalCgst: _totalCgst,
+      totalSgst: _totalSgst,
+      totalIgst: _totalIgst,
+      grandTotal: _grandTotal,
+    );
+  }
+
+  void _applyBill(SaleBill bill) {
+    setState(() {
+      _billNo = bill.billNo;
+      _billDate = bill.billDate;
+      _paymentMode = bill.paymentMode;
+      _customerNameController.text = bill.customerName;
+      _mobileController.text = bill.mobile;
+      _items
+        ..clear()
+        ..addAll(bill.items);
+      _selectedIndex = null;
+      _billSaved = true;
+      _rateController.text = '0';
+      _qtyController.text = '0';
+    });
   }
 
   // ============================================================
@@ -1323,6 +1428,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         button(
           'DELETE',
           _deleteItem,
+        ),
+
+        const SizedBox(width: 2),
+
+        button(
+          'LEDGER',
+          _openLedger,
         ),
 
         const SizedBox(width: 2),
