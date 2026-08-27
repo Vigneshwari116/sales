@@ -21,6 +21,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+  bool? _serverOnline;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkServer();
+  }
+
+  Future<void> _checkServer() async {
+    final online = await AuthApi.checkServerReachable();
+    if (!mounted) return;
+    setState(() => _serverOnline = online);
+  }
 
   @override
   void dispose() {
@@ -36,7 +49,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final result = await AuthApi.login(_userCtrl.text.trim(), _passCtrl.text);
+    final result = await AuthApi.login(
+      _userCtrl.text.trim(),
+      _passCtrl.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -84,9 +100,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
+                    if (_serverOnline != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _serverOnline!
+                            ? 'Server connected'
+                            : 'Server not reachable — check Wi‑Fi / mobile data',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _serverOnline! ? Colors.green.shade800 : Colors.red,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _userCtrl,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
                       decoration: const InputDecoration(
                         labelText: 'Username',
                         border: OutlineInputBorder(),
@@ -98,6 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _passCtrl,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
                       obscureText: _obscure,
                       decoration: InputDecoration(
                         labelText: 'Password',

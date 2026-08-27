@@ -106,14 +106,15 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body || {};
+  const username = String(req.body?.username ?? '').trim();
+  const password = String(req.body?.password ?? '');
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: 'Username and password required' });
   }
 
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1 LIMIT 1',
+      'SELECT * FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1',
       [username]
     );
     const user = result.rows[0];
