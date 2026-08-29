@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/services/bill_print_service.dart';
 import 'package:sales/services/session_service.dart';
 
@@ -672,7 +673,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     setState(() => _busy = true);
 
     final bill = _buildCurrentBill();
-    final result = await SalesApi.saveBill(bill);
+    final result = await BillRepository.saveBill(bill);
 
     if (!mounted) return;
 
@@ -763,6 +764,30 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         builder: (_) => SalesLedgerScreen(location: _selectedLocation),
       ),
     );
+  }
+
+  Future<void> _syncGstData() async {
+    if (_busy) return;
+
+    setState(() => _busy = true);
+
+    final result = await SalesApi.pullGstMasterData(_selectedLocation);
+
+    if (!mounted) return;
+
+    setState(() => _busy = false);
+
+    if (result.ok) {
+      final version = result.data;
+      if (version != null && version.isNotEmpty) {
+        _showMessage('GST data synced (version $version)');
+      } else {
+        _showMessage('GST data synced');
+      }
+      return;
+    }
+
+    _showMessage(result.error ?? 'GST sync failed');
   }
 
   SaleBill _buildCurrentBill() {
@@ -1468,6 +1493,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         button('EDIT', _modifyItem),
         button('DELETE', _deleteItem),
         button('LEDGER', _openLedger),
+        button('SYNC GST', _syncGstData),
         button('EXIT', _exitScreen),
       ],
     );

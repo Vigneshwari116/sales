@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/session_service.dart';
+import 'package:sales/services/sync_service.dart';
 
-void main() => runApp(const SalesBillApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SyncService.instance.start();
+  runApp(const SalesBillApp());
+}
 
 class SalesBillApp extends StatelessWidget {
   const SalesBillApp({super.key});
