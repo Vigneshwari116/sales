@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:sales/api/api%20config.dart';
+import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 
@@ -237,17 +238,15 @@ class SalesApi {
       }
 
       final dbName = body['db_name'] as String? ?? '';
-      final expected = expectedDbNames[location];
+      final expected = AppConfig.expectedGstDbName;
 
-      if (expected == null || dbName != expected) {
+      if (dbName != expected) {
         developer.log(
           'GST sync rejected: server db_name "$dbName" does not match '
-          'expected "${expected ?? 'unknown'}" for $location',
+          'expected "$expected" for build LOCATION_CODE=${AppConfig.locationCode}',
           name: 'SalesApi',
         );
-        return SalesApiResult.failure(
-          'GST sync rejected: server database name mismatch',
-        );
+        return SalesApiResult.failure('Sync rejected: database mismatch.');
       }
 
       final version = body['version'] as String? ?? '';
@@ -271,5 +270,10 @@ class SalesApi {
     } catch (_) {
       return SalesApiResult.failure('Could not reach the server.');
     }
+  }
+
+  /// Returns true when [serverDbName] matches this build's expected GST DB.
+  static bool isGstDbNameValid(String serverDbName) {
+    return serverDbName == AppConfig.expectedGstDbName;
   }
 }

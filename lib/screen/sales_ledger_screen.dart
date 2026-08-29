@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/repositories/ledger_repository.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
@@ -20,38 +21,49 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _border = Color(0xFF888888);
 
   bool _loading = true;
-  String? _error;
-  List<LedgerEntry> _entries = [];
+  bool _syncing = false;
+  List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
 
   @override
   void initState() {
     super.initState();
     _loadLedger();
+    _syncInBackground();
   }
 
   Future<void> _loadLedger() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
 
-    final result = await SalesApi.getLedger(location: widget.location);
+    final result = await LedgerRepository.getLedger(
+      location: widget.location,
+    );
 
     if (!mounted) return;
 
-    if (result.ok && result.data != null) {
-      setState(() {
-        _entries = result.data!.entries;
-        _summary = result.data!.summary;
-        _loading = false;
-      });
-    } else {
-      setState(() {
-        _error = result.error ?? 'Could not load ledger';
-        _loading = false;
-      });
-    }
+    setState(() {
+      _entries = result.entries;
+      _summary = result.summary;
+      _loading = false;
+    });
+  }
+
+  Future<void> _syncInBackground() async {
+    setState(() => _syncing = true);
+
+    await LedgerRepository.syncWithServer(location: widget.location);
+
+    if (!mounted) return;
+
+    setState(() => _syncing = false);
+    await _loadLedger();
+  }
+
+  Future<void> _refreshLedger() async {
+    await _loadLedger();
+    await _syncInBackground();
   }
 
   String _formatMoney(double value) {
@@ -79,8 +91,17 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
         actions: [
+          if (_syncing)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           IconButton(
-            onPressed: _loadLedger,
+            onPressed: _refreshLedger,
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
           ),
@@ -88,21 +109,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: _loadLedger,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : Padding(
+          : Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
@@ -153,6 +160,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('BILLNO', 80, bold: true),
           _cell('DATE', 90, bold: true),
           _cell('', 80, bold: true),
+          _cell('SYNC', 70, bold: true),
           _cell('TOTAL', 90, bold: true, alignRight: true),
           _cell('CGST', 80, bold: true, alignRight: true),
           _cell('SGST', 80, bold: true, alignRight: true),
@@ -163,12 +171,13 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
-  Widget _dataRow(LedgerEntry entry) {
+  Widget _dataRow(LocalLedgerEntry entry) {
     return Row(
       children: [
         _cell('${entry.billNo}', 80),
         _cell(_formatDate(entry.date), 90),
         _cell(entry.paymentMode, 80),
+        _syncStatusCell(entry.syncStatus, 70),
         _cell(_formatMoney(entry.total), 90, alignRight: true),
         _cell(_formatMoney(entry.cgst), 80, alignRight: true),
         _cell(_formatMoney(entry.sgst), 80, alignRight: true),
@@ -187,6 +196,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('', 80, bold: true),
           _cell('', 90, bold: true),
           _cell('', 80, bold: true),
+          _cell('', 70, bold: true),
           _cell(_formatMoney(summary.total), 90, bold: true, alignRight: true),
           _cell(_formatMoney(summary.cgst), 80, bold: true, alignRight: true),
           _cell(_formatMoney(summary.sgst), 80, bold: true, alignRight: true),
@@ -197,6 +207,41 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
             bold: true,
             alignRight: true,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _syncStatusCell(String syncStatus, double width) {
+    var isPending = syncStatus == 'pending';
+
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: _border, width: 0.6),
+          bottom: BorderSide(color: _border, width: 0.6),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isPending ? Colors.orange : Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          if (isPending) ...[
+            const SizedBox(width: 4),
+            const Text(
+              'Pending',
+              style: TextStyle(fontSize: 9, color: Colors.orange),
+            ),
+          ],
         ],
       ),
     );

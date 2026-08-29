@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:sales/config/app_config.dart';
 import 'package:sales/models/sale_bill.dart';
 
 class LocalDb {
@@ -18,14 +19,18 @@ class LocalDb {
     return _instance!;
   }
 
+  Future<void> initialize() async {
+    await database;
+  }
+
   Future<Database> get database async {
     _database ??= await _initDb();
     return _database!;
   }
 
   Future<Database> _initDb() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'sales_local.db');
+    var dbPath = await getDatabasesPath();
+    var path = join(dbPath, '${AppConfig.locationCode}_sales.db');
 
     return openDatabase(
       path,
@@ -93,6 +98,18 @@ class LocalDb {
     );
   }
 
+  Future<List<Map<String, dynamic>>> getBillsForLedger({
+    required String location,
+  }) async {
+    var db = await database;
+    return db.query(
+      'bills',
+      where: 'location = ?',
+      whereArgs: [location],
+      orderBy: 'bill_no DESC',
+    );
+  }
+
   Future<void> markBillSynced(String localId) async {
     var db = await database;
     await db.update(
@@ -101,6 +118,74 @@ class LocalDb {
       where: 'local_id = ?',
       whereArgs: [localId],
     );
+  }
+
+  Future<void> mergeLedgerFromServer({
+    required String location,
+    required List<({
+      int billNo,
+      String date,
+      String paymentMode,
+      double total,
+      double cgst,
+      double sgst,
+      double igst,
+      double grandTotal,
+    })> entries,
+  }) async {
+    var db = await database;
+
+    for (var entry in entries) {
+      var existing = await db.query(
+        'bills',
+        where: 'location = ? AND bill_no = ?',
+        whereArgs: [location, entry.billNo],
+        limit: 1,
+      );
+
+      if (existing.isNotEmpty &&
+          existing.first['sync_status'] == 'pending') {
+        continue;
+      }
+
+      var payload = jsonEncode({
+        'billNo': entry.billNo,
+        'location': location,
+        'billDate': entry.date,
+        'paymentMode': entry.paymentMode,
+        'customerName': '',
+        'mobile': '',
+        'items': <Map<String, dynamic>>[],
+        'totalQty': 0,
+        'totalAmount': entry.total,
+        'totalCgst': entry.cgst,
+        'totalSgst': entry.sgst,
+        'totalIgst': entry.igst,
+        'grandTotal': entry.grandTotal,
+      });
+
+      if (existing.isEmpty) {
+        await db.insert('bills', {
+          'local_id': const Uuid().v4(),
+          'bill_no': entry.billNo,
+          'location': location,
+          'payload': payload,
+          'sync_status': 'synced',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        continue;
+      }
+
+      await db.update(
+        'bills',
+        {
+          'payload': payload,
+          'sync_status': 'synced',
+        },
+        where: 'local_id = ?',
+        whereArgs: [existing.first['local_id']],
+      );
+    }
   }
 
   Future<void> replaceGstMaster(List<Map<String, String>> rows) async {
