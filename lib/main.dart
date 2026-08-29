@@ -49,6 +49,10 @@ class _AppRootState extends State<AppRoot> {
       return const SalesBillScreen();
     }
 
+    if (loggedIn) {
+      await SessionService.clearLogin();
+    }
+
     return const LoginScreen();
   }
 

@@ -2,6 +2,17 @@
 
 Jewellery sales billing app with offline-first save, background sync, and runtime location selection at login.
 
+## Login
+
+Login works **fully offline** — no server call. Shared credentials (see `lib/config/local_credentials.dart`):
+
+- Username: `admin`
+- Password: `admin123`
+
+Pick a location on the login screen (`location1`–`location4`). Location is independent of the username/password check.
+
+Server sync (bills, GST) runs only after login when the device is online.
+
 ## Build
 
 One APK serves all locations — staff pick their location on the login screen:

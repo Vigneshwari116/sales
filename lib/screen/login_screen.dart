@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:sales/api/auth%20api.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'sales_bill_screen.dart';
 
-/// Login gate in front of the Sales Bill screen.
-/// Calls the Sales Bill API's /api/login endpoint (see auth_api.dart).
+/// Local login gate — credentials checked offline; location picked separately.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,15 +14,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const Color _btn = Color(0xFF9C1C1C); // same maroon as the Sales Bill buttons
+  static const Color _btn = Color(0xFF9C1C1C);
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _userCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
   bool _obscure = true;
-  bool _loading = false;
   String? _error;
-  bool? _serverOnline;
 
   final List<String> _locationCodes = const [
     'location1',
@@ -35,18 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
   String _selectedLocationCode = 'location1';
 
   @override
-  void initState() {
-    super.initState();
-    _checkServer();
-  }
-
-  Future<void> _checkServer() async {
-    final online = await AuthApi.checkServerReachable();
-    if (!mounted) return;
-    setState(() => _serverOnline = online);
-  }
-
-  @override
   void dispose() {
     _userCtrl.dispose();
     _passCtrl.dispose();
@@ -55,30 +40,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
 
-    final result = await AuthApi.login(
-      _userCtrl.text.trim(),
-      _passCtrl.text.trim(),
-    );
+    var username = _userCtrl.text.trim();
+    var password = _passCtrl.text.trim();
+
+    if (username != appUsername || password != appPassword) {
+      setState(() => _error = 'Incorrect username or password.');
+      return;
+    }
+
+    setState(() => _error = null);
+
+    await AppConfig.setLocation(_selectedLocationCode);
+    await AppSessionService.onLoginComplete();
+    await SessionService.saveLogin(username);
 
     if (!mounted) return;
-    setState(() => _loading = false);
 
-    if (result.ok) {
-      await AppConfig.setLocation(_selectedLocationCode);
-      await AppSessionService.onLoginComplete();
-      await SessionService.saveLogin(_userCtrl.text.trim());
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const SalesBillScreen()),
-      );
-    } else {
-      setState(() => _error = result.error ?? 'Login failed');
-    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const SalesBillScreen()),
+    );
   }
 
   @override
@@ -97,7 +78,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF808080)),
                 boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
                 ],
               ),
               child: Form(
@@ -111,21 +96,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text(
                       'Sales Bill Login',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    if (_serverOnline != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _serverOnline!
-                            ? 'Server connected'
-                            : 'Server not reachable — check Wi‑Fi / mobile data',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _serverOnline! ? Colors.green.shade800 : Colors.red,
-                        ),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
+                    ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<String>(
                       value: _selectedLocationCode,
@@ -143,12 +118,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       }).toList(),
-                      onChanged: _loading
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-                              setState(() => _selectedLocationCode = value);
-                            },
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _selectedLocationCode = value);
+                      },
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -161,7 +134,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 14),
@@ -176,7 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                          icon: Icon(
+                            _obscure ? Icons.visibility_off : Icons.visibility,
+                          ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
@@ -186,25 +162,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 10),
-                      Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
                     ],
                     const SizedBox(height: 20),
                     SizedBox(
                       height: 46,
                       child: ElevatedButton(
-                        onPressed: _loading ? null : _login,
+                        onPressed: _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _btn,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
-                        child: _loading
-                            ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                            : const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                        child: const Text(
+                          'LOGIN',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
                       ),
                     ),
                   ],
