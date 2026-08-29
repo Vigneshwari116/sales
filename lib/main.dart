@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:sales/db/local_db.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
+import 'package:sales/services/auto_sync_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LocalDb.instance.initialize();
   SyncService.instance.start();
+  AutoSyncService.instance.start();
   runApp(const SalesBillApp());
 }
 

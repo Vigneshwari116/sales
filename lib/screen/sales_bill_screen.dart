@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/app_config.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/services/bill_print_service.dart';
@@ -771,7 +772,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     setState(() => _busy = true);
 
-    final result = await SalesApi.pullGstMasterData(_selectedLocation);
+    final result = await SalesApi.pullGstMasterData(AppConfig.locationCode);
 
     if (!mounted) return;
 
