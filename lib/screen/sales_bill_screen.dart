@@ -8,6 +8,7 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
+import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/bill_print_service.dart';
 import 'package:sales/services/session_service.dart';
 
@@ -834,6 +835,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   void _exitScreen() async {
     await _persistSession();
+    await AppSessionService.onLogout();
+    await AppConfig.clearLocation();
     await SessionService.clearLogin();
 
     if (!mounted) return;

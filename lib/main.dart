@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:sales/db/local_db.dart';
+import 'package:sales/config/app_config.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
-import 'package:sales/services/auto_sync_service.dart';
+import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
-import 'package:sales/services/sync_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalDb.instance.initialize();
-  SyncService.instance.start();
-  AutoSyncService.instance.start();
+  await AppConfig.loadFromPrefs();
   runApp(const SalesBillApp());
 }
 
@@ -36,18 +33,29 @@ class AppRoot extends StatefulWidget {
 }
 
 class _AppRootState extends State<AppRoot> {
-  late Future<bool> _loginFuture;
+  late Future<Widget> _homeFuture;
 
   @override
   void initState() {
     super.initState();
-    _loginFuture = SessionService.isLoggedIn();
+    _homeFuture = _resolveHome();
+  }
+
+  Future<Widget> _resolveHome() async {
+    var loggedIn = await SessionService.isLoggedIn();
+
+    if (loggedIn && AppConfig.isLocationSet) {
+      await AppSessionService.onLoginComplete();
+      return const SalesBillScreen();
+    }
+
+    return const LoginScreen();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _loginFuture,
+    return FutureBuilder<Widget>(
+      future: _homeFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -56,9 +64,7 @@ class _AppRootState extends State<AppRoot> {
           );
         }
 
-        return snapshot.data!
-            ? const SalesBillScreen()
-            : const LoginScreen();
+        return snapshot.data!;
       },
     );
   }

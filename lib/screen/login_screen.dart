@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sales/api/auth%20api.dart';
+import 'package:sales/config/app_config.dart';
+import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'sales_bill_screen.dart';
 
@@ -22,6 +24,15 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _error;
   bool? _serverOnline;
+
+  final List<String> _locationCodes = const [
+    'location1',
+    'location2',
+    'location3',
+    'location4',
+  ];
+
+  String _selectedLocationCode = 'location1';
 
   @override
   void initState() {
@@ -58,6 +69,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     if (result.ok) {
+      await AppConfig.setLocation(_selectedLocationCode);
+      await AppSessionService.onLoginComplete();
       await SessionService.saveLogin(_userCtrl.text.trim());
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -114,6 +127,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                     const SizedBox(height: 20),
+                    DropdownButtonFormField<String>(
+                      value: _selectedLocationCode,
+                      decoration: const InputDecoration(
+                        labelText: 'Location',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                      ),
+                      items: _locationCodes.map((code) {
+                        return DropdownMenuItem<String>(
+                          value: code,
+                          child: Text(
+                            '${AppConfig.displayLocationNameFor(code)} ($code)',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: _loading
+                          ? null
+                          : (value) {
+                              if (value == null) return;
+                              setState(() => _selectedLocationCode = value);
+                            },
+                    ),
+                    const SizedBox(height: 14),
                     TextFormField(
                       controller: _userCtrl,
                       autocorrect: false,

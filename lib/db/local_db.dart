@@ -23,6 +23,13 @@ class LocalDb {
     await database;
   }
 
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
   Future<Database> get database async {
     _database ??= await _initDb();
     return _database!;
