@@ -1,4 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
@@ -7,6 +11,12 @@ import 'package:sales/services/session_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   await AppConfig.loadFromPrefs();
   runApp(const SalesBillApp());
 }
