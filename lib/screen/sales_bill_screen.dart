@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
@@ -39,17 +38,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   static const double _desktopBreakpoint = 900;
 
   // ============================================================
-  // LOCATIONS
+  // LOCATION (from login — not shown on screen)
   // ============================================================
 
-  final List<String> _locations = const [
-    'Location 1',
-    'Location 2',
-    'Location 3',
-    'Location 4',
-  ];
-
-  String _selectedLocation = 'Location 1';
+  late String _selectedLocation;
 
   // Current bill number.
   int _billNo = 1;
@@ -138,6 +130,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void initState() {
     super.initState();
 
+    _selectedLocation = AppConfig.displayLocationName;
     _rateController.text = '0';
     _qtyController.text = '0';
 
@@ -153,9 +146,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     if (!mounted) return;
 
-    if (session != null) {
+    if (session != null && session.location == _selectedLocation) {
       setState(() {
-        _selectedLocation = session.location;
         _billNo = session.billNo;
         _billDate = session.billDate;
         _paymentMode = session.paymentMode;
@@ -189,65 +181,18 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // LOCATION BILL NUMBER
-  // ============================================================
-
-  String _billNumberKey(String location) {
-    switch (location) {
-      case 'Location 1':
-        return 'sales_bill_number_location_1';
-
-      case 'Location 2':
-        return 'sales_bill_number_location_2';
-
-      case 'Location 3':
-        return 'sales_bill_number_location_3';
-
-      case 'Location 4':
-        return 'sales_bill_number_location_4';
-
-      default:
-        return 'sales_bill_number_location_1';
-    }
-  }
-
-  // ============================================================
-  // LOAD BILL NUMBER
+  // LOAD BILL NUMBER (from this location's local DB only)
   // ============================================================
 
   Future<void> _loadBillNumber() async {
-    final serverResult =
-        await SalesApi.getNextBillNumber(_selectedLocation);
-
-    if (serverResult.ok && serverResult.data != null) {
-      if (!mounted) return;
-      setState(() {
-        _billNo = serverResult.data!;
-      });
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final key = _billNumberKey(_selectedLocation);
-    final lastBillNumber = prefs.getInt(key) ?? 0;
+    var nextBillNo =
+        await BillRepository.getNextBillNumber(_selectedLocation);
 
     if (!mounted) return;
 
     setState(() {
-      _billNo = lastBillNumber + 1;
+      _billNo = nextBillNo;
     });
-  }
-
-  // ============================================================
-  // SAVE LAST COMPLETED BILL NUMBER
-  // ============================================================
-
-  Future<void> _saveBillNumber() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final key = _billNumberKey(_selectedLocation);
-
-    await prefs.setInt(key, _billNo);
   }
 
   // ============================================================
@@ -350,11 +295,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             double.tryParse(_qtyController.text) ?? 0;
 
         if (currentQty > 0) {
-          if (_selectedIndex != null) {
-            _updateModifiedItem();
-          } else {
-            _addItem();
-          }
+          _addItem();
         }
       },
     );
@@ -402,11 +343,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    if (_selectedIndex != null) {
-      _updateModifiedItem();
-    } else {
-      _addItem();
-    }
+    _addItem();
   }
 
   // ============================================================
@@ -461,106 +398,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // MODIFY SELECTED ITEM
-  // ============================================================
-
-  void _modifyItem() {
-    if (_selectedIndex == null) {
-      _showMessage('Select an item first');
-      return;
-    }
-
-    final BillItem item =
-    _items[_selectedIndex!];
-
-    setState(() {
-      _rateController.text =
-          _format(item.rate);
-
-      _qtyController.text =
-          _format(item.qty);
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
-  }
-
-  // ============================================================
-  // UPDATE MODIFIED ITEM
-  // ============================================================
-
-  void _updateModifiedItem() {
-    if (_selectedIndex == null) {
-      _addItem();
-      return;
-    }
-
-    final double? rate =
-    double.tryParse(_rateController.text);
-
-    final double? qty =
-    double.tryParse(_qtyController.text);
-
-    if (rate == null || rate <= 0) {
-      _showMessage('Rate must be greater than 0');
-      _focusRate();
-      return;
-    }
-
-    if (qty == null || qty <= 0) {
-      _showMessage('Quantity must be greater than 0');
-      _focusQty();
-      return;
-    }
-
-    setState(() {
-      _items[_selectedIndex!] =
-          _items[_selectedIndex!].copyWith(
-            rate: rate,
-            qty: qty,
-          );
-
-      _selectedIndex = null;
-      _billSaved = false;
-
-      _rateController.text = '0';
-      _qtyController.text = '0';
-    });
-
-    _persistSession();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
-  }
-
-  // ============================================================
-  // DELETE ITEM
-  // ============================================================
-
-  void _deleteItem() {
-    if (_selectedIndex == null) {
-      _showMessage('Select an item first');
-      return;
-    }
-
-    setState(() {
-      _items.removeAt(_selectedIndex!);
-
-      _selectedIndex = null;
-      _billSaved = false;
-
-      _rateController.text = '0';
-      _qtyController.text = '0';
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
-  }
-
-  // ============================================================
   // CLEAR CURRENT BILL
   // ============================================================
 
@@ -585,83 +422,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // NEW BILL
-  //
-  // Starts the next bill number.
-  // ============================================================
-
-  Future<void> _newBill() async {
-    // If current bill has not been saved, don't silently lose it.
-    if (_items.isNotEmpty && !_billSaved) {
-      _showMessage(
-        'Save the current bill before starting the next bill',
-      );
-      return;
-    }
-
-    await _saveBillNumber();
-
-    if (!mounted) return;
-
-    setState(() {
-      _billNo++;
-      _clearCurrentBill();
-    });
-
-    _persistSession();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
-  }
-
-  // ============================================================
-  // NEXT BILL
-  // ============================================================
-
-  Future<void> _nextBill() async {
-    await _newBill();
-  }
-
-  // ============================================================
-  // PREVIOUS BILL
-  //
-  // Only changes the displayed number.
-  // ============================================================
-
-  Future<void> _previousBill() async {
-    if (_busy) return;
-
-    if (_items.isNotEmpty && !_billSaved) {
-      _showMessage('Save the current bill before loading previous bill');
-      return;
-    }
-
-    setState(() => _busy = true);
-
-    final result = await SalesApi.getPreviousBill(
-      billNo: _billNo,
-      location: _selectedLocation,
-    );
-
-    if (!mounted) return;
-
-    setState(() => _busy = false);
-
-    if (!result.ok || result.data == null) {
-      _showMessage(result.error ?? 'No previous bill found');
-      return;
-    }
-
-    _applyBill(result.data!);
-    _persistSession();
-    _showMessage('Loaded Bill ${result.data!.billNo}');
-  }
-
-  // ============================================================
   // SAVE BILL
-  //
-  // Save current bill and automatically move to next bill.
   // ============================================================
 
   Future<void> _saveBill() async {
@@ -685,28 +446,26 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    await _saveBillNumber();
-
-    if (!mounted) return;
-
     final int savedBillNo = _billNo;
 
     try {
-      final path = await BillPrintService.saveReceiptToDesktop(bill);
-      setState(() {
-        _billSaved = true;
-        _busy = false;
-      });
-
-      _showMessage(
-        'Bill $savedBillNo saved. Receipt: $path',
+      await BillPrintService.printReceipt(
+        bill,
+        printerName: _printer,
       );
-    } catch (e) {
+      if (!mounted) return;
       setState(() {
         _billSaved = true;
         _busy = false;
       });
-      _showMessage('Bill $savedBillNo saved on server');
+      _showMessage('Bill $savedBillNo saved and printed');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _billSaved = true;
+        _busy = false;
+      });
+      _showMessage('Bill $savedBillNo saved (print failed: $e)');
     }
 
     await Future.delayed(const Duration(milliseconds: 300));
@@ -726,38 +485,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusRate();
     });
-  }
-
-  // ============================================================
-  // PRINT
-  // ============================================================
-
-  Future<void> _printBill() async {
-    if (_busy) return;
-
-    if (_items.isEmpty) {
-      _showMessage('Add items before printing');
-      return;
-    }
-
-    setState(() => _busy = true);
-
-    try {
-      final bill = _buildCurrentBill();
-      await BillPrintService.printReceipt(
-        bill,
-        printerName: _printer,
-      );
-      if (!mounted) return;
-      _showMessage('Printing Bill $_billNo (${bill.items.length} items)');
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage('Print failed: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
   }
 
   void _openLedger() {
@@ -812,23 +539,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  void _applyBill(SaleBill bill) {
-    setState(() {
-      _billNo = bill.billNo;
-      _billDate = bill.billDate;
-      _paymentMode = bill.paymentMode;
-      _customerNameController.text = bill.customerName;
-      _mobileController.text = bill.mobile;
-      _items
-        ..clear()
-        ..addAll(bill.items);
-      _selectedIndex = null;
-      _billSaved = true;
-      _rateController.text = '0';
-      _qtyController.text = '0';
-    });
-  }
-
   // ============================================================
   // EXIT
   // ============================================================
@@ -845,49 +555,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
     );
-  }
-
-  // ============================================================
-  // LOCATION CHANGE
-  // ============================================================
-
-  Future<void> _changeLocation(
-      String location) async {
-    if (location == _selectedLocation) {
-      return;
-    }
-
-    // Don't destroy an unsaved bill.
-    if (_items.isNotEmpty && !_billSaved) {
-      _showMessage(
-        'Save the current bill before changing location',
-      );
-      return;
-    }
-
-    setState(() {
-      _selectedLocation = location;
-
-      _items.clear();
-
-      _selectedIndex = null;
-
-      _rateController.text = '0';
-      _qtyController.text = '0';
-
-      _customerNameController.text = '';
-      _mobileController.clear();
-
-      _paymentMode = 'CASH';
-
-      _billDate = DateTime.now();
-    });
-
-    await _loadBillNumber();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
   }
 
   // ============================================================
@@ -1031,6 +698,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildDesktopScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
+      drawer: _buildDrawer(),
       appBar: AppBar(
         toolbarHeight: 52,
         title: const SizedBox.shrink(),
@@ -1038,8 +706,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
-          _buildLocationDropdown(),
-          const SizedBox(width: 8),
           _buildPrinterDropdown(),
           const SizedBox(width: 10),
         ],
@@ -1064,6 +730,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildMobileScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
+      drawer: _buildDrawer(),
       appBar: AppBar(
         title: const Text(
           'Sales Bill',
@@ -1078,8 +745,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildLocationDropdown(fullWidth: true),
-            const SizedBox(height: 6),
             _buildPrinterDropdown(fullWidth: true),
             const SizedBox(height: 8),
             _buildBillDetails(mobile: true),
@@ -1087,15 +752,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             _buildCustomerDetails(),
             const SizedBox(height: 10),
             _buildRateQtyAmount(mobile: true),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _topActionButton('MODIFY', _modifyItem, mobile: true),
-                const SizedBox(width: 8),
-                _topActionButton('DELETE', _deleteItem, mobile: true),
-              ],
-            ),
             const SizedBox(height: 10),
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.28,
@@ -1109,57 +765,38 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  // ============================================================
-  // LOCATION DROPDOWN
-  // ============================================================
-
-  Widget _buildLocationDropdown({bool fullWidth = false}) {
-    return SizedBox(
-      width: fullWidth ? double.infinity : 145,
-      height: 40,
-      child: DropdownButtonFormField<String>(
-        value: _selectedLocation,
-
-        decoration:
-        const InputDecoration(
-          labelText: 'Location',
-          labelStyle: TextStyle(
-            fontSize: 9,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(),
-          contentPadding:
-          EdgeInsets.symmetric(
-            horizontal: 7,
-            vertical: 0,
-          ),
+  Widget _buildDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: const Text('LEDGER'),
+              onTap: () {
+                Navigator.pop(context);
+                _openLedger();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('SYNC GST'),
+              onTap: () {
+                Navigator.pop(context);
+                _syncGstData();
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app),
+              title: const Text('EXIT'),
+              onTap: () {
+                Navigator.pop(context);
+                _exitScreen();
+              },
+            ),
+          ],
         ),
-
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 11,
-        ),
-
-        items: _locations.map(
-              (location) {
-            return DropdownMenuItem<String>(
-              value: location,
-              child: Text(
-                location,
-                style: const TextStyle(
-                  fontSize: 11,
-                ),
-              ),
-            );
-          },
-        ).toList(),
-
-        onChanged: (value) {
-          if (value == null) return;
-
-          _changeLocation(value);
-        },
       ),
     );
   }
@@ -1489,16 +1126,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       runSpacing: mobile ? 4 : 2,
       alignment: mobile ? WrapAlignment.center : WrapAlignment.start,
       children: [
-        button('PRINT', _printBill),
-        button('NEW', _newBill),
-        button('NEXT', _nextBill),
-        button('PREVIOUS', _previousBill),
         button('SAVE', _saveBill),
-        button('EDIT', _modifyItem),
-        button('DELETE', _deleteItem),
-        button('LEDGER', _openLedger),
-        button('SYNC GST', _syncGstData),
-        button('EXIT', _exitScreen),
       ],
     );
   }
@@ -1844,18 +1472,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               Expanded(
                 child: _buildItemTable(),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Padding(
-          padding: const EdgeInsets.only(top: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _topActionButton('MODIFY', _modifyItem),
-              const SizedBox(height: 4),
-              _topActionButton('DELETE', _deleteItem),
             ],
           ),
         ),

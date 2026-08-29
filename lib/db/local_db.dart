@@ -80,6 +80,13 @@ class LocalDb {
   }
 
   Future<String> insertPendingBill(SaleBill bill) async {
+    return insertSavedBill(bill, syncStatus: 'pending');
+  }
+
+  Future<String> insertSavedBill(
+    SaleBill bill, {
+    required String syncStatus,
+  }) async {
     var localId = const Uuid().v4();
     var db = await database;
 
@@ -88,11 +95,26 @@ class LocalDb {
       'bill_no': bill.billNo,
       'location': bill.location,
       'payload': jsonEncode(bill.toJson()),
-      'sync_status': 'pending',
+      'sync_status': syncStatus,
       'created_at': DateTime.now().toIso8601String(),
     });
 
     return localId;
+  }
+
+  Future<int> getNextBillNumber(String location) async {
+    var db = await database;
+    var result = await db.rawQuery(
+      'SELECT MAX(bill_no) AS max_no FROM bills WHERE location = ?',
+      [location],
+    );
+
+    var maxNo = result.first['max_no'];
+    if (maxNo == null) {
+      return 1;
+    }
+
+    return (maxNo as num).toInt() + 1;
   }
 
   Future<List<Map<String, dynamic>>> getPendingBills() async {

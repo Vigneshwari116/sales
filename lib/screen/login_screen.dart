@@ -51,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _error = null);
 
+    await SessionService.clearBillSession();
     await AppConfig.setLocation(_selectedLocationCode);
     await AppSessionService.onLoginComplete();
     await SessionService.saveLogin(username);
