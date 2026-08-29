@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:sales/api/api%20config.dart';
+import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 
 class LedgerEntry {
@@ -212,6 +214,60 @@ class SalesApi {
       return SalesApiResult.failure(
         body['error'] as String? ?? 'Could not load ledger',
       );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
+  static Future<SalesApiResult<String>> pullGstMasterData(
+      String location) async {
+    final uri =
+        Uri.parse('$salesBillApiBaseUrl/api/gst/sync').replace(
+      queryParameters: {'location': location},
+    );
+
+    try {
+      final res = await http.get(uri).timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode != 200 || body['ok'] != true) {
+        return SalesApiResult.failure(
+          body['error'] as String? ?? 'Could not sync GST data',
+        );
+      }
+
+      final dbName = body['db_name'] as String? ?? '';
+      final expected = expectedDbNames[location];
+
+      if (expected == null || dbName != expected) {
+        developer.log(
+          'GST sync rejected: server db_name "$dbName" does not match '
+          'expected "${expected ?? 'unknown'}" for $location',
+          name: 'SalesApi',
+        );
+        return SalesApiResult.failure(
+          'GST sync rejected: server database name mismatch',
+        );
+      }
+
+      final version = body['version'] as String? ?? '';
+      final data = body['data'] as List<dynamic>? ?? [];
+      final rows = data.map((entry) {
+        final map = entry as Map<String, dynamic>;
+        return {
+          'key': map['key'] as String,
+          'value': map['value'] as String,
+        };
+      }).toList();
+
+      await LocalDb.instance.replaceGstMaster(rows);
+      await LocalDb.instance.updateSyncMeta(
+        location: location,
+        expectedDbName: expected,
+        lastGstVersion: version,
+      );
+
+      return SalesApiResult.success(version);
     } catch (_) {
       return SalesApiResult.failure('Could not reach the server.');
     }
