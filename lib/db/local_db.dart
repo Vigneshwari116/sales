@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -36,8 +37,8 @@ class LocalDb {
   }
 
   Future<Database> _initDb() async {
-    var dbPath = await getDatabasesPath();
-    var path = join(dbPath, '${AppConfig.locationCode}_sales.db');
+    var supportDir = await getApplicationSupportDirectory();
+    var path = join(supportDir.path, '${AppConfig.locationCode}_sales.db');
 
     return openDatabase(
       path,
