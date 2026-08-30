@@ -36,6 +36,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   static const double _entryBoxWidth = 100;
   static const double _entryBoxHeight = 42;
   static const double _desktopBreakpoint = 900;
+  static const double _sidebarBreakpoint = 700;
+  static const double _sidebarWidth = 200;
+
+  bool _sidebarOpen = false;
 
   // ============================================================
   // LOCATION (from login — not shown on screen)
@@ -684,54 +688,72 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget build(BuildContext context) {
     _updateAmountDisplay();
 
-    if (MediaQuery.sizeOf(context).width < _desktopBreakpoint) {
-      return _buildMobileScaffold(context);
-    }
+    final width = MediaQuery.sizeOf(context).width;
+    final useSidebarLayout = width > _sidebarBreakpoint;
+    final mobileBillLayout = width < _desktopBreakpoint;
 
-    return _buildDesktopScaffold(context);
-  }
-
-  // ============================================================
-  // DESKTOP (WINDOWS) — unchanged layout
-  // ============================================================
-
-  Widget _buildDesktopScaffold(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      drawer: _buildDrawer(),
-      appBar: AppBar(
-        toolbarHeight: 52,
-        title: const SizedBox.shrink(),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          _buildPrinterDropdown(),
-          const SizedBox(width: 10),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-        child: Column(
-          children: [
-            _buildTopArea(),
-            const SizedBox(height: 6),
-            Expanded(child: _buildMainArea()),
-          ],
-        ),
-      ),
+    return _buildRootScaffold(
+      context,
+      useSidebarLayout: useSidebarLayout,
+      mobileBillLayout: mobileBillLayout,
     );
   }
 
-  // ============================================================
-  // MOBILE — stacked scroll layout, same features
-  // ============================================================
+  Widget _buildRootScaffold(
+    BuildContext context, {
+    required bool useSidebarLayout,
+    required bool mobileBillLayout,
+  }) {
+    final body = mobileBillLayout
+        ? _buildMobileBody(context)
+        : _buildDesktopBody();
 
-  Widget _buildMobileScaffold(BuildContext context) {
+    if (useSidebarLayout) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: _buildAppBar(
+          mobileBillLayout: mobileBillLayout,
+          useSidebarLayout: true,
+        ),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_sidebarOpen) ...[
+              SizedBox(
+                width: _sidebarWidth,
+                child: _buildMenuPanel(
+                  onClose: () => setState(() => _sidebarOpen = false),
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+            ],
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: backgroundColor,
-      drawer: _buildDrawer(),
-      appBar: AppBar(
+      drawer: Drawer(
+        child: _buildMenuPanel(
+          onClose: () => Navigator.pop(context),
+        ),
+      ),
+      appBar: _buildAppBar(
+        mobileBillLayout: mobileBillLayout,
+        useSidebarLayout: false,
+      ),
+      body: body,
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar({
+    required bool mobileBillLayout,
+    required bool useSidebarLayout,
+  }) {
+    if (mobileBillLayout) {
+      return AppBar(
         title: const Text(
           'Sales Bill',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -739,34 +761,83 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
         elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildPrinterDropdown(fullWidth: true),
-            const SizedBox(height: 8),
-            _buildBillDetails(mobile: true),
-            const SizedBox(height: 8),
-            _buildCustomerDetails(),
-            const SizedBox(height: 10),
-            _buildRateQtyAmount(mobile: true),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.28,
-              child: _buildItemTable(mobile: true),
-            ),
-            const SizedBox(height: 10),
-            _buildTotals(pinToBottom: false),
-          ],
-        ),
+        automaticallyImplyLeading: !useSidebarLayout,
+        leading: useSidebarLayout
+            ? IconButton(
+                icon: Icon(_sidebarOpen ? Icons.menu_open : Icons.menu),
+                tooltip: _sidebarOpen ? 'Close menu' : 'Open menu',
+                onPressed: () {
+                  setState(() => _sidebarOpen = !_sidebarOpen);
+                },
+              )
+            : null,
+      );
+    }
+
+    return AppBar(
+      toolbarHeight: 52,
+      title: const SizedBox.shrink(),
+      backgroundColor: const Color(0xFFD5D8D5),
+      foregroundColor: Colors.black,
+      elevation: 0,
+      automaticallyImplyLeading: !useSidebarLayout,
+      leading: useSidebarLayout
+          ? IconButton(
+              icon: Icon(_sidebarOpen ? Icons.menu_open : Icons.menu),
+              tooltip: _sidebarOpen ? 'Close menu' : 'Open menu',
+              onPressed: () {
+                setState(() => _sidebarOpen = !_sidebarOpen);
+              },
+            )
+          : null,
+      actions: [
+        _buildPrinterDropdown(),
+        const SizedBox(width: 10),
+      ],
+    );
+  }
+
+  Widget _buildDesktopBody() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+      child: Column(
+        children: [
+          _buildTopArea(),
+          const SizedBox(height: 6),
+          Expanded(child: _buildMainArea()),
+        ],
       ),
     );
   }
 
-  Widget _buildDrawer() {
-    return Drawer(
+  Widget _buildMobileBody(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildPrinterDropdown(fullWidth: true),
+          const SizedBox(height: 8),
+          _buildBillDetails(mobile: true),
+          const SizedBox(height: 8),
+          _buildCustomerDetails(),
+          const SizedBox(height: 10),
+          _buildRateQtyAmount(mobile: true),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.28,
+            child: _buildItemTable(mobile: true),
+          ),
+          const SizedBox(height: 10),
+          _buildTotals(pinToBottom: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuPanel({required VoidCallback onClose}) {
+    return Material(
+      color: Colors.white,
       child: SafeArea(
         child: Column(
           children: [
@@ -774,7 +845,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               leading: const Icon(Icons.menu_book),
               title: const Text('LEDGER'),
               onTap: () {
-                Navigator.pop(context);
+                onClose();
                 _openLedger();
               },
             ),
@@ -782,7 +853,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               leading: const Icon(Icons.sync),
               title: const Text('SYNC GST'),
               onTap: () {
-                Navigator.pop(context);
+                onClose();
                 _syncGstData();
               },
             ),
@@ -791,7 +862,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               leading: const Icon(Icons.exit_to_app),
               title: const Text('EXIT'),
               onTap: () {
-                Navigator.pop(context);
+                onClose();
                 _exitScreen();
               },
             ),
@@ -1399,54 +1470,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // TOP ACTION BUTTON
-  // ============================================================
-
-  Widget _topActionButton(
-      String text,
-      VoidCallback onPressed, {
-        bool mobile = false,
-      }) {
-    return SizedBox(
-      width: mobile ? 88 : 64,
-      height: mobile ? 44 : _entryBoxHeight,
-
-      child: ElevatedButton(
-        onPressed: onPressed,
-
-        style:
-        ElevatedButton.styleFrom(
-          backgroundColor:
-          buttonColor,
-
-          foregroundColor:
-          Colors.white,
-
-          padding: EdgeInsets.zero,
-
-          shape:
-          RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(
-              18,
-            ),
-          ),
-        ),
-
-        child: Text(
-          text,
-          style:
-          TextStyle(
-            fontSize: mobile ? 10 : 8.5,
-            fontWeight:
-            FontWeight.bold,
-          ),
-        ),
       ),
     );
   }
