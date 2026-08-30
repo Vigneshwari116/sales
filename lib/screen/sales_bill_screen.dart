@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
@@ -14,6 +13,7 @@ import 'package:sales/services/session_service.dart';
 import 'bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
+import 'sales_abstract_screen.dart';
 import 'sales_ledger_screen.dart';
 
 class SalesBillScreen extends StatefulWidget {
@@ -499,28 +499,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  Future<void> _syncGstData() async {
-    if (_busy) return;
-
-    setState(() => _busy = true);
-
-    final result = await SalesApi.pullGstMasterData(AppConfig.locationCode);
-
-    if (!mounted) return;
-
-    setState(() => _busy = false);
-
-    if (result.ok) {
-      final version = result.data;
-      if (version != null && version.isNotEmpty) {
-        _showMessage('GST data synced (version $version)');
-      } else {
-        _showMessage('GST data synced');
-      }
-      return;
-    }
-
-    _showMessage(result.error ?? 'GST sync failed');
+  void _openAbstract() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SalesAbstractScreen(location: _selectedLocation),
+      ),
+    );
   }
 
   SaleBill _buildCurrentBill() {
@@ -840,22 +824,39 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       color: Colors.white,
       child: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              leading: const Icon(Icons.menu_book),
-              title: const Text('LEDGER'),
-              onTap: () {
-                onClose();
-                _openLedger();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sync),
-              title: const Text('SYNC GST'),
-              onTap: () {
-                onClose();
-                _syncGstData();
-              },
+            ExpansionTile(
+              initiallyExpanded: true,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+              childrenPadding: EdgeInsets.zero,
+              title: const Text(
+                'REPORTS',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                  leading: const Icon(Icons.menu_book, size: 20),
+                  title: const Text('LEDGER'),
+                  onTap: () {
+                    onClose();
+                    _openLedger();
+                  },
+                ),
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                  leading: const Icon(Icons.summarize_outlined, size: 20),
+                  title: const Text('ABSTRACT'),
+                  onTap: () {
+                    onClose();
+                    _openAbstract();
+                  },
+                ),
+              ],
             ),
             const Spacer(),
             ListTile(
