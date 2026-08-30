@@ -168,7 +168,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         _billNo = session.billNo;
         _billDate = session.billDate;
         _paymentMode = session.paymentMode;
-        _customerNameController.text = session.customerName;
+        var customerName = session.customerName;
+        if (customerName == 'CASH' && session.paymentMode == 'CASH') {
+          customerName = '';
+        }
+        _customerNameController.text = customerName;
         _mobileController.text = session.mobile;
         _items
           ..clear()
@@ -195,9 +199,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       billNo: _billNo,
       billDate: _billDate,
       paymentMode: _paymentMode,
-      customerName: _customerNameController.text.trim().isEmpty
-          ? 'CASH'
-          : _customerNameController.text.trim(),
+      customerName: _customerNameController.text.trim(),
       mobile: _mobileController.text.trim(),
       items: List<BillItem>.from(_items),
       billSaved: _billSaved,
@@ -710,9 +712,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       location: _selectedLocation,
       billDate: _billDate,
       paymentMode: _paymentMode,
-      customerName: _customerNameController.text.trim().isEmpty
-          ? 'CASH'
-          : _customerNameController.text.trim(),
+      customerName: _customerNameController.text.trim(),
       mobile: _mobileController.text.trim(),
       items: List<BillItem>.from(_items),
       totalQty: _totalQty,

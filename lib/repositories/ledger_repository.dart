@@ -168,7 +168,7 @@ class LedgerRepository {
         localId: row['local_id'] as String,
         billNo: (row['bill_no'] as num).toInt(),
         date: payload['billDate'] as String? ?? '',
-        customerName: payload['customerName'] as String? ?? 'CASH',
+        customerName: payload['customerName'] as String? ?? '',
         paymentMode: payload['paymentMode'] as String? ?? 'CASH',
         total: (payload['totalAmount'] as num?)?.toDouble() ?? 0,
         cgst: (payload['totalCgst'] as num?)?.toDouble() ?? 0,

@@ -221,6 +221,29 @@ class LocalDb {
         continue;
       }
 
+      if (existing.isNotEmpty) {
+        var existingPayload = jsonDecode(existing.first['payload'] as String)
+            as Map<String, dynamic>;
+        existingPayload['billDate'] = entry.date;
+        existingPayload['paymentMode'] = entry.paymentMode;
+        existingPayload['totalAmount'] = entry.total;
+        existingPayload['totalCgst'] = entry.cgst;
+        existingPayload['totalSgst'] = entry.sgst;
+        existingPayload['totalIgst'] = entry.igst;
+        existingPayload['grandTotal'] = entry.grandTotal;
+
+        await db.update(
+          'bills',
+          {
+            'payload': jsonEncode(existingPayload),
+            'sync_status': 'synced',
+          },
+          where: 'local_id = ?',
+          whereArgs: [existing.first['local_id']],
+        );
+        continue;
+      }
+
       var payload = jsonEncode({
         'billNo': entry.billNo,
         'location': location,
@@ -237,27 +260,14 @@ class LocalDb {
         'grandTotal': entry.grandTotal,
       });
 
-      if (existing.isEmpty) {
-        await db.insert('bills', {
-          'local_id': const Uuid().v4(),
-          'bill_no': entry.billNo,
-          'location': location,
-          'payload': payload,
-          'sync_status': 'synced',
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        continue;
-      }
-
-      await db.update(
-        'bills',
-        {
-          'payload': payload,
-          'sync_status': 'synced',
-        },
-        where: 'local_id = ?',
-        whereArgs: [existing.first['local_id']],
-      );
+      await db.insert('bills', {
+        'local_id': const Uuid().v4(),
+        'bill_no': entry.billNo,
+        'location': location,
+        'payload': payload,
+        'sync_status': 'synced',
+        'created_at': DateTime.now().toIso8601String(),
+      });
     }
   }
 

@@ -56,7 +56,7 @@ class SaleBill {
       location: json['location'] as String? ?? 'Location 1',
       billDate: _parseDate(json['billDate'] as String),
       paymentMode: json['paymentMode'] as String? ?? 'CASH',
-      customerName: json['customerName'] as String? ?? 'CASH',
+      customerName: json['customerName'] as String? ?? '',
       mobile: json['mobile'] as String? ?? '',
       items: itemsJson
           .map((e) => BillItem.fromJson(e as Map<String, dynamic>))
