@@ -53,7 +53,7 @@ class SaleBill {
     final itemsJson = json['items'] as List<dynamic>? ?? [];
     return SaleBill(
       billNo: (json['billNo'] as num).toInt(),
-      location: json['location'] as String? ?? 'Location 1',
+      location: json['location'] as String? ?? 'Win1',
       billDate: _parseDate(json['billDate'] as String),
       paymentMode: json['paymentMode'] as String? ?? 'CASH',
       customerName: json['customerName'] as String? ?? '',

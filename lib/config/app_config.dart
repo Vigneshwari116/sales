@@ -20,14 +20,14 @@ class AppConfig {
 
   static String displayLocationNameFor(String code) {
     switch (code) {
-      case 'location1':
-        return 'Location 1';
-      case 'location2':
-        return 'Location 2';
-      case 'location3':
-        return 'Location 3';
-      case 'location4':
-        return 'Location 4';
+      case 'win1':
+        return 'Win1';
+      case 'win2':
+        return 'Win2';
+      case 'win3':
+        return 'Win3';
+      case 'win4':
+        return 'Win4';
       default:
         return code;
     }

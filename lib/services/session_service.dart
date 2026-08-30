@@ -86,7 +86,7 @@ class SessionService {
     }
 
     return BillSessionData(
-      location: prefs.getString(_locationKey) ?? 'Location 1',
+      location: prefs.getString(_locationKey) ?? 'Win1',
       billNo: prefs.getInt(_billNoKey) ?? 1,
       billDate: billDate,
       paymentMode: prefs.getString(_paymentModeKey) ?? 'CASH',

@@ -23,13 +23,13 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   final List<String> _locationCodes = const [
-    'location1',
-    'location2',
-    'location3',
-    'location4',
+    'win1',
+    'win2',
+    'win3',
+    'win4',
   ];
 
-  String _selectedLocationCode = 'location1';
+  String _selectedLocationCode = 'win1';
 
   @override
   void dispose() {
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         return DropdownMenuItem<String>(
                           value: code,
                           child: Text(
-                            '${AppConfig.displayLocationNameFor(code)} ($code)',
+                            AppConfig.displayLocationNameFor(code),
                             style: const TextStyle(fontSize: 13),
                           ),
                         );

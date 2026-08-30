@@ -5,5 +5,5 @@ import 'package:sales/config/app_config.dart';
 /// into the app, never typed in by staff.
 const String salesBillApiBaseUrl = 'http://187.127.180.135:3003';
 
-/// Expected GST database name for this build (e.g. `location1_gst`).
+/// Expected GST database name for this build (e.g. `win1_gst`).
 String get expectedGstDbName => AppConfig.expectedGstDbName;
