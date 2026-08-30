@@ -2,9 +2,12 @@ import 'dart:convert';
 
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/models/sale_bill.dart';
+import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/sync_service.dart';
 
 class LocalLedgerEntry {
+  final String localId;
   final int billNo;
   final String date;
   final String paymentMode;
@@ -16,6 +19,7 @@ class LocalLedgerEntry {
   final String syncStatus;
 
   LocalLedgerEntry({
+    required this.localId,
     required this.billNo,
     required this.date,
     required this.paymentMode,
@@ -73,6 +77,56 @@ class LedgerRepository {
     }
   }
 
+  static Future<SaleBill?> getBillByLocalId(String localId) async {
+    return LocalDb.instance.getBillByLocalId(localId);
+  }
+
+  static Future<void> deleteBill(String localId) async {
+    await LocalDb.instance.deleteBill(localId);
+  }
+
+  static Future<void> updateBill({
+    required String localId,
+    required SaleBill bill,
+  }) async {
+    // TODO: server API may not yet support update on already-synced bills.
+    await LocalDb.instance.updateSavedBill(localId, bill);
+  }
+
+  static SaleBill recalculateBill(SaleBill bill, List<BillItem> items) {
+    var totalQty = 0.0;
+    var totalAmount = 0.0;
+    var totalCgst = 0.0;
+    var totalSgst = 0.0;
+    var totalIgst = 0.0;
+    var grandTotal = 0.0;
+
+    for (var item in items) {
+      totalQty += item.qty;
+      totalAmount += item.amount;
+      totalCgst += item.cgst;
+      totalSgst += item.sgst;
+      totalIgst += item.igst;
+      grandTotal += item.netAmt;
+    }
+
+    return SaleBill(
+      billNo: bill.billNo,
+      location: bill.location,
+      billDate: bill.billDate,
+      paymentMode: bill.paymentMode,
+      customerName: bill.customerName,
+      mobile: bill.mobile,
+      items: items,
+      totalQty: totalQty,
+      totalAmount: totalAmount,
+      totalCgst: totalCgst,
+      totalSgst: totalSgst,
+      totalIgst: totalIgst,
+      grandTotal: grandTotal,
+    );
+  }
+
   static Future<void> syncWithServer({required String location}) async {
     await SyncService.instance.pushPendingBills();
 
@@ -109,6 +163,7 @@ class LedgerRepository {
       var payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
 
       return LocalLedgerEntry(
+        localId: row['local_id'] as String,
         billNo: (row['bill_no'] as num).toInt(),
         date: payload['billDate'] as String? ?? '',
         paymentMode: payload['paymentMode'] as String? ?? 'CASH',

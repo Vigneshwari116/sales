@@ -56,7 +56,7 @@ flutter test test/gst_sync_validation_test.dart
 ## Sync behaviour
 
 - **Bills:** saved online when possible; queued locally when offline; pushed every 2 minutes (foreground) and on reconnect.
-- **GST:** pulled automatically on reconnect and every 24 hours after login; manual **SYNC GST** remains as force-refresh.
+- **GST:** pulled automatically on reconnect and every 24 hours after login — no manual sync needed.
 - **Ledger:** always reads local SQLite first; background sync merges server ledger without blocking the UI.
 
 ## Getting Started

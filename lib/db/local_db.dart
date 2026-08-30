@@ -149,6 +149,50 @@ class LocalDb {
     );
   }
 
+  Future<SaleBill?> getBillByLocalId(String localId) async {
+    var db = await database;
+    var rows = await db.query(
+      'bills',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    try {
+      var payload = jsonDecode(rows.first['payload'] as String)
+          as Map<String, dynamic>;
+      return SaleBill.fromJson(payload);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> deleteBill(String localId) async {
+    var db = await database;
+    await db.delete(
+      'bills',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> updateSavedBill(String localId, SaleBill bill) async {
+    var db = await database;
+    await db.update(
+      'bills',
+      {
+        'payload': jsonEncode(bill.toJson()),
+        'sync_status': 'pending',
+      },
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
   Future<void> mergeLedgerFromServer({
     required String location,
     required List<({
