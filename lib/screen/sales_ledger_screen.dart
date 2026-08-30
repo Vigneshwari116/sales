@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
-import 'package:sales/config/local_credentials.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_edit_dialog.dart';
 
@@ -25,7 +24,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   bool _loading = true;
   bool _syncing = false;
-  bool _editModeEnabled = false;
   List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
 
@@ -68,78 +66,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Future<void> _refreshLedger() async {
     await _loadLedger();
     await _syncInBackground();
-  }
-
-  Future<void> _promptEditModeUnlock() async {
-    var passwordController = TextEditingController();
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        var errorText = '';
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Enter password'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) {
-                      if (passwordController.text != appPassword) {
-                        setDialogState(() {
-                          errorText = 'Incorrect password';
-                        });
-                        return;
-                      }
-
-                      setState(() => _editModeEnabled = true);
-                      Navigator.pop(dialogContext);
-                    },
-                  ),
-                  if (errorText.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      errorText,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (passwordController.text != appPassword) {
-                      setDialogState(() {
-                        errorText = 'Incorrect password';
-                      });
-                      return;
-                    }
-
-                    setState(() => _editModeEnabled = true);
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Unlock'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    passwordController.dispose();
   }
 
   Future<void> _editBill(LocalLedgerEntry entry) async {
@@ -216,12 +142,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
-        title: GestureDetector(
-          onDoubleTap: _promptEditModeUnlock,
-          child: const Text(
-            'SALES LEDGER',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+        title: const Text(
+          'SALES LEDGER',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
@@ -301,8 +224,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('SGST', 80, bold: true, alignRight: true),
           _cell('IGST', 80, bold: true, alignRight: true),
           _cell('GRAND TOTAL', 110, bold: true, alignRight: true),
-          if (_editModeEnabled)
-            SizedBox(width: _deleteColumnWidth, height: 32),
+          SizedBox(width: _deleteColumnWidth, height: 32),
         ],
       ),
     );
@@ -320,13 +242,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         _cell(_formatMoney(entry.sgst), 80, alignRight: true),
         _cell(_formatMoney(entry.igst), 80, alignRight: true),
         _cell(_formatMoney(entry.grandTotal), 110, alignRight: true),
-        if (_editModeEnabled) _deleteCell(entry),
+        _deleteCell(entry),
       ],
     );
-
-    if (!_editModeEnabled) {
-      return row;
-    }
 
     return Material(
       color: Colors.transparent,
@@ -370,8 +288,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
             bold: true,
             alignRight: true,
           ),
-          if (_editModeEnabled)
-            SizedBox(width: _deleteColumnWidth, height: 32),
+          SizedBox(width: _deleteColumnWidth, height: 32),
         ],
       ),
     );

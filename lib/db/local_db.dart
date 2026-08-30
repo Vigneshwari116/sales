@@ -261,6 +261,26 @@ class LocalDb {
     }
   }
 
+  Future<String?> findLocalIdByBillNo({
+    required String location,
+    required int billNo,
+  }) async {
+    var db = await database;
+    var rows = await db.query(
+      'bills',
+      columns: ['local_id'],
+      where: 'location = ? AND bill_no = ?',
+      whereArgs: [location, billNo],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return rows.first['local_id'] as String;
+  }
+
   Future<void> replaceGstMaster(List<Map<String, String>> rows) async {
     var db = await database;
 

@@ -7,12 +7,19 @@ class BillRepository {
     return LocalDb.instance.getNextBillNumber(location);
   }
 
-  static Future<SalesApiResult<int>> saveBill(SaleBill bill) async {
+  static Future<SalesApiResult<int>> saveBill(
+    SaleBill bill, {
+    String? updateLocalId,
+  }) async {
     var result = await SalesApi.saveBill(bill);
 
     if (result.ok) {
       try {
-        await LocalDb.instance.insertSavedBill(bill, syncStatus: 'synced');
+        if (updateLocalId != null) {
+          await LocalDb.instance.updateSavedBill(updateLocalId, bill);
+        } else {
+          await LocalDb.instance.insertSavedBill(bill, syncStatus: 'synced');
+        }
       } catch (_) {
         // Bill saved on server; local record is best-effort for numbering.
       }
@@ -20,7 +27,11 @@ class BillRepository {
     }
 
     try {
-      await LocalDb.instance.insertPendingBill(bill);
+      if (updateLocalId != null) {
+        await LocalDb.instance.updateSavedBill(updateLocalId, bill);
+      } else {
+        await LocalDb.instance.insertPendingBill(bill);
+      }
       return SalesApiResult.success(bill.billNo);
     } catch (_) {
       return SalesApiResult.failure('Could not save bill locally.');
