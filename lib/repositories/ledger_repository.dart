@@ -10,6 +10,7 @@ class LocalLedgerEntry {
   final String localId;
   final int billNo;
   final String date;
+  final String customerName;
   final String paymentMode;
   final double total;
   final double cgst;
@@ -22,6 +23,7 @@ class LocalLedgerEntry {
     required this.localId,
     required this.billNo,
     required this.date,
+    required this.customerName,
     required this.paymentMode,
     required this.total,
     required this.cgst,
@@ -166,6 +168,7 @@ class LedgerRepository {
         localId: row['local_id'] as String,
         billNo: (row['bill_no'] as num).toInt(),
         date: payload['billDate'] as String? ?? '',
+        customerName: payload['customerName'] as String? ?? 'CASH',
         paymentMode: payload['paymentMode'] as String? ?? 'CASH',
         total: (payload['totalAmount'] as num?)?.toDouble() ?? 0,
         cgst: (payload['totalCgst'] as num?)?.toDouble() ?? 0,

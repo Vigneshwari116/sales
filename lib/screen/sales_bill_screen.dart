@@ -17,6 +17,8 @@ import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
 import 'sales_abstract_screen.dart';
 import 'sales_ledger_screen.dart';
+import 'printer_settings_screen.dart';
+import 'package:sales/services/printer_settings_service.dart';
 
 enum _ItemCellField {
   qty,
@@ -128,17 +130,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Timer? _rateTimer;
   Timer? _qtyTimer;
-
-  // ============================================================
-  // PRINTER
-  // ============================================================
-
-  String _printer = 'TVS-E RP 3230 on Ne00:';
-
-  final List<String> _printers = const [
-    'TVS-E RP 3230 on Ne00:',
-    'Microsoft Print to PDF',
-  ];
 
   // ============================================================
   // ITEMS
@@ -430,6 +421,31 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
   }
 
+  void _removeItem(int index) {
+    setState(() {
+      _items.removeAt(index);
+
+      if (_selectedIndex == index) {
+        _selectedIndex = null;
+      } else if (_selectedIndex != null && _selectedIndex! > index) {
+        _selectedIndex = _selectedIndex! - 1;
+      }
+
+      if (_editingRow == index) {
+        _editingRow = null;
+        _editingField = null;
+        _cellEditController?.dispose();
+        _cellEditController = null;
+      } else if (_editingRow != null && _editingRow! > index) {
+        _editingRow = _editingRow! - 1;
+      }
+
+      _billSaved = false;
+    });
+
+    _persistSession();
+  }
+
   // ============================================================
   // CLEAR CURRENT BILL
   // ============================================================
@@ -607,23 +623,42 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     final int savedBillNo = _billNo;
 
     try {
-      await BillPrintService.printReceipt(
-        bill,
-        printerName: _printer,
+      await BillPrintService.saveReceiptToDesktop(bill);
+    } catch (_) {
+      // Desktop save is best-effort; bill is already persisted locally.
+    }
+
+    final defaultPrinter = await PrinterSettingsService.getDefaultPrinter();
+
+    if (defaultPrinter == null || defaultPrinter.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _billSaved = true;
+        _busy = false;
+      });
+      _showMessage(
+        'No printer selected. Please choose one in Printer Settings.',
       );
-      if (!mounted) return;
-      setState(() {
-        _billSaved = true;
-        _busy = false;
-      });
-      _showMessage('Bill $savedBillNo saved and printed');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _billSaved = true;
-        _busy = false;
-      });
-      _showMessage('Bill $savedBillNo saved (print failed: $e)');
+    } else {
+      try {
+        await BillPrintService.printReceipt(
+          bill,
+          printerName: defaultPrinter,
+        );
+        if (!mounted) return;
+        setState(() {
+          _billSaved = true;
+          _busy = false;
+        });
+        _showMessage('Bill $savedBillNo saved and printed');
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _billSaved = true;
+          _busy = false;
+        });
+        _showMessage('Bill $savedBillNo saved (print failed: $e)');
+      }
     }
 
     await Future.delayed(const Duration(milliseconds: 300));
@@ -657,6 +692,14 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SalesAbstractScreen(location: _selectedLocation),
+      ),
+    );
+  }
+
+  void _openPrinterSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PrinterSettingsScreen(),
       ),
     );
   }
@@ -928,10 +971,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               },
             )
           : null,
-      actions: [
-        _buildPrinterDropdown(),
-        const SizedBox(width: 10),
-      ],
     );
   }
 
@@ -954,8 +993,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildPrinterDropdown(fullWidth: true),
-          const SizedBox(height: 8),
           _buildBillDetails(mobile: true),
           const SizedBox(height: 8),
           _buildCustomerDetails(),
@@ -1012,6 +1049,14 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 ),
               ],
             ),
+            ListTile(
+              leading: const Icon(Icons.print_outlined),
+              title: const Text('PRINTER SETTINGS'),
+              onTap: () {
+                onClose();
+                _openPrinterSettings();
+              },
+            ),
             const Spacer(),
             ListTile(
               leading: const Icon(Icons.exit_to_app),
@@ -1023,59 +1068,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // PRINTER DROPDOWN
-  // ============================================================
-
-  Widget _buildPrinterDropdown({bool fullWidth = false}) {
-    return SizedBox(
-      width: fullWidth ? double.infinity : 205,
-      height: 40,
-      child: DropdownButtonFormField<String>(
-        value: _printer,
-
-        decoration:
-        const InputDecoration(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(),
-          contentPadding:
-          EdgeInsets.symmetric(
-            horizontal: 7,
-            vertical: 0,
-          ),
-        ),
-
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 11,
-        ),
-
-        items: _printers.map(
-              (item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                item,
-                style: const TextStyle(
-                  fontSize: 11,
-                ),
-              ),
-            );
-          },
-        ).toList(),
-
-        onChanged: (value) {
-          if (value == null) return;
-
-          setState(() {
-            _printer = value;
-          });
-        },
       ),
     );
   }
@@ -1731,7 +1723,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
   Widget _buildItemTable({bool mobile = false}) {
     final bool showTax = _items.isNotEmpty;
-    const double mobileTableWidth = 590;
+    const double mobileTableWidth = 624;
 
     Widget table = Container(
       decoration: BoxDecoration(
@@ -1791,8 +1783,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           if (showTax) ...[
             _tableHeaderCell('CGST %', 70),
             _tableHeaderCell('SGST %', 70),
-            _tableHeaderCell('IGST', 65, last: true),
+            _tableHeaderCell('IGST', 65),
           ],
+          _tableDeleteHeaderCell(),
         ],
       ),
     );
@@ -1819,6 +1812,20 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             fontSize: 9,
             fontWeight: FontWeight.bold,
             height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tableDeleteHeaderCell() {
+    return SizedBox(
+      width: 34,
+      child: Container(
+        height: 32,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: borderColor, width: 0.6),
           ),
         ),
       ),
@@ -1860,11 +1867,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             _ItemCellField.igstPct,
             item,
             65,
-            last: true,
             displayOverride: _format(item.igst),
             editOverride: _format(item.igstPct),
           ),
         ],
+        _buildDeleteCell(index),
       ],
     );
 
@@ -1894,6 +1901,27 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             : backgroundColor,
 
         child: rowContent,
+      ),
+    );
+  }
+
+  Widget _buildDeleteCell(int index) {
+    return SizedBox(
+      width: 34,
+      child: Container(
+        height: 34,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: borderColor, width: 0.6),
+          ),
+        ),
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          icon: const Icon(Icons.close, color: Colors.red, size: 16),
+          tooltip: 'Remove item',
+          onPressed: () => _removeItem(index),
+        ),
       ),
     );
   }

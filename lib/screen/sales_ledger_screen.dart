@@ -20,7 +20,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _background = Color(0xFFC5F6C5);
   static const Color _header = Color(0xFFFFF5C5);
   static const Color _border = Color(0xFF888888);
-  static const double _deleteColumnWidth = 36;
 
   bool _loading = true;
   bool _syncing = false;
@@ -93,37 +92,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     }
   }
 
-  Future<void> _confirmDeleteBill(LocalLedgerEntry entry) async {
-    var confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('Delete bill #${entry.billNo}?'),
-          content: const Text('This cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) return;
-
-    await LedgerRepository.deleteBill(entry.localId);
-    await _loadLedger();
-  }
-
   String _formatMoney(double value) {
     return NumberFormat('#,##0.00').format(value);
   }
@@ -169,17 +137,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
-                        child: _buildTable(),
-                      ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      child: _buildTable(),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
     );
@@ -187,12 +153,13 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   Widget _buildTable() {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         border: Border.all(color: _border),
         color: Colors.white,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _headerRow(),
           ..._entries.map(_dataRow),
@@ -207,53 +174,38 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: _header,
       child: Row(
         children: [
-          _cell('BILLNO', 90, bold: true),
-          _cell('DATE', 100, bold: true),
-          _cell('', 90, bold: true),
-          _cell('TOTAL', 100, bold: true, alignRight: true),
-          _cell('CGST', 90, bold: true, alignRight: true),
-          _cell('SGST', 90, bold: true, alignRight: true),
-          _cell('IGST', 90, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 120, bold: true, alignRight: true),
-          SizedBox(width: _deleteColumnWidth, height: 32),
+          _cell('BILLNO', 1, bold: true),
+          _cell('DATE', 1, bold: true),
+          _cell('NAME', 2, bold: true),
+          _cell('', 1, bold: true),
+          _cell('TOTAL', 1, bold: true, alignRight: true),
+          _cell('CGST', 1, bold: true, alignRight: true),
+          _cell('SGST', 1, bold: true, alignRight: true),
+          _cell('IGST', 1, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', 1, bold: true, alignRight: true),
         ],
       ),
     );
   }
 
   Widget _dataRow(LocalLedgerEntry entry) {
-    var row = Row(
-      children: [
-        _cell('${entry.billNo}', 90),
-        _cell(_formatDate(entry.date), 100),
-        _cell(entry.paymentMode, 90),
-        _cell(_formatMoney(entry.total), 100, alignRight: true),
-        _cell(_formatMoney(entry.cgst), 90, alignRight: true),
-        _cell(_formatMoney(entry.sgst), 90, alignRight: true),
-        _cell(_formatMoney(entry.igst), 90, alignRight: true),
-        _cell(_formatMoney(entry.grandTotal), 120, alignRight: true),
-        _deleteCell(entry),
-      ],
-    );
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _editBill(entry),
-        child: row,
-      ),
-    );
-  }
-
-  Widget _deleteCell(LocalLedgerEntry entry) {
-    return SizedBox(
-      width: _deleteColumnWidth,
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        icon: const Icon(Icons.close, color: Colors.red, size: 18),
-        tooltip: 'Delete bill',
-        onPressed: () => _confirmDeleteBill(entry),
+        child: Row(
+          children: [
+            _cell('${entry.billNo}', 1),
+            _cell(_formatDate(entry.date), 1),
+            _cell(entry.customerName, 2),
+            _cell(entry.paymentMode, 1),
+            _cell(_formatMoney(entry.total), 1, alignRight: true),
+            _cell(_formatMoney(entry.cgst), 1, alignRight: true),
+            _cell(_formatMoney(entry.sgst), 1, alignRight: true),
+            _cell(_formatMoney(entry.igst), 1, alignRight: true),
+            _cell(_formatMoney(entry.grandTotal), 1, alignRight: true),
+          ],
+        ),
       ),
     );
   }
@@ -264,20 +216,20 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: const Color(0xFFE8F4E8),
       child: Row(
         children: [
-          _cell('', 90, bold: true),
-          _cell('', 100, bold: true),
-          _cell('', 90, bold: true),
-          _cell(_formatMoney(summary.total), 100, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 90, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 90, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 90, bold: true, alignRight: true),
+          _cell('', 1, bold: true),
+          _cell('', 1, bold: true),
+          _cell('', 2, bold: true),
+          _cell('', 1, bold: true),
+          _cell(_formatMoney(summary.total), 1, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst), 1, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst), 1, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst), 1, bold: true, alignRight: true),
           _cell(
             _formatMoney(summary.grandTotal),
-            120,
+            1,
             bold: true,
             alignRight: true,
           ),
-          SizedBox(width: _deleteColumnWidth, height: 32),
         ],
       ),
     );
@@ -285,25 +237,28 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   Widget _cell(
     String text,
-    double width, {
+    int flex, {
     bool bold = false,
     bool alignRight = false,
   }) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: _border, width: 0.6),
-          bottom: BorderSide(color: _border, width: 0.6),
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: _border, width: 0.6),
+            bottom: BorderSide(color: _border, width: 0.6),
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        textAlign: alignRight ? TextAlign.right : TextAlign.left,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        child: Text(
+          text,
+          textAlign: alignRight ? TextAlign.right : TextAlign.left,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
