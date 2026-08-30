@@ -46,11 +46,11 @@ If `users` is empty, default **admin / admin** is created.
 |--------|------|
 | GET | `/api/health` |
 | POST | `/api/login` |
-| GET | `/api/bills/next-number?location=Location%201` |
-| GET | `/api/bills/:billNo?location=Location%201` |
-| GET | `/api/bills/by-number/previous?billNo=5&location=Location%201` |
+| GET | `/api/bills/next-number?location=Win1` |
+| GET | `/api/bills/:billNo?location=Win1` |
+| GET | `/api/bills/by-number/previous?billNo=5&location=Win1` |
 | POST | `/api/bills` |
-| GET | `/api/ledger?location=Location%201` |
+| GET | `/api/ledger?location=Win1` |
 
 ## View data in DBeaver
 

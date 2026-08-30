@@ -129,7 +129,10 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/bills/next-number', async (req, res) => {
-  const location = req.query.location || 'Location 1';
+  const location = req.query.location;
+  if (!location) {
+    return res.status(400).json({ error: 'location parameter is required' });
+  }
   try {
     const result = await pool.query(
       'SELECT MAX(bill_no) AS max_no FROM bills WHERE location = $1',
@@ -145,7 +148,10 @@ app.get('/api/bills/next-number', async (req, res) => {
 
 app.get('/api/bills/by-number/previous', async (req, res) => {
   const billNo = parseInt(req.query.billNo, 10);
-  const location = req.query.location || 'Location 1';
+  const location = req.query.location;
+  if (!location) {
+    return res.status(400).json({ error: 'location parameter is required' });
+  }
   if (!Number.isFinite(billNo)) {
     return res.status(400).json({ ok: false, error: 'Invalid bill number' });
   }
@@ -171,7 +177,10 @@ app.get('/api/bills/by-number/previous', async (req, res) => {
 
 app.get('/api/bills/:billNo', async (req, res) => {
   const billNo = parseInt(req.params.billNo, 10);
-  const location = req.query.location || 'Location 1';
+  const location = req.query.location;
+  if (!location) {
+    return res.status(400).json({ error: 'location parameter is required' });
+  }
   if (!Number.isFinite(billNo)) {
     return res.status(400).json({ ok: false, error: 'Invalid bill number' });
   }
@@ -290,7 +299,10 @@ app.post('/api/bills', async (req, res) => {
 });
 
 app.get('/api/ledger', async (req, res) => {
-  const location = req.query.location || 'Location 1';
+  const location = req.query.location;
+  if (!location) {
+    return res.status(400).json({ error: 'location parameter is required' });
+  }
   const { from, to } = req.query;
 
   try {
