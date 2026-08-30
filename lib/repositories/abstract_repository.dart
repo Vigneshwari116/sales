@@ -15,12 +15,14 @@ class AbstractSummary {
 }
 
 class AbstractRepository {
-  static Future<AbstractSummary> getSummaryForDate({
+  static Future<AbstractSummary> getSummaryForDateRange({
     required String location,
-    required DateTime date,
+    required DateTime fromDate,
+    required DateTime toDate,
   }) async {
     try {
-      var dateKey = _formatDate(date);
+      var fromKey = _formatDate(fromDate);
+      var toKey = _formatDate(toDate);
       var rows =
           await LocalDb.instance.getBillsForLedger(location: location);
 
@@ -29,7 +31,7 @@ class AbstractRepository {
       var grandTotal = 0.0;
 
       for (var row in rows) {
-        var totals = _totalsForRow(row, dateKey);
+        var totals = _totalsForRow(row, fromKey: fromKey, toKey: toKey);
         if (totals == null) {
           continue;
         }
@@ -54,9 +56,10 @@ class AbstractRepository {
   }
 
   static (double, double, double)? _totalsForRow(
-    Map<String, dynamic> row,
-    String dateKey,
-  ) {
+    Map<String, dynamic> row, {
+    required String fromKey,
+    required String toKey,
+  }) {
     try {
       var payloadRaw = row['payload'] as String?;
       if (payloadRaw == null || payloadRaw.isEmpty) {
@@ -66,7 +69,7 @@ class AbstractRepository {
       var payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
       var billDate = payload['billDate'] as String? ?? '';
 
-      if (billDate != dateKey) {
+      if (billDate.compareTo(fromKey) < 0 || billDate.compareTo(toKey) > 0) {
         return null;
       }
 

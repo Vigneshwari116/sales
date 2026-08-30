@@ -67,6 +67,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   bool _busy = false;
   bool _editModeEnabled = false;
+  bool _showEditPasswordField = false;
+  String? _editPasswordError;
   String? _currentBillLocalId;
   int? _editingRow;
   _ItemCellField? _editingField;
@@ -99,6 +101,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   final TextEditingController _mobileController =
   TextEditingController();
+
+  final TextEditingController _editPasswordController =
+      TextEditingController();
 
   // ============================================================
   // RATE / QTY
@@ -448,6 +453,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     _billSaved = false;
     _editModeEnabled = false;
+    _showEditPasswordField = false;
+    _editPasswordError = null;
+    _editPasswordController.clear();
     _currentBillLocalId = null;
     _editingRow = null;
     _editingField = null;
@@ -455,69 +463,30 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _cellEditController = null;
   }
 
-  Future<void> _promptEditModeUnlock() async {
-    var passwordController = TextEditingController();
+  void _onMobileDoubleTap() {
+    if (_editModeEnabled) {
+      return;
+    }
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        var errorText = '';
+    setState(() {
+      _showEditPasswordField = true;
+      _editPasswordError = null;
+      _editPasswordController.clear();
+    });
+  }
 
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            void tryUnlock() {
-              if (passwordController.text != appPassword) {
-                setDialogState(() {
-                  errorText = 'Incorrect password';
-                });
-                return;
-              }
+  void _tryUnlockEditMode() {
+    if (_editPasswordController.text != appPassword) {
+      setState(() => _editPasswordError = 'Incorrect password');
+      return;
+    }
 
-              setState(() => _editModeEnabled = true);
-              Navigator.pop(dialogContext);
-              _showMessage('Edit mode unlocked');
-            }
-
-            return AlertDialog(
-              title: const Text('Enter password'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => tryUnlock(),
-                  ),
-                  if (errorText.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      errorText,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: tryUnlock,
-                  child: const Text('Unlock'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    passwordController.dispose();
+    setState(() {
+      _editModeEnabled = true;
+      _showEditPasswordField = false;
+      _editPasswordError = null;
+      _editPasswordController.clear();
+    });
   }
 
   void _startCellEdit(int rowIndex, _ItemCellField field, String value) {
@@ -1442,7 +1411,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
               Expanded(
                 child: GestureDetector(
-                  onDoubleTap: _promptEditModeUnlock,
+                  onDoubleTap: _onMobileDoubleTap,
                   child: _smallTextField(
                     _mobileController,
                     number: true,
@@ -1451,6 +1420,58 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               ),
             ],
           ),
+
+          if (_showEditPasswordField && !_editModeEnabled) ...[
+            const SizedBox(height: 5),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  width: 45,
+                  child: Text(
+                    'Password',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 27,
+                        child: TextField(
+                          controller: _editPasswordController,
+                          obscureText: true,
+                          autofocus: true,
+                          onSubmitted: (_) => _tryUnlockEditMode(),
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 0,
+                            ),
+                          ),
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ),
+                      if (_editPasswordError != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _editPasswordError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -2133,6 +2154,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _customerNameController.dispose();
 
     _mobileController.dispose();
+
+    _editPasswordController.dispose();
 
     _rateController.dispose();
 

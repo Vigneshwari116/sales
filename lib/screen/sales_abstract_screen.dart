@@ -18,8 +18,10 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
   static const Color _background = Color(0xFFC5F6C5);
   static const Color _border = Color(0xFF888888);
 
-  DateTime _selectedDate = DateTime.now();
+  DateTime _fromDate = DateTime.now();
+  DateTime _toDate = DateTime.now();
   bool _loading = true;
+  String? _dateRangeError;
   AbstractSummary? _summary;
 
   @override
@@ -28,12 +30,31 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     _loadSummary();
   }
 
-  Future<void> _loadSummary() async {
-    setState(() => _loading = true);
+  bool get _isDateRangeValid {
+    final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+    final to = DateTime(_toDate.year, _toDate.month, _toDate.day);
+    return !to.isBefore(from);
+  }
 
-    var summary = await AbstractRepository.getSummaryForDate(
+  Future<void> _loadSummary() async {
+    if (!_isDateRangeValid) {
+      setState(() {
+        _loading = false;
+        _dateRangeError = 'To Date cannot be before From Date';
+        _summary = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _dateRangeError = null;
+    });
+
+    var summary = await AbstractRepository.getSummaryForDateRange(
       location: widget.location,
-      date: _selectedDate,
+      fromDate: _fromDate,
+      toDate: _toDate,
     );
 
     if (!mounted) return;
@@ -44,17 +65,31 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     });
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickFromDate() async {
     var picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: _fromDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
 
     if (picked == null) return;
 
-    setState(() => _selectedDate = picked);
+    setState(() => _fromDate = picked);
+    await _loadSummary();
+  }
+
+  Future<void> _pickToDate() async {
+    var picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked == null) return;
+
+    setState(() => _toDate = picked);
     await _loadSummary();
   }
 
@@ -62,8 +97,38 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     return NumberFormat('#,##0.00').format(value);
   }
 
-  String _formatSelectedDate() {
-    return DateFormat('dd-MMM-yyyy').format(_selectedDate);
+  String _formatDate(DateTime date) {
+    return DateFormat('dd-MMM-yyyy').format(date);
+  }
+
+  Widget _datePickerRow({
+    required String label,
+    required DateTime date,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: _border),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              '$label: ${_formatDate(date)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -85,32 +150,28 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  InkWell(
-                    onTap: _pickDate,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: _border),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today, size: 18),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Date: ${_formatSelectedDate()}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                  _datePickerRow(
+                    label: 'From Date',
+                    date: _fromDate,
+                    onTap: _pickFromDate,
+                  ),
+                  const SizedBox(height: 10),
+                  _datePickerRow(
+                    label: 'To Date',
+                    date: _toDate,
+                    onTap: _pickToDate,
+                  ),
+                  if (_dateRangeError != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _dateRangeError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 20),
                   _summaryRow(
                     'Total Sale Amount',

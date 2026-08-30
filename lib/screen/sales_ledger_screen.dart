@@ -171,14 +171,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  Text(
-                    widget.location,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -215,15 +207,14 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: _header,
       child: Row(
         children: [
-          _cell('BILLNO', 80, bold: true),
-          _cell('DATE', 90, bold: true),
-          _cell('', 80, bold: true),
-          _cell('SYNC', 70, bold: true),
-          _cell('TOTAL', 90, bold: true, alignRight: true),
-          _cell('CGST', 80, bold: true, alignRight: true),
-          _cell('SGST', 80, bold: true, alignRight: true),
-          _cell('IGST', 80, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 110, bold: true, alignRight: true),
+          _cell('BILLNO', 90, bold: true),
+          _cell('DATE', 100, bold: true),
+          _cell('', 90, bold: true),
+          _cell('TOTAL', 100, bold: true, alignRight: true),
+          _cell('CGST', 90, bold: true, alignRight: true),
+          _cell('SGST', 90, bold: true, alignRight: true),
+          _cell('IGST', 90, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', 120, bold: true, alignRight: true),
           SizedBox(width: _deleteColumnWidth, height: 32),
         ],
       ),
@@ -233,15 +224,14 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Widget _dataRow(LocalLedgerEntry entry) {
     var row = Row(
       children: [
-        _cell('${entry.billNo}', 80),
-        _cell(_formatDate(entry.date), 90),
-        _cell(entry.paymentMode, 80),
-        _syncStatusCell(entry.syncStatus, 70),
-        _cell(_formatMoney(entry.total), 90, alignRight: true),
-        _cell(_formatMoney(entry.cgst), 80, alignRight: true),
-        _cell(_formatMoney(entry.sgst), 80, alignRight: true),
-        _cell(_formatMoney(entry.igst), 80, alignRight: true),
-        _cell(_formatMoney(entry.grandTotal), 110, alignRight: true),
+        _cell('${entry.billNo}', 90),
+        _cell(_formatDate(entry.date), 100),
+        _cell(entry.paymentMode, 90),
+        _cell(_formatMoney(entry.total), 100, alignRight: true),
+        _cell(_formatMoney(entry.cgst), 90, alignRight: true),
+        _cell(_formatMoney(entry.sgst), 90, alignRight: true),
+        _cell(_formatMoney(entry.igst), 90, alignRight: true),
+        _cell(_formatMoney(entry.grandTotal), 120, alignRight: true),
         _deleteCell(entry),
       ],
     );
@@ -274,56 +264,20 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: const Color(0xFFE8F4E8),
       child: Row(
         children: [
-          _cell('', 80, bold: true),
           _cell('', 90, bold: true),
-          _cell('', 80, bold: true),
-          _cell('', 70, bold: true),
-          _cell(_formatMoney(summary.total), 90, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 80, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 80, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 80, bold: true, alignRight: true),
+          _cell('', 100, bold: true),
+          _cell('', 90, bold: true),
+          _cell(_formatMoney(summary.total), 100, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst), 90, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst), 90, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst), 90, bold: true, alignRight: true),
           _cell(
             _formatMoney(summary.grandTotal),
-            110,
+            120,
             bold: true,
             alignRight: true,
           ),
           SizedBox(width: _deleteColumnWidth, height: 32),
-        ],
-      ),
-    );
-  }
-
-  Widget _syncStatusCell(String syncStatus, double width) {
-    var isPending = syncStatus == 'pending';
-
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: _border, width: 0.6),
-          bottom: BorderSide(color: _border, width: 0.6),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: isPending ? Colors.orange : Colors.green,
-              shape: BoxShape.circle,
-            ),
-          ),
-          if (isPending) ...[
-            const SizedBox(width: 4),
-            const Text(
-              'Pending',
-              style: TextStyle(fontSize: 9, color: Colors.orange),
-            ),
-          ],
         ],
       ),
     );
