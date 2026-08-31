@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:bcrypt/bcrypt.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,11 +12,18 @@ import 'package:sales/services/credential_storage.dart';
 ///
 /// One credential set per **app install** (each location device runs setup
 /// independently; secrets are not synced across devices).
+///
+/// Staff passwords use SHA-256 + install salt (lower-stakes POS login).
+/// Admin passwords and owner-delete PINs use bcrypt (slow hash) because
+/// short PINs and privileged access need offline brute-force resistance.
 class CredentialService {
   CredentialService._();
 
   static const int minPasswordLength = 8;
   static const int minPinLength = 4;
+
+  /// bcrypt cost factor for admin password and owner-delete PIN.
+  static const int slowHashLogRounds = 12;
 
   static const String _configuredPrefsKey = 'credentials_configured';
 
@@ -82,16 +90,16 @@ class CredentialService {
     await _storage.write(key: _staffUsernameKey, value: staffUsername.trim());
     await _storage.write(
       key: _staffHashKey,
-      value: _hashSecret(staffPassword, salt),
+      value: _hashStaffSecret(staffPassword, salt),
     );
     await _storage.write(key: _adminUsernameKey, value: adminUsername.trim());
     await _storage.write(
       key: _adminHashKey,
-      value: _hashSecret(adminPassword, salt),
+      value: _hashSlowSecret(adminPassword),
     );
     await _storage.write(
       key: _deletePinHashKey,
-      value: _hashSecret(ownerDeletePin, salt),
+      value: _hashSlowSecret(ownerDeletePin),
     );
 
     final prefs = await SharedPreferences.getInstance();
@@ -108,7 +116,7 @@ class CredentialService {
       return false;
     }
 
-    return _verifySecret(password, _staffHashKey);
+    return _verifyStaffSecret(password, _staffHashKey);
   }
 
   static Future<bool> verifyAdmin(String username, String password) async {
@@ -121,7 +129,7 @@ class CredentialService {
       return false;
     }
 
-    return _verifySecret(password, _adminHashKey);
+    return _verifySlowSecret(password, _adminHashKey);
   }
 
   static Future<bool> verifyOwnerDeletePin(String pin) async {
@@ -129,7 +137,7 @@ class CredentialService {
       return false;
     }
 
-    return _verifySecret(pin, _deletePinHashKey);
+    return _verifySlowSecret(pin, _deletePinHashKey);
   }
 
   static Future<bool> rotateStaffPassword({
@@ -147,7 +155,7 @@ class CredentialService {
     final salt = await _requireSalt();
     await _storage.write(
       key: _staffHashKey,
-      value: _hashSecret(newPassword, salt),
+      value: _hashStaffSecret(newPassword, salt),
     );
     return true;
   }
@@ -169,18 +177,16 @@ class CredentialService {
     _validateUsername(newUsername);
     _validatePassword(newPassword);
 
-    final deletePinMatches = await verifyOwnerDeletePin(newPassword);
-    if (deletePinMatches) {
+    if (await verifyOwnerDeletePin(newPassword)) {
       throw CredentialValidationException(
         'Admin password must be different from the owner-delete PIN.',
       );
     }
 
-    final salt = await _requireSalt();
     await _storage.write(key: _adminUsernameKey, value: newUsername.trim());
     await _storage.write(
       key: _adminHashKey,
-      value: _hashSecret(newPassword, salt),
+      value: _hashSlowSecret(newPassword),
     );
     return true;
   }
@@ -197,21 +203,15 @@ class CredentialService {
     _validatePin(newPin);
 
     final adminUser = await adminUsername();
-    if (adminUser != null) {
-      // Prevent setting delete PIN equal to admin password text.
-      final adminHash = await _storage.read(key: _adminHashKey);
-      final salt = await _requireSalt();
-      if (adminHash != null && _hashSecret(newPin, salt) == adminHash) {
-        throw CredentialValidationException(
-          'Owner-delete PIN must be different from the admin password.',
-        );
-      }
+    if (adminUser != null && await verifyAdmin(adminUser, newPin)) {
+      throw CredentialValidationException(
+        'Owner-delete PIN must be different from the admin password.',
+      );
     }
 
-    final salt = await _requireSalt();
     await _storage.write(
       key: _deletePinHashKey,
-      value: _hashSecret(newPin, salt),
+      value: _hashSlowSecret(newPin),
     );
     return true;
   }
@@ -243,19 +243,35 @@ class CredentialService {
     return base64UrlEncode(bytes);
   }
 
-  static String _hashSecret(String secret, String salt) {
+  static String _hashStaffSecret(String secret, String salt) {
     final digest = sha256.convert(utf8.encode('$salt::$secret'));
     return digest.toString();
   }
 
-  static Future<bool> _verifySecret(String secret, String hashKey) async {
+  static String _hashSlowSecret(String secret) {
+    return BCrypt.hashpw(
+      secret,
+      BCrypt.gensalt(logRounds: slowHashLogRounds),
+    );
+  }
+
+  static Future<bool> _verifyStaffSecret(String secret, String hashKey) async {
     final salt = await _storage.read(key: _saltKey);
     final storedHash = await _storage.read(key: hashKey);
     if (salt == null || storedHash == null) {
       return false;
     }
 
-    return _hashSecret(secret, salt) == storedHash;
+    return _hashStaffSecret(secret, salt) == storedHash;
+  }
+
+  static Future<bool> _verifySlowSecret(String secret, String hashKey) async {
+    final storedHash = await _storage.read(key: hashKey);
+    if (storedHash == null) {
+      return false;
+    }
+
+    return BCrypt.checkpw(secret, storedHash);
   }
 
   static Future<String> _requireSalt() async {

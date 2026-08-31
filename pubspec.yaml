@@ -47,6 +47,7 @@ dependencies:
   connectivity_plus: ^6.1.4
   crypto: ^3.0.6
   flutter_secure_storage: ^9.2.4
+  bcrypt: ^1.2.0
 
 dependency_overrides:
   # Mutex fix for concurrent read/write on Windows DPAPI storage.
