@@ -554,7 +554,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       // Desktop save is best-effort; bill is already persisted locally.
     }
 
-    final defaultPrinter = await PrinterSettingsService.getDefaultPrinter();
+    final defaultPrinter = await PrinterSettingsService.getDefaultPrinter(
+      PrinterType.thermal,
+    );
 
     if (defaultPrinter == null || defaultPrinter.isEmpty) {
       if (!mounted) return;
@@ -563,13 +565,14 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         _busy = false;
       });
       _showMessage(
-        'No printer selected. Please choose one in Printer Settings.',
+        'No thermal printer selected. Please choose one in Printer Settings.',
       );
     } else {
       try {
         await BillPrintService.printReceipt(
           bill,
           printerName: defaultPrinter,
+          type: PrinterType.thermal,
         );
         if (!mounted) return;
         setState(() {

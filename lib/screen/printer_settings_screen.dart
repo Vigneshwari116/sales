@@ -12,13 +12,17 @@ class PrinterSettingsScreen extends StatefulWidget {
 class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   static const Color _background = Color(0xFFC5F6C5);
   static const Color _border = Color(0xFF888888);
+  static const Color _header = Color(0xFFFFF5C5);
 
   bool _loading = true;
-  bool _saving = false;
-  String? _savedPrinter;
-  String? _selectedPrinter;
-  List<Printer> _printers = [];
   String? _error;
+  List<Printer> _printers = [];
+
+  final Map<PrinterType, String?> _savedPrinters = {};
+  final Map<PrinterType, String?> _selectedPrinters = {};
+  final Map<PrinterType, bool> _saving = {
+    for (final type in PrinterType.values) type: false,
+  };
 
   @override
   void initState() {
@@ -33,26 +37,17 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     });
 
     try {
-      final saved = await PrinterSettingsService.getDefaultPrinter();
       final printers = await Printing.listPrinters();
-      String? matchedSelection;
 
-      if (saved != null && saved.isNotEmpty) {
-        for (final printer in printers) {
-          final key = _printerKey(printer);
-          if (key == saved || printer.name == saved) {
-            matchedSelection = key;
-            break;
-          }
-        }
-        matchedSelection ??= saved;
+      for (final type in PrinterType.values) {
+        final saved = await PrinterSettingsService.getDefaultPrinter(type);
+        _savedPrinters[type] = saved;
+        _selectedPrinters[type] = _matchSavedPrinter(saved, printers);
       }
 
       if (!mounted) return;
 
       setState(() {
-        _savedPrinter = saved;
-        _selectedPrinter = matchedSelection;
         _printers = printers;
         _loading = false;
       });
@@ -66,34 +61,47 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
-  Future<void> _saveSelection() async {
-    final selected = _selectedPrinter;
+  String? _matchSavedPrinter(String? saved, List<Printer> printers) {
+    if (saved == null || saved.isEmpty) {
+      return null;
+    }
+
+    for (final printer in printers) {
+      final key = _printerKey(printer);
+      if (key == saved || printer.name == saved) {
+        return key;
+      }
+    }
+
+    return saved;
+  }
+
+  Future<void> _saveSelection(PrinterType type) async {
+    final selected = _selectedPrinters[type];
     if (selected == null || selected.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a printer first')),
+        SnackBar(content: Text('Select a ${type.label.toLowerCase()} printer first')),
       );
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() => _saving[type] = true);
 
-    await PrinterSettingsService.setDefaultPrinter(selected);
+    await PrinterSettingsService.setDefaultPrinter(type, selected);
 
     if (!mounted) return;
 
     setState(() {
-      _savedPrinter = selected;
-      _saving = false;
+      _savedPrinters[type] = selected;
+      _saving[type] = false;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Default printer saved: $selected')),
+      SnackBar(content: Text('${type.label} printer saved: $selected')),
     );
   }
 
-  String _printerLabel(Printer printer) {
-    return printer.name;
-  }
+  String _printerLabel(Printer printer) => printer.name;
 
   String _printerKey(Printer printer) {
     return printer.url.isNotEmpty ? printer.url : printer.name;
@@ -125,23 +133,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_savedPrinter != null && _savedPrinter!.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: _border),
-                      ),
-                      child: Text(
-                        'Current default: $_savedPrinter',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (_savedPrinter != null && _savedPrinter!.isNotEmpty)
-                    const SizedBox(height: 12),
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -151,69 +142,114 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       ),
                     ),
                   Expanded(
-                    child: _printers.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No printers found on this system.',
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: _border),
-                            ),
-                            child: ListView.separated(
-                              itemCount: _printers.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final printer = _printers[index];
-                                final key = _printerKey(printer);
-
-                                return RadioListTile<String>(
-                                  value: key,
-                                  groupValue: _selectedPrinter,
-                                  onChanged: (value) {
-                                    setState(() => _selectedPrinter = value);
-                                  },
-                                  title: Text(_printerLabel(printer)),
-                                  subtitle: printer.url.isNotEmpty
-                                      ? Text(
-                                          printer.url,
-                                          style: const TextStyle(fontSize: 11),
-                                        )
-                                      : null,
-                                );
-                              },
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _saveSelection,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF9D1717),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: ListView(
+                      children: [
+                        for (final type in PrinterType.values) ...[
+                          _buildTypeSection(type),
+                          if (type != PrinterType.values.last)
+                            const SizedBox(height: 16),
+                        ],
+                      ],
                     ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'SAVE DEFAULT PRINTER',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
                   ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildTypeSection(PrinterType type) {
+    final saved = _savedPrinters[type];
+    final selected = _selectedPrinters[type];
+    final saving = _saving[type] ?? false;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: _header,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              type.settingsTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  saved != null && saved.isNotEmpty
+                      ? 'Current: $saved'
+                      : 'No ${type.label.toLowerCase()} printer selected',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (_printers.isEmpty)
+                  const Text(
+                    'No printers found on this system.',
+                    style: TextStyle(fontSize: 12),
+                  )
+                else
+                  ..._printers.map((printer) {
+                    final key = _printerKey(printer);
+
+                    return RadioListTile<String>(
+                      value: key,
+                      groupValue: selected,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (value) {
+                        setState(() => _selectedPrinters[type] = value);
+                      },
+                      title: Text(
+                        _printerLabel(printer),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      subtitle: printer.url.isNotEmpty
+                          ? Text(
+                              printer.url,
+                              style: const TextStyle(fontSize: 10),
+                            )
+                          : null,
+                    );
+                  }),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: saving ? null : () => _saveSelection(type),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9D1717),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'SAVE ${type.settingsTitle}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

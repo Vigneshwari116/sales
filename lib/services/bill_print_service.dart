@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
@@ -24,7 +24,16 @@ class BillPrintService {
   static Future<bool> printReceipt(
     SaleBill bill, {
     required String printerName,
+    PrinterType type = PrinterType.thermal,
   }) async {
+    if (type == PrinterType.fast) {
+      throw UnsupportedError(
+        'Fast printer routing is not configured yet. '
+        'Persist a fast printer in settings, but assign its print flow '
+        'before calling printReceipt with PrinterType.fast.',
+      );
+    }
+
     final printers = await Printing.listPrinters();
     Printer? printer;
 
@@ -39,7 +48,7 @@ class BillPrintService {
       throw Exception('Printer "$printerName" not found');
     }
 
-    final pdfBytes = await _buildPdfBytes(bill);
+    final pdfBytes = await _buildPdfBytes(bill, type: type);
 
     final printed = await Printing.directPrintPdf(
       printer: printer,
@@ -51,22 +60,35 @@ class BillPrintService {
     return printed;
   }
 
-  static Future<Uint8List> _buildPdfBytes(SaleBill bill) async {
+  static Future<Uint8List> _buildPdfBytes(
+    SaleBill bill, {
+    required PrinterType type,
+  }) async {
     final text = ReceiptService.buildReceiptText(bill);
     final doc = pw.Document();
     final style = pw.TextStyle(
       font: pw.Font.courier(),
-      fontSize: 8,
+      fontSize: type == PrinterType.thermal ? 8 : 10,
       lineSpacing: 1.2,
     );
 
-    final lineCount = text.split('\n').length;
-    final heightMm = (lineCount * 4.2 + 12).clamp(100.0, 600.0);
-    final pageFormat = PdfPageFormat(
-      80 * PdfPageFormat.mm,
-      heightMm * PdfPageFormat.mm,
-      marginAll: 4 * PdfPageFormat.mm,
-    );
+    final PdfPageFormat pageFormat;
+    if (type == PrinterType.thermal) {
+      final lineCount = text.split('\n').length;
+      final heightMm = (lineCount * 4.2 + 12).clamp(100.0, 600.0);
+      pageFormat = PdfPageFormat(
+        80 * PdfPageFormat.mm,
+        heightMm * PdfPageFormat.mm,
+        marginAll: 4 * PdfPageFormat.mm,
+      );
+    } else {
+      pageFormat = PdfPageFormat.a4.copyWith(
+        marginTop: 12 * PdfPageFormat.mm,
+        marginBottom: 12 * PdfPageFormat.mm,
+        marginLeft: 12 * PdfPageFormat.mm,
+        marginRight: 12 * PdfPageFormat.mm,
+      );
+    }
 
     doc.addPage(
       pw.Page(

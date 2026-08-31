@@ -1,20 +1,69 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum PrinterType {
+  thermal,
+  a4,
+  fast;
+
+  String get label {
+    switch (this) {
+      case PrinterType.thermal:
+        return 'Thermal Receipt';
+      case PrinterType.a4:
+        return 'A4 / Office';
+      case PrinterType.fast:
+        return 'Fast Printer';
+    }
+  }
+
+  String get settingsTitle {
+    switch (this) {
+      case PrinterType.thermal:
+        return 'THERMAL RECEIPT PRINTER';
+      case PrinterType.a4:
+        return 'A4 / OFFICE PRINTER';
+      case PrinterType.fast:
+        return 'FAST PRINTER';
+    }
+  }
+}
+
 class PrinterSettingsService {
-  static const String defaultPrinterKey = 'default_printer';
+  static const String legacyDefaultPrinterKey = 'default_printer';
 
-  static Future<String?> getDefaultPrinter() async {
+  static String _key(PrinterType type) => 'default_printer_${type.name}';
+
+  static Future<void> migrateLegacyIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(defaultPrinterKey);
+    final legacy = prefs.getString(legacyDefaultPrinterKey);
+
+    if (legacy == null || legacy.isEmpty) {
+      return;
+    }
+
+    if (!prefs.containsKey(_key(PrinterType.thermal))) {
+      await prefs.setString(_key(PrinterType.thermal), legacy);
+    }
+
+    await prefs.remove(legacyDefaultPrinterKey);
   }
 
-  static Future<void> setDefaultPrinter(String printerName) async {
+  static Future<String?> getDefaultPrinter(PrinterType type) async {
+    await migrateLegacyIfNeeded();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(defaultPrinterKey, printerName);
+    return prefs.getString(_key(type));
   }
 
-  static Future<void> clearDefaultPrinter() async {
+  static Future<void> setDefaultPrinter(
+    PrinterType type,
+    String printerName,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(defaultPrinterKey);
+    await prefs.setString(_key(type), printerName);
+  }
+
+  static Future<void> clearDefaultPrinter(PrinterType type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(type));
   }
 }
