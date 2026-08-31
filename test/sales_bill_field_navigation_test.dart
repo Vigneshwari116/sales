@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
+import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class _FakePathProvider extends Fake
@@ -55,6 +56,7 @@ void main() {
 
   setUp(() async {
     await AppConfig.setLocation(_testLocationCode);
+    await SessionService.clearBillSession();
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
@@ -111,6 +113,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.byIcon(Icons.close), findsNothing);
+  });
+
+  testWidgets('on-screen NEXT and ADD buttons advance rate→qty and add item',
+      (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.enterText(rateField, '100');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('bill_rate_next_button')));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
+
+    await tester.enterText(qtyField, '2');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('bill_qty_add_button')));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.close), findsOneWidget);
   });
 
   testWidgets('enter on rate advances to qty; enter on qty adds item',

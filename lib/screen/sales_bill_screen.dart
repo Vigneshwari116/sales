@@ -1498,81 +1498,134 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   Widget _buildRateQtyAmount({bool mobile = false}) {
+    final fields = mobile
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: _buildEntryField(
+                  label: 'RATE',
+                  controller: _rateController,
+                  focusNode: _rateFocus,
+                  onChanged: _rateChanged,
+                  onSubmitted: _rateSubmitted,
+                  blockTabTraversal: true,
+                  textInputAction: TextInputAction.next,
+                  fieldKey: const Key('bill_rate_field'),
+                  fullWidth: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildEntryField(
+                  label: 'QTY',
+                  controller: _qtyController,
+                  focusNode: _qtyFocus,
+                  onChanged: _qtyChanged,
+                  onSubmitted: _qtySubmitted,
+                  blockTabTraversal: true,
+                  textInputAction: TextInputAction.done,
+                  fieldKey: const Key('bill_qty_field'),
+                  fullWidth: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildEntryField(
+                  label: 'AMOUNT',
+                  controller: _amountController,
+                  readOnly: true,
+                  fullWidth: true,
+                ),
+              ),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildEntryField(
+                label: 'RATE',
+                controller: _rateController,
+                focusNode: _rateFocus,
+                onChanged: _rateChanged,
+                onSubmitted: _rateSubmitted,
+                blockTabTraversal: true,
+                textInputAction: TextInputAction.next,
+                fieldKey: const Key('bill_rate_field'),
+              ),
+              const SizedBox(width: 12),
+              _buildEntryField(
+                label: 'QTY',
+                controller: _qtyController,
+                focusNode: _qtyFocus,
+                onChanged: _qtyChanged,
+                onSubmitted: _qtySubmitted,
+                blockTabTraversal: true,
+                textInputAction: TextInputAction.done,
+                fieldKey: const Key('bill_qty_field'),
+              ),
+              const SizedBox(width: 12),
+              _buildEntryField(
+                label: 'AMOUNT',
+                controller: _amountController,
+                readOnly: true,
+              ),
+            ],
+          );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment:
+          mobile ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+      children: [
+        fields,
+        const SizedBox(height: 6),
+        _buildRateQtyActionButtons(mobile: mobile),
+      ],
+    );
+  }
+
+  /// Touch/tablet fallback: iOS decimal pads ignore [TextInputAction] and
+  /// often have no submit key; Android numeric keyboards are inconsistent.
+  Widget _buildRateQtyActionButtons({required bool mobile}) {
+    final buttonStyle = ElevatedButton.styleFrom(
+      backgroundColor: buttonColor,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+    );
+
+    final nextButton = ElevatedButton(
+      key: const Key('bill_rate_next_button'),
+      style: buttonStyle,
+      onPressed: _isEntryLocked ? null : _rateSubmitted,
+      child: const Text('NEXT'),
+    );
+
+    final addButton = ElevatedButton(
+      key: const Key('bill_qty_add_button'),
+      style: buttonStyle,
+      onPressed: _isEntryLocked ? null : _qtySubmitted,
+      child: const Text('ADD'),
+    );
+
     if (mobile) {
       return Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Expanded(
-            child: _buildEntryField(
-              label: 'RATE',
-              controller: _rateController,
-              focusNode: _rateFocus,
-              onChanged: _rateChanged,
-              onSubmitted: _rateSubmitted,
-              blockTabTraversal: true,
-              textInputAction: TextInputAction.next,
-              fieldKey: const Key('bill_rate_field'),
-              fullWidth: true,
-            ),
-          ),
+          Expanded(child: nextButton),
           const SizedBox(width: 8),
-          Expanded(
-            child: _buildEntryField(
-              label: 'QTY',
-              controller: _qtyController,
-              focusNode: _qtyFocus,
-              onChanged: _qtyChanged,
-              onSubmitted: _qtySubmitted,
-              blockTabTraversal: true,
-              textInputAction: TextInputAction.done,
-              fieldKey: const Key('bill_qty_field'),
-              fullWidth: true,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildEntryField(
-              label: 'AMOUNT',
-              controller: _amountController,
-              readOnly: true,
-              fullWidth: true,
-            ),
-          ),
+          Expanded(child: addButton),
         ],
       );
     }
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildEntryField(
-          label: 'RATE',
-          controller: _rateController,
-          focusNode: _rateFocus,
-          onChanged: _rateChanged,
-          onSubmitted: _rateSubmitted,
-          blockTabTraversal: true,
-          textInputAction: TextInputAction.next,
-          fieldKey: const Key('bill_rate_field'),
-        ),
+        SizedBox(width: 100, child: nextButton),
         const SizedBox(width: 12),
-        _buildEntryField(
-          label: 'QTY',
-          controller: _qtyController,
-          focusNode: _qtyFocus,
-          onChanged: _qtyChanged,
-          onSubmitted: _qtySubmitted,
-          blockTabTraversal: true,
-          textInputAction: TextInputAction.done,
-          fieldKey: const Key('bill_qty_field'),
-        ),
-        const SizedBox(width: 12),
-        _buildEntryField(
-          label: 'AMOUNT',
-          controller: _amountController,
-          readOnly: true,
-        ),
+        SizedBox(width: 100, child: addButton),
       ],
     );
   }
