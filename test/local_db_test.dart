@@ -265,6 +265,65 @@ void main() {
         timestamp,
       );
     });
+
+    test('applyPulledBills inserts server bills and overwrites synced rows',
+        () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final localBill = SaleBill.fromJson(_sampleBillJson(billNo: 1));
+      await db.insertBill(localBill, syncStatus: 'synced');
+
+      final pulledUpdate = SaleBill.fromJson({
+        ..._sampleBillJson(billNo: 1),
+        'customerName': 'Admin Edited',
+      });
+      final pulledNew = SaleBill.fromJson(_sampleBillJson(billNo: 2));
+
+      final applied = await db.applyPulledBills([pulledUpdate, pulledNew]);
+
+      expect(applied, 2);
+
+      final updated = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 1,
+      );
+      expect(updated!.bill.customerName, 'Admin Edited');
+
+      final inserted = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 2,
+      );
+      expect(inserted, isNotNull);
+      expect(inserted!.syncStatus, 'synced');
+    });
+
+    test('applyPulledBills does not overwrite pending local bills', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final pendingBill = SaleBill.fromJson({
+        ..._sampleBillJson(billNo: 5),
+        'customerName': 'Local Pending',
+      });
+      await db.insertBill(pendingBill, syncStatus: 'pending');
+
+      final pulled = SaleBill.fromJson({
+        ..._sampleBillJson(billNo: 5),
+        'customerName': 'Server Version',
+      });
+
+      final applied = await db.applyPulledBills([pulled]);
+
+      expect(applied, 0);
+
+      final stored = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 5,
+      );
+      expect(stored!.bill.customerName, 'Local Pending');
+      expect(stored.syncStatus, 'pending');
+    });
   });
 
   group('V1 to V2 migration', () {

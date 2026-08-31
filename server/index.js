@@ -40,11 +40,25 @@ async function initDatabase() {
       grand_total DOUBLE PRECISION NOT NULL,
       items_json JSONB NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (location, bill_no)
     );
 
     CREATE INDEX IF NOT EXISTS idx_bills_location_date
       ON bills (location, bill_date);
+
+    CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
+      ON bills (location, updated_at);
+  `);
+
+  await pool.query(`
+    ALTER TABLE bills
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
+      ON bills (location, updated_at)
   `);
 
   const userCount = await pool.query('SELECT COUNT(*)::int AS count FROM users');
@@ -79,6 +93,12 @@ function mapBillRow(row) {
       typeof row.items_json === 'string'
         ? JSON.parse(row.items_json)
         : row.items_json,
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : row.updated_at
+          ? String(row.updated_at)
+          : null,
   };
 }
 
@@ -143,6 +163,39 @@ app.get('/api/bills/next-number', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Could not load bill number' });
+  }
+});
+
+app.get('/api/bills/updates-since', async (req, res) => {
+  const location = req.query.location;
+  const since = req.query.since;
+
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'location parameter is required' });
+  }
+
+  const sinceDate = since ? new Date(String(since)) : new Date(0);
+  if (Number.isNaN(sinceDate.getTime())) {
+    return res.status(400).json({ ok: false, error: 'Invalid since timestamp' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT * FROM bills
+       WHERE location = $1 AND updated_at > $2::timestamptz
+       ORDER BY bill_no ASC`,
+      [location, sinceDate.toISOString()]
+    );
+
+    const serverTime = new Date().toISOString();
+    res.json({
+      ok: true,
+      bills: result.rows.map(mapBillRow),
+      serverTime,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not load bill updates' });
   }
 });
 
@@ -249,7 +302,8 @@ app.post('/api/bills', async (req, res) => {
           total_sgst = $8,
           total_igst = $9,
           grand_total = $10,
-          items_json = $11::jsonb
+          items_json = $11::jsonb,
+          updated_at = NOW()
         WHERE location = $12 AND bill_no = $13`,
         [
           bill.billDate,
@@ -271,8 +325,9 @@ app.post('/api/bills', async (req, res) => {
       await pool.query(
         `INSERT INTO bills (
           bill_no, location, bill_date, payment_mode, customer_name, mobile,
-          total_qty, total_amount, total_cgst, total_sgst, total_igst, grand_total, items_json
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
+          total_qty, total_amount, total_cgst, total_sgst, total_igst, grand_total,
+          items_json, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,NOW())`,
         [
           bill.billNo,
           bill.location,

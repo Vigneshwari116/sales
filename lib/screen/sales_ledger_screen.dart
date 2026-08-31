@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_edit_dialog.dart';
+import 'package:sales/services/sync_service.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
@@ -22,7 +23,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _border = Color(0xFF888888);
 
   bool _loading = true;
-  bool _syncing = false;
+  bool _pulling = false;
+  bool _pushing = false;
   List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
 
@@ -30,7 +32,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   void initState() {
     super.initState();
     _loadLedger();
-    _syncInBackground();
+    _pullInBackground();
   }
 
   Future<void> _loadLedger() async {
@@ -51,20 +53,36 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     });
   }
 
-  Future<void> _syncInBackground() async {
-    setState(() => _syncing = true);
+  Future<void> _pullInBackground() async {
+    setState(() => _pulling = true);
 
-    await LedgerRepository.syncWithServer(location: widget.location);
+    await LedgerRepository.refreshFromServer(location: widget.location);
 
     if (!mounted) return;
 
-    setState(() => _syncing = false);
+    setState(() => _pulling = false);
     await _loadLedger();
   }
 
-  Future<void> _refreshLedger() async {
+  Future<void> _syncNow() async {
+    setState(() => _pushing = true);
+
+    final result = await SyncService.instance.manualPush(widget.location);
+
+    if (!mounted) return;
+
+    setState(() => _pushing = false);
     await _loadLedger();
-    await _syncInBackground();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.summaryMessage)),
+    );
+  }
+
+  Future<void> _refreshLedger() async {
+    await _pullInBackground();
   }
 
   Future<void> _editBill(LocalLedgerEntry entry) async {
@@ -117,15 +135,26 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
         actions: [
-          if (_syncing)
+          if (_pulling)
             const Padding(
-              padding: EdgeInsets.only(right: 8),
+              padding: EdgeInsets.only(right: 4),
               child: SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
+          TextButton.icon(
+            onPressed: _pushing ? null : _syncNow,
+            icon: _pushing
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: const Text('Sync Now'),
+          ),
           IconButton(
             onPressed: _refreshLedger,
             icon: const Icon(Icons.refresh),

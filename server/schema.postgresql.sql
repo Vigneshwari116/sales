@@ -24,11 +24,15 @@ CREATE TABLE IF NOT EXISTS bills (
   grand_total DOUBLE PRECISION NOT NULL,
   items_json JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (location, bill_no)
 );
 
 CREATE INDEX IF NOT EXISTS idx_bills_location_date
   ON bills (location, bill_date);
+
+CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
+  ON bills (location, updated_at);
 
 -- View saved bills:
 -- SELECT bill_no, bill_date, customer_name, grand_total, items_json FROM bills ORDER BY bill_no DESC;

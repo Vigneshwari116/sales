@@ -129,30 +129,8 @@ class LedgerRepository {
     );
   }
 
-  static Future<void> syncWithServer({required String location}) async {
-    await SyncService.instance.pushPendingBills();
-
-    var result = await SalesApi.getLedger(location: location);
-
-    if (result.ok && result.data != null) {
-      await LocalDb.instance.mergeLedgerFromServer(
-        location: location,
-        entries: result.data!.entries
-            .map(
-              (entry) => (
-                billNo: entry.billNo,
-                date: entry.date,
-                paymentMode: entry.paymentMode,
-                total: entry.total,
-                cgst: entry.cgst,
-                sgst: entry.sgst,
-                igst: entry.igst,
-                grandTotal: entry.grandTotal,
-              ),
-            )
-            .toList(),
-      );
-    }
+  static Future<void> refreshFromServer({required String location}) async {
+    await SyncService.instance.autoPull(location);
   }
 
   static LocalLedgerEntry? _entryFromRow(Map<String, dynamic> row) {
