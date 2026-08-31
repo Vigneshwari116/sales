@@ -5,9 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
-import 'package:sales/services/owner_delete_service.dart';
-
-import 'credential_test_helpers.dart';
 
 LocalLedgerEntry _sampleLedgerEntry() {
   return LocalLedgerEntry(
@@ -48,12 +45,6 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    await seedTestCredentials(ownerDeletePin: 'delete99');
-  });
-
-  tearDown(() async {
-    OwnerDeleteService.instance.disable();
-    await resetTestCredentials();
   });
 
   Future<void> pumpLedger(WidgetTester tester) async {
@@ -73,62 +64,10 @@ void main() {
     expect(find.text('Ledger Test Customer'), findsOneWidget);
   }
 
-  Future<void> doubleTap(WidgetTester tester, Finder target) async {
-    await tester.tap(target);
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(target);
-    await tester.pump(const Duration(milliseconds: 300));
-  }
-
-  testWidgets('delete control is absent before owner authentication', (tester) async {
+  testWidgets('ledger has no delete control', (tester) async {
     await pumpLedger(tester);
 
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
     expect(find.byTooltip('Delete bill'), findsNothing);
     expect(find.text('X'), findsNothing);
-  });
-
-  testWidgets('delete control appears only after owner authentication', (tester) async {
-    await pumpLedger(tester);
-
-    expect(find.byTooltip('Delete bill'), findsNothing);
-
-    OwnerDeleteService.instance.enable();
-    await tester.pump();
-
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isTrue);
-    expect(find.byTooltip('Delete bill'), findsOneWidget);
-    expect(find.text('X'), findsOneWidget);
-  });
-
-  testWidgets('incorrect password UI does not enable delete control', (tester) async {
-    await pumpLedger(tester);
-
-    await doubleTap(tester, find.text('SALES LEDGER'));
-
-    expect(find.text('Owner password'), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField), 'not-the-owner-password');
-    await tester.tap(find.text('Unlock'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
-    expect(find.byTooltip('Delete bill'), findsNothing);
-    expect(find.text('X'), findsNothing);
-    expect(find.text('Incorrect password'), findsOneWidget);
-  });
-
-  testWidgets('delete mode disabled after leaving ledger screen', (tester) async {
-    await pumpLedger(tester);
-
-    OwnerDeleteService.instance.enable();
-    await tester.pump();
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isTrue);
-
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    await tester.pump();
-
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
   });
 }

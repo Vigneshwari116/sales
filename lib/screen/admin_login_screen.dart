@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
-import 'package:sales/services/credential_service.dart';
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 
-/// Admin login gate — separate credentials from staff POS login.
+/// Admin login — cross-location; no location dropdown.
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 
@@ -23,15 +23,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   bool _obscure = true;
   String? _error;
 
-  final List<String> _locationCodes = const [
-    'win1',
-    'win2',
-    'win3',
-    'win4',
-  ];
-
-  String _selectedLocationCode = 'win1';
-
   @override
   void dispose() {
     _userCtrl.dispose();
@@ -45,15 +36,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text.trim();
 
-    if (!await CredentialService.verifyAdmin(username, password)) {
-      setState(() => _error = 'Incorrect admin username or password.');
+    if (!verifyAdminLogin(username, password)) {
+      setState(() => _error = 'Incorrect username or password.');
       return;
     }
 
     setState(() => _error = null);
 
     await SessionService.clearBillSession();
-    await AppConfig.setLocation(_selectedLocationCode);
+    // Admin session uses win1 internally for any local DB paths; UI is cross-location.
+    await AppConfig.setLocation('win1');
     await AppSessionService.onLoginComplete();
     await SessionService.saveLogin(username, role: SessionRole.admin);
 
@@ -103,7 +95,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         size: 48, color: _btn),
                     const SizedBox(height: 8),
                     const Text(
-                      'Admin Login',
+                      'Login',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
@@ -111,35 +103,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLocationCode,
-                      decoration: const InputDecoration(
-                        labelText: 'Location',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on_outlined),
-                      ),
-                      items: _locationCodes.map((code) {
-                        return DropdownMenuItem<String>(
-                          value: code,
-                          child: Text(
-                            AppConfig.displayLocationNameFor(code),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _selectedLocationCode = value);
-                      },
-                    ),
-                    const SizedBox(height: 14),
                     TextFormField(
                       controller: _userCtrl,
                       autocorrect: false,
                       enableSuggestions: false,
                       textCapitalization: TextCapitalization.none,
                       decoration: const InputDecoration(
-                        labelText: 'Admin username',
+                        labelText: 'Username',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_outline),
                       ),
@@ -190,7 +160,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           ),
                         ),
                         child: const Text(
-                          'ADMIN LOGIN',
+                          'LOGIN',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1,
@@ -198,10 +168,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: _openStaffLogin,
-                      child: const Text('Staff login'),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        tooltip: 'Switch login',
+                        onPressed: _openStaffLogin,
+                        icon: const Icon(Icons.swap_horiz, size: 20),
+                      ),
                     ),
                   ],
                 ),

@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:sales/config/app_config.dart';
-import 'package:sales/screen/credential_settings_screen.dart';
+import 'package:sales/config/location_codes.dart';
+import 'package:sales/screen/admin_cross_abstract_screen.dart';
+import 'package:sales/screen/admin_location_grid_screen.dart';
 import 'package:sales/screen/login_screen.dart';
-import 'package:sales/screen/printer_settings_screen.dart';
-import 'package:sales/screen/sales_abstract_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
+import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/app_config.dart';
+import 'package:sales/services/gst_config_service.dart';
 
 enum _AdminSection {
+  dashboard,
   abstract,
   ledger,
-  printers,
   sync,
-  security,
 }
 
 /// Admin shell with [NavigationRail] on wide layouts and a drawer on narrow.
 class AdminDashboardScreen extends StatefulWidget {
-  /// When set (tests only), replaces the default [SalesLedgerScreen] body.
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
 
@@ -34,11 +35,11 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   static const Color _background = Color(0xFFC5F6C5);
+  static const Color _navSurface = Color(0xFFE8F5E8);
   static const double _railBreakpoint = 700;
 
-  _AdminSection _selectedSection = _AdminSection.abstract;
-
-  String get _location => AppConfig.displayLocationName;
+  _AdminSection _selectedSection = _AdminSection.dashboard;
+  String _ledgerLocation = displayNameForLocationCode('win1');
 
   int get _selectedIndex => _selectedSection.index;
 
@@ -61,31 +62,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _sectionLabel(_AdminSection section) {
     switch (section) {
+      case _AdminSection.dashboard:
+        return const Text('DASHBOARD');
       case _AdminSection.abstract:
         return const Text('ABSTRACT');
       case _AdminSection.ledger:
         return const Text('LEDGER');
-      case _AdminSection.printers:
-        return const Text('PRINTERS');
       case _AdminSection.sync:
         return const Text('SYNC');
-      case _AdminSection.security:
-        return const Text('SECURITY');
     }
   }
 
   IconData _sectionIcon(_AdminSection section) {
     switch (section) {
+      case _AdminSection.dashboard:
+        return Icons.dashboard_outlined;
       case _AdminSection.abstract:
         return Icons.summarize_outlined;
       case _AdminSection.ledger:
         return Icons.menu_book_outlined;
-      case _AdminSection.printers:
-        return Icons.print_outlined;
       case _AdminSection.sync:
         return Icons.cloud_upload_outlined;
-      case _AdminSection.security:
-        return Icons.security_outlined;
     }
   }
 
@@ -93,20 +90,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        DrawerHeader(
-          decoration: const BoxDecoration(color: Color(0xFFD5D8D5)),
+        const DrawerHeader(
+          decoration: BoxDecoration(color: _navSurface),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const Text(
+              Text(
                 'Admin',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
-                _location,
-                style: const TextStyle(fontSize: 13),
+                'All locations',
+                style: TextStyle(fontSize: 13),
               ),
             ],
           ),
@@ -137,17 +134,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildSectionBody() {
-    return IndexedStack(
-      index: _selectedIndex,
-      children: [
-        SalesAbstractScreen(location: _location),
-        widget.ledgerScreenBuilder?.call(_location) ??
-            SalesLedgerScreen(location: _location),
-        const PrinterSettingsScreen(),
-        _AdminSyncPanel(location: _location),
-        const CredentialSettingsScreen(),
-      ],
-    );
+    switch (_selectedSection) {
+      case _AdminSection.dashboard:
+        return const AdminLocationGridScreen();
+      case _AdminSection.abstract:
+        return const AdminCrossAbstractScreen();
+      case _AdminSection.ledger:
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: DropdownButtonFormField<String>(
+                initialValue: _ledgerLocation,
+                decoration: const InputDecoration(
+                  labelText: 'Ledger location',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: allLocationCodes
+                    .map(
+                      (code) => DropdownMenuItem(
+                        value: displayNameForLocationCode(code),
+                        child: Text(displayNameForLocationCode(code)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _ledgerLocation = value);
+                },
+              ),
+            ),
+            Expanded(
+              child: widget.ledgerScreenBuilder?.call(_ledgerLocation) ??
+                  SalesLedgerScreen(
+                    location: _ledgerLocation,
+                    embeddedInDashboard: true,
+                    readOnly: true,
+                  ),
+            ),
+          ],
+        );
+      case _AdminSection.sync:
+        return const _AdminSyncPanel();
+    }
   }
 
   @override
@@ -169,16 +199,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               labelType: width > 900
                   ? NavigationRailLabelType.all
                   : NavigationRailLabelType.selected,
-              backgroundColor: Colors.white,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
+              backgroundColor: _navSurface,
+              leading: const Padding(
+                padding: EdgeInsets.only(top: 12, bottom: 8),
                 child: Column(
                   children: [
-                    const Icon(Icons.admin_panel_settings, size: 28),
-                    const SizedBox(height: 4),
+                    Icon(Icons.admin_panel_settings, size: 28),
+                    SizedBox(height: 4),
                     Text(
-                      _location,
-                      style: const TextStyle(
+                      'Admin',
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -218,22 +248,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       key: const Key('admin_dashboard_drawer_shell'),
       backgroundColor: _background,
-      drawer: Drawer(child: _buildNavigationList()),
+      drawer: Drawer(
+        backgroundColor: _background,
+        child: _buildNavigationList(),
+      ),
       appBar: AppBar(
         title: _sectionLabel(_selectedSection),
-        backgroundColor: const Color(0xFFD5D8D5),
+        backgroundColor: _navSurface,
         foregroundColor: Colors.black,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Text(
-                _location,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
       ),
       body: _buildSectionBody(),
     );
@@ -241,9 +263,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 class _AdminSyncPanel extends StatefulWidget {
-  final String location;
-
-  const _AdminSyncPanel({required this.location});
+  const _AdminSyncPanel();
 
   @override
   State<_AdminSyncPanel> createState() => _AdminSyncPanelState();
@@ -252,21 +272,70 @@ class _AdminSyncPanel extends StatefulWidget {
 class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   static const Color _background = Color(0xFFC5F6C5);
 
-  bool _syncing = false;
+  final _cgstCtrl = TextEditingController(
+    text: GstConfigService.defaultCgstPct.toString(),
+  );
+  final _sgstCtrl = TextEditingController(
+    text: GstConfigService.defaultSgstPct.toString(),
+  );
+
+  String _selectedLocationCode = 'win1';
+  bool _saving = false;
   String? _message;
 
-  Future<void> _syncNow() async {
+  @override
+  void dispose() {
+    _cgstCtrl.dispose();
+    _sgstCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveGstConfig() async {
+    final cgst = double.tryParse(_cgstCtrl.text.trim());
+    final sgst = double.tryParse(_sgstCtrl.text.trim());
+
+    if (cgst == null || sgst == null) {
+      setState(() => _message = 'Enter valid GST percentages');
+      return;
+    }
+
     setState(() {
-      _syncing = true;
+      _saving = true;
       _message = null;
     });
 
-    final result = await SyncService.instance.manualPush(widget.location);
+    final result = await SalesApi.updateGstConfig(
+      locationCode: _selectedLocationCode,
+      cgstPct: cgst,
+      sgstPct: sgst,
+    );
 
     if (!mounted) return;
 
     setState(() {
-      _syncing = false;
+      _saving = false;
+      _message = result.ok
+          ? 'GST config saved — staff will receive on next sync'
+          : (result.error ?? 'Could not save GST config');
+    });
+  }
+
+  Future<void> _syncLocation() async {
+    final allowed = await SyncGateService.confirmSync(context);
+    if (!allowed || !mounted) return;
+
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    final location = displayNameForLocationCode(_selectedLocationCode);
+    final result = await SyncService.instance.manualSync(location);
+
+    if (!mounted) return;
+
+    setState(() {
+      _saving = false;
       _message = result.summaryMessage;
     });
   }
@@ -277,16 +346,16 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
       backgroundColor: _background,
       appBar: AppBar(
         title: const Text(
-          'SYNC',
+          'SYNC & GST CONFIG',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
+        backgroundColor: const Color(0xFFE8F5E8),
         foregroundColor: Colors.black,
         automaticallyImplyLeading: false,
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -294,30 +363,62 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Push pending bills for ${widget.location} to the server.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    height: 46,
-                    child: ElevatedButton.icon(
-                      key: const Key('admin_sync_now_button'),
-                      onPressed: _syncing ? null : _syncNow,
-                      icon: _syncing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.cloud_upload_outlined),
-                      label: Text(_syncing ? 'SYNCING...' : 'SYNC NOW'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9C1C1C),
-                        foregroundColor: Colors.white,
-                      ),
+                  DropdownButtonFormField<String>(
+                    value: _selectedLocationCode,
+                    decoration: const InputDecoration(
+                      labelText: 'Location',
+                      border: OutlineInputBorder(),
                     ),
+                    items: allLocationCodes
+                        .map(
+                          (code) => DropdownMenuItem(
+                            value: code,
+                            child: Text(displayNameForLocationCode(code)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() => _selectedLocationCode = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _cgstCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'CGST %',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _sgstCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'SGST %',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _saveGstConfig,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF9C1C1C),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(_saving ? 'SAVING...' : 'SAVE GST CONFIG'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('admin_sync_now_button'),
+                    onPressed: _saving ? null : _syncLocation,
+                    icon: const Icon(Icons.cloud_upload_outlined),
+                    label: const Text('SYNC LOCATION'),
                   ),
                   if (_message != null) ...[
                     const SizedBox(height: 16),

@@ -90,7 +90,7 @@ class LedgerRepository {
   }
 
   static Future<void> refreshFromServer({required String location}) async {
-    await SyncService.instance.autoPull(location);
+    await SyncService.instance.pullAdminUpdates(location);
   }
 
   static LedgerSummary _buildSummary(List<LocalLedgerEntry> entries) {

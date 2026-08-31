@@ -7,7 +7,6 @@ import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
-import 'package:sales/services/owner_delete_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 const _localId = 'drill-down-local-id';
@@ -71,7 +70,6 @@ Future<
 void main() {
   tearDown(() async {
     await SyncService.resetForTesting();
-    OwnerDeleteService.instance.disable();
   });
 
   testWidgets('tapping ledger row opens read-only bill detail', (tester) async {
@@ -123,43 +121,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Could not load bill'), findsOneWidget);
-    expect(find.byType(LedgerBillDetailScreen), findsNothing);
-  });
-
-  testWidgets('tapping delete X does not open bill detail', (tester) async {
-    var viewBillCalls = 0;
-    var deleteCalls = 0;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SalesLedgerScreen(
-          location: 'Win1',
-          autoRefreshOnOpen: false,
-          loadLedgerOverride: _loadSampleLedger,
-          loadBillOverride: (localId) async {
-            viewBillCalls++;
-            return _sampleBill();
-          },
-          softDeleteBillOverride: (localId) async {
-            deleteCalls++;
-            expect(localId, _localId);
-          },
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-
-    OwnerDeleteService.instance.enable();
-    await tester.pump();
-
-    await tester.tap(find.byTooltip('Delete bill'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(deleteCalls, 1);
-    expect(viewBillCalls, 0);
     expect(find.byType(LedgerBillDetailScreen), findsNothing);
   });
 

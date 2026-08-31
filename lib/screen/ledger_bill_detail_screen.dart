@@ -1,42 +1,199 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 
-/// Read-only drill-down for a saved bill from the sales ledger.
-class LedgerBillDetailScreen extends StatelessWidget {
+/// Drill-down for a saved bill — password-gated edit for staff.
+class LedgerBillDetailScreen extends StatefulWidget {
   final SaleBill bill;
+  final String localId;
   final String? syncStatus;
+  final bool readOnly;
 
   const LedgerBillDetailScreen({
     super.key,
     required this.bill,
+    required this.localId,
     this.syncStatus,
+    this.readOnly = false,
   });
 
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _header = Color(0xFFFFF5C5);
-  static const Color _border = Color(0xFF888888);
-  static const Color _billNoColor = Color(0xFFFFE5A0);
+  static const Color background = Color(0xFFC5F6C5);
+  static const Color header = Color(0xFFFFF5C5);
+  static const Color border = Color(0xFF888888);
+  static const Color billNoColor = Color(0xFFFFE5A0);
+
+  @override
+  State<LedgerBillDetailScreen> createState() => _LedgerBillDetailScreenState();
+}
+
+class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
+  late SaleBill _bill;
+  late List<BillItem> _items;
+
+  bool _editUnlocked = false;
+  bool _showPasswordField = false;
+  bool _saving = false;
+  String? _passwordError;
+  int? _editingIndex;
+
+  final _passwordCtrl = TextEditingController();
+  final _rateCtrl = TextEditingController();
+  final _qtyCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _bill = widget.bill;
+    _items = widget.bill.items.map((e) => e.copyWith()).toList();
+  }
+
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    _rateCtrl.dispose();
+    _qtyCtrl.dispose();
+    super.dispose();
+  }
 
   String _format(num value) => NumberFormat('#,##0.00').format(value);
 
-  String _formatDate(DateTime date) =>
-      DateFormat('dd-MMM-yy').format(date);
+  String _formatDate(DateTime date) => DateFormat('dd-MMM-yy').format(date);
+
+  double get _totalQty =>
+      _items.fold(0.0, (sum, item) => sum + item.qty);
+
+  double get _totalAmount =>
+      _items.fold(0.0, (sum, item) => sum + item.amount);
+
+  double get _totalCgst =>
+      _items.fold(0.0, (sum, item) => sum + item.cgst);
+
+  double get _totalSgst =>
+      _items.fold(0.0, (sum, item) => sum + item.sgst);
+
+  double get _totalIgst =>
+      _items.fold(0.0, (sum, item) => sum + item.igst);
+
+  double get _grandTotal =>
+      _items.fold(0.0, (sum, item) => sum + item.grossAmt);
+
+  void _onMobileDoubleTap() {
+    if (widget.readOnly || _editUnlocked) return;
+
+    setState(() {
+      _showPasswordField = true;
+      _passwordError = null;
+      _passwordCtrl.clear();
+    });
+  }
+
+  void _tryUnlockEdit() {
+    if (_passwordCtrl.text == billEditPassword) {
+      setState(() {
+        _editUnlocked = true;
+        _showPasswordField = false;
+        _passwordError = null;
+      });
+      return;
+    }
+
+    setState(() => _passwordError = 'Incorrect password');
+  }
+
+  void _startEditLine(int index) {
+    if (!_editUnlocked) return;
+
+    setState(() {
+      _editingIndex = index;
+      _rateCtrl.text = _items[index].rate.toString();
+      _qtyCtrl.text = _items[index].qty.toString();
+    });
+  }
+
+  void _applyLineEdit() {
+    final index = _editingIndex;
+    if (index == null) return;
+
+    final rate = double.tryParse(_rateCtrl.text.trim());
+    final qty = double.tryParse(_qtyCtrl.text.trim());
+
+    if (rate == null || rate <= 0 || qty == null || qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid rate and quantity')),
+      );
+      return;
+    }
+
+    setState(() {
+      _items[index] = _items[index].copyWith(rate: rate, qty: qty);
+      _editingIndex = null;
+    });
+  }
+
+  Future<void> _saveBill() async {
+    if (!_editUnlocked || _saving) return;
+
+    setState(() => _saving = true);
+
+    final updated = SaleBill(
+      billNo: _bill.billNo,
+      location: _bill.location,
+      billDate: _bill.billDate,
+      paymentMode: _bill.paymentMode,
+      customerName: _bill.customerName,
+      mobile: _bill.mobile,
+      items: _items,
+      totalQty: _totalQty,
+      totalAmount: _totalAmount,
+      totalCgst: _totalCgst,
+      totalSgst: _totalSgst,
+      totalIgst: _totalIgst,
+      grandTotal: _grandTotal,
+    );
+
+    final result = await BillRepository.saveBill(
+      updated,
+      updateLocalId: widget.localId,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _saving = false);
+
+    if (!result.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Could not save bill')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(true);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: LedgerBillDetailScreen.background,
       appBar: AppBar(
         title: Text(
-          'BILL ${bill.billNo}',
+          'BILL ${_bill.billNo}',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
+        actions: [
+          if (_editUnlocked)
+            TextButton(
+              onPressed: _saving ? null : _saveBill,
+              child: Text(_saving ? 'SAVING...' : 'SAVE'),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
@@ -59,7 +216,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
   Widget _buildBillHeader() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: _border),
+        border: Border.all(color: LedgerBillDetailScreen.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
@@ -74,9 +231,9 @@ class LedgerBillDetailScreen extends StatelessWidget {
                 width: 72,
                 height: 28,
                 alignment: Alignment.center,
-                color: _billNoColor,
+                color: LedgerBillDetailScreen.billNoColor,
                 child: Text(
-                  '${bill.billNo}',
+                  '${_bill.billNo}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -87,12 +244,12 @@ class LedgerBillDetailScreen extends StatelessWidget {
               const Text('DATE:', style: TextStyle(fontSize: 10)),
               const SizedBox(width: 6),
               Text(
-                _formatDate(bill.billDate),
+                _formatDate(_bill.billDate),
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
               ),
               const Spacer(),
               Text(
-                bill.paymentMode,
+                _bill.paymentMode,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ],
@@ -101,12 +258,12 @@ class LedgerBillDetailScreen extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Location: ${bill.location}',
+                'Location: ${_bill.location}',
                 style: const TextStyle(fontSize: 10),
               ),
-              if (syncStatus != null) ...[
+              if (widget.syncStatus != null) ...[
                 const Spacer(),
-                _syncBadge(syncStatus!),
+                _syncBadge(widget.syncStatus!),
               ],
             ],
           ),
@@ -121,7 +278,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: isPending ? const Color(0xFFFFF3CD) : const Color(0xFFD4EDDA),
-        border: Border.all(color: _border),
+        border: Border.all(color: LedgerBillDetailScreen.border),
       ),
       child: Text(
         isPending ? 'Pending sync' : 'Synced',
@@ -137,7 +294,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
   Widget _buildCustomerSection() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: _border),
+        border: Border.all(color: LedgerBillDetailScreen.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
@@ -149,9 +306,56 @@ class LedgerBillDetailScreen extends StatelessWidget {
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
-          _readOnlyField('Name', bill.customerName),
+          _readOnlyField('Name', _bill.customerName),
           const SizedBox(height: 4),
-          _readOnlyField('Mobile', bill.mobile),
+          GestureDetector(
+            onDoubleTap: _onMobileDoubleTap,
+            child: _readOnlyField('Mobile', _bill.mobile),
+          ),
+          if (_showPasswordField && !_editUnlocked) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 48,
+                  child: Text('Password', style: TextStyle(fontSize: 10)),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _passwordCtrl,
+                    obscureText: true,
+                    autofocus: true,
+                    onSubmitted: (_) => _tryUnlockEdit(),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _tryUnlockEdit,
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+            if (_passwordError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _passwordError!,
+                  style: const TextStyle(color: Colors.red, fontSize: 10),
+                ),
+              ),
+          ],
+          if (_editUnlocked)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Edit mode — tap a line item to correct rate/qty, then SAVE.',
+                style: TextStyle(fontSize: 10, color: Color(0xFF155724)),
+              ),
+            ),
         ],
       ),
     );
@@ -165,10 +369,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
           child: Text(label, style: const TextStyle(fontSize: 10)),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 11),
-          ),
+          child: Text(value, style: const TextStyle(fontSize: 11)),
         ),
       ],
     );
@@ -177,14 +378,14 @@ class LedgerBillDetailScreen extends StatelessWidget {
   Widget _buildItemTable() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: _border),
+        border: Border.all(color: LedgerBillDetailScreen.border),
         color: Colors.white,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _tableHeader(),
-          if (bill.items.isEmpty)
+          if (_items.isEmpty)
             const Padding(
               padding: EdgeInsets.all(12),
               child: Text(
@@ -193,9 +394,59 @@ class LedgerBillDetailScreen extends StatelessWidget {
               ),
             )
           else
-            ...List.generate(bill.items.length, (index) {
-              return _tableRow(index, bill.items[index]);
+            ...List.generate(_items.length, (index) {
+              if (_editingIndex == index) {
+                return _editRow(index);
+              }
+              return _tableRow(index, _items[index]);
             }),
+        ],
+      ),
+    );
+  }
+
+  Widget _editRow(int index) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Text('Line ${index + 1}', style: const TextStyle(fontSize: 10)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 72,
+            height: 32,
+            child: TextField(
+              controller: _rateCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Rate',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 72,
+            height: 32,
+            child: TextField(
+              controller: _qtyCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Qty',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(onPressed: _applyLineEdit, child: const Text('OK')),
         ],
       ),
     );
@@ -203,7 +454,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
 
   Widget _tableHeader() {
     return Container(
-      color: _header,
+      color: LedgerBillDetailScreen.header,
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: const Row(
         children: [
@@ -221,35 +472,38 @@ class LedgerBillDetailScreen extends StatelessWidget {
   }
 
   Widget _tableRow(int index, BillItem item) {
-    return Row(
-      children: [
-        _DataCell('${index + 1}', 1),
-        _DataCell(_format(item.qty), 1),
-        _DataCell(_format(item.rate), 1),
-        _DataCell(_format(item.amount), 1),
-        _DataCell(_format(item.grossAmt), 1),
-        _DataCell(_format(item.cgstPct), 1),
-        _DataCell(_format(item.sgstPct), 1),
-        _DataCell(_format(item.igst), 1),
-      ],
+    return InkWell(
+      onTap: _editUnlocked ? () => _startEditLine(index) : null,
+      child: Row(
+        children: [
+          _DataCell('${index + 1}', 1),
+          _DataCell(_format(item.qty), 1),
+          _DataCell(_format(item.rate), 1),
+          _DataCell(_format(item.amount), 1),
+          _DataCell(_format(item.grossAmt), 1),
+          _DataCell(_format(item.cgstPct), 1),
+          _DataCell(_format(item.sgstPct), 1),
+          _DataCell(_format(item.igst), 1),
+        ],
+      ),
     );
   }
 
   Widget _buildTotals() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: _border),
+        border: Border.all(color: LedgerBillDetailScreen.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _totalRow('Total Qty', _format(bill.totalQty)),
-          _totalRow('Total Amt', _format(bill.totalAmount)),
-          _totalRow('CGST', _format(bill.totalCgst)),
-          _totalRow('SGST', _format(bill.totalSgst)),
-          _totalRow('IGST', _format(bill.totalIgst)),
+          _totalRow('Total Qty', _format(_totalQty)),
+          _totalRow('Total Amt', _format(_totalAmount)),
+          _totalRow('CGST', _format(_totalCgst)),
+          _totalRow('SGST', _format(_totalSgst)),
+          _totalRow('IGST', _format(_totalIgst)),
           const SizedBox(height: 8),
           const Text(
             'Grand Total',
@@ -259,7 +513,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              _format(bill.grandTotal),
+              _format(_grandTotal),
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
@@ -267,7 +521,7 @@ class LedgerBillDetailScreen extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              amountInWords(bill.grandTotal),
+              amountInWords(_grandTotal),
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ),
@@ -331,7 +585,7 @@ class _DataCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: const BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: LedgerBillDetailScreen._border, width: 0.6),
+            bottom: BorderSide(color: LedgerBillDetailScreen.border, width: 0.6),
           ),
         ),
         child: Text(

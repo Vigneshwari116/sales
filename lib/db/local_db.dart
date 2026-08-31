@@ -323,11 +323,6 @@ class LocalDb {
         );
 
         if (existingRows.isNotEmpty) {
-          final syncStatus = existingRows.first['sync_status'] as String?;
-          if (syncStatus == 'pending') {
-            continue;
-          }
-
           final localId = existingRows.first['local_id'] as String;
           final now = DateTime.now().toUtc().toIso8601String();
           await txn.update(
@@ -558,6 +553,23 @@ class LocalDb {
         conflictAlgorithm: ConflictAlgorithm.abort,
       );
     }
+  }
+
+  Future<String?> getGstMasterValue(String key) async {
+    final db = await database;
+    final rows = await db.query(
+      'gst_master',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return rows.first['value'] as String?;
   }
 
   Future<void> replaceGstMaster(List<Map<String, String>> rows) async {
