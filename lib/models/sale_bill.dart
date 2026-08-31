@@ -14,6 +14,7 @@ class SaleBill {
   final double totalSgst;
   final double totalIgst;
   final double grandTotal;
+  final bool deleted;
 
   SaleBill({
     required this.billNo,
@@ -29,6 +30,7 @@ class SaleBill {
     required this.totalSgst,
     required this.totalIgst,
     required this.grandTotal,
+    this.deleted = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -46,6 +48,7 @@ class SaleBill {
       'totalSgst': totalSgst,
       'totalIgst': totalIgst,
       'grandTotal': grandTotal,
+      'deleted': deleted,
     };
   }
 
@@ -67,6 +70,7 @@ class SaleBill {
       totalSgst: (json['totalSgst'] as num).toDouble(),
       totalIgst: (json['totalIgst'] as num).toDouble(),
       grandTotal: (json['grandTotal'] as num).toDouble(),
+      deleted: json['deleted'] as bool? ?? false,
     );
   }
 

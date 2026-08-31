@@ -131,8 +131,8 @@ class LocalDb {
   }) async {
     final db = await database;
     final where = location == null
-        ? 'sync_status = ? AND deleted = 0'
-        : 'sync_status = ? AND location = ? AND deleted = 0';
+        ? 'sync_status = ?'
+        : 'sync_status = ? AND location = ?';
     final whereArgs =
         location == null ? [syncStatus] : [syncStatus, location];
 
@@ -368,14 +368,31 @@ class LocalDb {
     return applied;
   }
 
-  /// Soft-deletes a bill (row kept for audit; hidden from ledger/sync).
+  /// Soft-deletes a bill (row kept for audit; hidden from ledger).
+  /// Previously synced bills are re-queued for push so the server tombstone
+  /// is updated. Never-synced bills are marked synced locally (nothing to push).
   Future<void> markBillDeleted(String localId) async {
     final db = await database;
+    final rows = await db.query(
+      'bills',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return;
+    }
+
+    final wasSynced = rows.first['sync_status'] == 'synced';
+    final now = DateTime.now().toUtc().toIso8601String();
+
     await db.update(
       'bills',
       {
         'deleted': 1,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': now,
+        'sync_status': wasSynced ? 'pending' : 'synced',
       },
       where: 'local_id = ?',
       whereArgs: [localId],
@@ -892,6 +909,7 @@ class LocalDb {
       'grand_total': bill.grandTotal,
       'sync_status': syncStatus,
       'updated_at': updatedAt,
+      'deleted': bill.deleted ? 1 : 0,
     };
   }
 
@@ -914,6 +932,7 @@ class LocalDb {
           totalSgst: (row['total_sgst'] as num).toDouble(),
           totalIgst: (row['total_igst'] as num).toDouble(),
           grandTotal: (row['grand_total'] as num).toDouble(),
+          deleted: (row['deleted'] as int? ?? 0) == 1,
         ),
         syncStatus: row['sync_status'] as String? ?? 'pending',
         updatedAt: row['updated_at'] as String? ?? '',

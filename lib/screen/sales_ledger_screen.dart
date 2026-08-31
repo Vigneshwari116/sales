@@ -56,6 +56,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   @override
   void dispose() {
     OwnerDeleteService.instance.removeListener(_onOwnerDeleteChanged);
+    OwnerDeleteService.instance.disable();
     _ownerPasswordController.dispose();
     super.dispose();
   }

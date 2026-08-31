@@ -106,4 +106,17 @@ void main() {
     expect(find.text('X'), findsNothing);
     expect(find.text('Incorrect password'), findsOneWidget);
   });
+
+  testWidgets('delete mode disabled after leaving ledger screen', (tester) async {
+    await pumpLedger(tester);
+
+    OwnerDeleteService.instance.enable();
+    await tester.pump();
+    expect(OwnerDeleteService.instance.isDeleteEnabled, isTrue);
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump();
+
+    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
+  });
 }

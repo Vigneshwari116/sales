@@ -325,12 +325,37 @@ void main() {
       expect(stored.syncStatus, 'pending');
     });
 
+    test('applyPulledBills applies server-side soft delete', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson()),
+        syncStatus: 'synced',
+      );
+
+      final pulled = SaleBill.fromJson({
+        ..._sampleBillJson(),
+        'deleted': true,
+      });
+
+      final applied = await db.applyPulledBills([pulled]);
+
+      expect(applied, 1);
+
+      final entries = await db.getLedgerEntries(_testLocationName);
+      expect(entries, isEmpty);
+    });
+
     test('markBillDeleted hides bill from ledger but keeps row in database',
         () async {
       final db = LocalDb.instance;
       await db.initialize();
 
-      final localId = await db.insertBill(SaleBill.fromJson(_sampleBillJson()));
+      final localId = await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson()),
+        syncStatus: 'synced',
+      );
       await db.markBillDeleted(localId);
 
       final entries = await db.getLedgerEntries(_testLocationName);
@@ -341,6 +366,22 @@ void main() {
         billNo: 1,
       );
       expect(stored, isNotNull);
+
+      final pending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(pending, hasLength(1));
+      expect(pending.first.bill.deleted, isTrue);
+    });
+
+    test('markBillDeleted on never-synced bill does not queue server push',
+        () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final localId = await db.insertBill(SaleBill.fromJson(_sampleBillJson()));
+      await db.markBillDeleted(localId);
 
       final pending = await db.getBillsBySyncStatus(
         'pending',

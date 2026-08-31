@@ -212,5 +212,38 @@ void main() {
         expect(stillPending, isEmpty);
       },
     );
+
+    test('manualPush pushes soft-deleted synced bill with deleted flag', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final localId = await db.insertBill(
+        _pendingBill(1),
+        syncStatus: 'synced',
+      );
+      await db.markBillDeleted(localId);
+
+      final sync = SyncService.instance;
+      sync.isOnlineOverride = () async => true;
+
+      SaleBill? pushedBill;
+      sync.saveBillOverride = (bill) async {
+        pushedBill = bill;
+        return SalesApiResult.success(bill.billNo);
+      };
+
+      final result = await sync.manualPush(_testLocationName);
+
+      expect(result.ok, isTrue);
+      expect(result.syncedCount, 1);
+      expect(pushedBill, isNotNull);
+      expect(pushedBill!.deleted, isTrue);
+
+      final stillPending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(stillPending, isEmpty);
+    });
   });
 }
