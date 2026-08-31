@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
-import 'package:sales/config/local_credentials.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/services/owner_delete_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
+  final bool autoRefreshOnOpen;
+
+  /// When set (tests only), bypasses [LedgerRepository.getLedger].
+  @visibleForTesting
+  final Future<
+      ({
+        List<LocalLedgerEntry> entries,
+        LedgerSummary summary,
+      })>? Function()? loadLedgerOverride;
 
   const SalesLedgerScreen({
     super.key,
     required this.location,
+    this.autoRefreshOnOpen = true,
+    this.loadLedgerOverride,
   });
 
   @override
@@ -38,7 +48,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     super.initState();
     OwnerDeleteService.instance.addListener(_onOwnerDeleteChanged);
     _loadLedger();
-    _pullInBackground();
+    if (widget.autoRefreshOnOpen) {
+      _pullInBackground();
+    }
   }
 
   @override
@@ -59,9 +71,18 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       _loading = true;
     });
 
-    final result = await LedgerRepository.getLedger(
-      location: widget.location,
-    );
+    final ({
+      List<LocalLedgerEntry> entries,
+      LedgerSummary summary,
+    }) result;
+
+    if (widget.loadLedgerOverride != null) {
+      result = await widget.loadLedgerOverride!()!;
+    } else {
+      result = await LedgerRepository.getLedger(
+        location: widget.location,
+      );
+    }
 
     if (!mounted) return;
 
@@ -104,7 +125,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     await _pullInBackground();
   }
 
-  void _onNameHeaderDoubleTap() {
+  void _onOwnerUnlockDoubleTap() {
     if (OwnerDeleteService.instance.isDeleteEnabled) {
       return;
     }
@@ -117,12 +138,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   void _tryUnlockOwnerDelete() {
-    if (_ownerPasswordController.text != appPassword) {
+    final unlocked = OwnerDeleteService.instance.tryUnlockWithPassword(
+      _ownerPasswordController.text,
+    );
+
+    if (!unlocked) {
       setState(() => _ownerPasswordError = 'Incorrect password');
       return;
     }
 
-    OwnerDeleteService.instance.enable();
     setState(() {
       _showOwnerPasswordField = false;
       _ownerPasswordError = null;
@@ -155,9 +179,12 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
-        title: const Text(
-          'SALES LEDGER',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        title: GestureDetector(
+          onDoubleTap: _onOwnerUnlockDoubleTap,
+          child: const Text(
+            'SALES LEDGER',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
         ),
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
@@ -221,33 +248,45 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Expanded(
-              flex: 2,
-              child: Text(
-                'Owner password',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _ownerPasswordController,
-                obscureText: true,
-                autofocus: true,
-                onSubmitted: (_) => _tryUnlockOwnerDelete(),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: OutlineInputBorder(),
+            Row(
+              children: [
+                const Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Owner password',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                 ),
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _ownerPasswordController,
+                    obscureText: true,
+                    autofocus: true,
+                    onSubmitted: (_) => _tryUnlockOwnerDelete(),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _tryUnlockOwnerDelete,
+                  child: const Text('Unlock'),
+                ),
+              ],
+            ),
+            if (_ownerPasswordError != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _ownerPasswordError!,
+                style: const TextStyle(color: Colors.red, fontSize: 11),
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _tryUnlockOwnerDelete,
-              child: const Text('Unlock'),
-            ),
+            ],
           ],
         ),
       ),
@@ -279,13 +318,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         children: [
           _cell('BILLNO', 1, bold: true),
           _cell('DATE', 1, bold: true),
-          Expanded(
-            flex: 2,
-            child: GestureDetector(
-              onDoubleTap: _onNameHeaderDoubleTap,
-              child: _cell('NAME', 2, bold: true, embedded: true),
-            ),
-          ),
+          _cell('NAME', 2, bold: true),
           _cell('', 1, bold: true),
           _cell('TOTAL', 1, bold: true, alignRight: true),
           _cell('CGST', 1, bold: true, alignRight: true),
@@ -389,31 +422,27 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     int flex, {
     bool bold = false,
     bool alignRight = false,
-    bool embedded = false,
   }) {
-    final cell = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: _border, width: 0.6),
-          bottom: BorderSide(color: _border, width: 0.6),
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: _border, width: 0.6),
+            bottom: BorderSide(color: _border, width: 0.6),
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        textAlign: alignRight ? TextAlign.right : TextAlign.left,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        child: Text(
+          text,
+          textAlign: alignRight ? TextAlign.right : TextAlign.left,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
-
-    if (embedded) {
-      return cell;
-    }
-
-    return Expanded(flex: flex, child: cell);
   }
 }

@@ -475,7 +475,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _currentBillLocalId = null;
   }
 
-  void _onNameDoubleTap() {
+  void _onOwnerUnlockDoubleTap() {
     if (OwnerDeleteService.instance.isDeleteEnabled) {
       return;
     }
@@ -488,12 +488,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   void _tryUnlockOwnerDelete() {
-    if (_ownerPasswordController.text != appPassword) {
+    final unlocked = OwnerDeleteService.instance.tryUnlockWithPassword(
+      _ownerPasswordController.text,
+    );
+
+    if (!unlocked) {
       setState(() => _ownerPasswordError = 'Incorrect password');
       return;
     }
 
-    OwnerDeleteService.instance.enable();
     setState(() {
       _showOwnerPasswordField = false;
       _ownerPasswordError = null;
@@ -1320,9 +1323,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Customer Details',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          GestureDetector(
+            onDoubleTap: _onOwnerUnlockDoubleTap,
+            child: const Text(
+              'Customer Details',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 5),
           Row(
@@ -1338,11 +1344,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               ),
 
               Expanded(
-                child: GestureDetector(
-                  onDoubleTap: _onNameDoubleTap,
-                  child: _smallTextField(
-                    _customerNameController,
-                  ),
+                child: _smallTextField(
+                  _customerNameController,
                 ),
               ),
             ],
