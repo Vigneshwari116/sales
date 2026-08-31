@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/screen/credential_settings_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/printer_settings_screen.dart';
 import 'package:sales/screen/sales_abstract_screen.dart';
@@ -13,6 +14,7 @@ enum _AdminSection {
   ledger,
   printers,
   sync,
+  security,
 }
 
 /// Admin shell with [NavigationRail] on wide layouts and a drawer on narrow.
@@ -67,6 +69,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return const Text('PRINTERS');
       case _AdminSection.sync:
         return const Text('SYNC');
+      case _AdminSection.security:
+        return const Text('SECURITY');
     }
   }
 
@@ -80,6 +84,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return Icons.print_outlined;
       case _AdminSection.sync:
         return Icons.cloud_upload_outlined;
+      case _AdminSection.security:
+        return Icons.security_outlined;
     }
   }
 
@@ -139,6 +145,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             SalesLedgerScreen(location: _location),
         const PrinterSettingsScreen(),
         _AdminSyncPanel(location: _location),
+        const CredentialSettingsScreen(),
       ],
     );
   }

@@ -15,6 +15,8 @@ import 'package:sales/screen/login_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
+import 'credential_test_helpers.dart';
+
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
@@ -61,6 +63,7 @@ void main() {
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
+    await seedTestCredentials();
   });
 
   tearDown(() async {
@@ -69,6 +72,7 @@ void main() {
     await _deleteTestDb();
     await SessionService.clearLogin();
     await AppConfig.clearLocation();
+    await resetTestCredentials();
   });
 
   testWidgets('staff login screen has no ledger menu link', (tester) async {
@@ -83,8 +87,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
-    await tester.enterText(find.byType(TextFormField).at(1), 'admin123');
+    await tester.enterText(find.byType(TextFormField).at(0), 'adminuser');
+    await tester.enterText(find.byType(TextFormField).at(1), 'adminpass1');
     await tester.tap(find.text('LOGIN'));
     await tester.pump();
 
@@ -96,8 +100,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: AdminLoginScreen()));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'staff');
-    await tester.enterText(find.byType(TextFormField).at(1), 'staff123');
+    await tester.enterText(find.byType(TextFormField).at(0), 'staffuser');
+    await tester.enterText(find.byType(TextFormField).at(1), 'staffpass1');
     await tester.tap(find.text('ADMIN LOGIN'));
     await tester.pump();
 

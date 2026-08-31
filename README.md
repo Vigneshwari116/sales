@@ -2,62 +2,44 @@
 
 Jewellery sales billing app with offline-first save, background sync, and runtime location selection at login.
 
-## Login
+## First launch — owner setup (required)
 
-Login works **fully offline** — no server call. Shared credentials (see `lib/config/local_credentials.dart`):
+There are **no default passwords**. On first launch, the owner must complete a one-time setup wizard on **each device**:
 
-- Username: `admin`
-- Password: `admin123`
+1. **Staff POS** username/password (counter staff at that location)
+2. **Admin dashboard** username/password (owner/manager)
+3. **Owner-delete PIN** (separate from admin login — unlocks bill deletion on the ledger)
 
-Pick a location on the login screen (`location1`–`location4`). Location is independent of the username/password check.
+Credentials are stored **hashed** on that device only (`flutter_secure_storage` — DPAPI on Windows, Keychain/Keystore on mobile). They are **not synced** across Win 1–4 tablets; each location device runs setup independently.
 
-Server sync (bills, GST) runs only after login when the device is online.
+After setup, staff pick their location (`Win 1`–`Win 4`) on the login screen. Login works **fully offline** — no server call.
+
+Owner/manager can rotate credentials later from **Admin → Security**.
 
 ## Build
 
-One APK serves all locations — staff pick their location on the login screen:
+One build serves all locations — staff pick their location on the login screen:
 
 ```bash
 flutter pub get
+flutter build windows --release
+```
+
+For Android tablets:
+
+```bash
 flutter build apk --release
 ```
 
 Debug run:
 
 ```bash
-flutter run
+flutter run -d windows
 ```
 
 ## Location selection at login
 
-On login, choose **location1** through **location4**. The app then:
-
-| Selected code | Local SQLite file      | Expected GST `db_name` |
-|---------------|------------------------|-------------------------|
-| `location1`   | `location1_sales.db`   | `location1_gst`         |
-| `location2`   | `location2_sales.db`   | `location2_gst`         |
-| `location3`   | `location3_sales.db`   | `location3_gst`         |
-| `location4`   | `location4_sales.db`   | `location4_gst`         |
-
-Each location uses a physically separate database file. Log out and log in as a different location to switch — the previous DB is closed and the new one is opened.
-
-## GST sync validation (manual check)
-
-1. Log in as **location1**.
-2. Trigger GST sync against a server response with `db_name: location2_gst`.
-3. Expect snackbar: **Sync rejected: database mismatch.**
-
-Automated check:
-
-```bash
-flutter test test/gst_sync_validation_test.dart
-```
-
-## Sync behaviour
-
-- **Bills:** saved online when possible; queued locally when offline; pushed every 2 minutes (foreground) and on reconnect.
-- **GST:** pulled automatically on reconnect and every 24 hours after login — no manual sync needed.
-- **Ledger:** always reads local SQLite first; background sync merges server ledger without blocking the UI.
+On login, choose **Win 1** through **Win 4**. Each location uses a separate local SQLite file on that device.
 
 ## Getting Started
 

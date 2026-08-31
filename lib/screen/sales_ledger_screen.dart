@@ -150,10 +150,12 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     });
   }
 
-  void _tryUnlockOwnerDelete() {
-    final unlocked = OwnerDeleteService.instance.tryUnlockWithPassword(
+  Future<void> _tryUnlockOwnerDelete() async {
+    final unlocked = await OwnerDeleteService.instance.tryUnlockWithPin(
       _ownerPasswordController.text,
     );
+
+    if (!mounted) return;
 
     if (!unlocked) {
       setState(() => _ownerPasswordError = 'Incorrect password');

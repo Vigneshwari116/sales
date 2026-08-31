@@ -1,40 +1,51 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sales/config/local_credentials.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:sales/services/credential_service.dart';
+import 'package:sales/services/credential_storage.dart';
 import 'package:sales/services/owner_delete_service.dart';
 
 void main() {
-  tearDown(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    CredentialService.useStorage(InMemoryCredentialStorage());
+    await CredentialService.resetForTesting();
+    await CredentialService.saveInitialSetup(
+      staffUsername: 'staff',
+      staffPassword: 'staffpass1',
+      adminUsername: 'admin',
+      adminPassword: 'adminpass1',
+      ownerDeletePin: 'delete99',
+    );
     OwnerDeleteService.instance.disable();
   });
 
-  test('starts disabled and enables owner delete mode', () {
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
-
-    OwnerDeleteService.instance.enable();
-
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isTrue);
-  });
-
-  test('disable resets owner delete mode', () {
-    OwnerDeleteService.instance.enable();
+  tearDown(() async {
     OwnerDeleteService.instance.disable();
-
-    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
+    await CredentialService.resetForTesting();
   });
 
-  test('incorrect password does not enable delete mode', () {
+  test('incorrect PIN does not enable delete mode', () async {
     final unlocked =
-        OwnerDeleteService.instance.tryUnlockWithPassword('wrong-password');
+        await OwnerDeleteService.instance.tryUnlockWithPin('wrong-pin');
 
     expect(unlocked, isFalse);
     expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
   });
 
-  test('correct password enables delete mode', () {
+  test('correct delete PIN enables delete mode', () async {
     final unlocked =
-        OwnerDeleteService.instance.tryUnlockWithPassword(appPassword);
+        await OwnerDeleteService.instance.tryUnlockWithPin('delete99');
 
     expect(unlocked, isTrue);
     expect(OwnerDeleteService.instance.isDeleteEnabled, isTrue);
+  });
+
+  test('admin password does not unlock delete mode', () async {
+    final unlocked =
+        await OwnerDeleteService.instance.tryUnlockWithPin('adminpass1');
+
+    expect(unlocked, isFalse);
+    expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
   });
 }

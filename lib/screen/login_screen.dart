@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
-import 'package:sales/config/local_credentials.dart';
+import 'package:sales/services/credential_service.dart';
 import 'package:sales/screen/admin_login_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     var username = _userCtrl.text.trim();
     var password = _passCtrl.text.trim();
 
-    if (username != staffUsername || password != staffPassword) {
+    if (!await CredentialService.verifyStaff(username, password)) {
       setState(() => _error = 'Incorrect username or password.');
       return;
     }
