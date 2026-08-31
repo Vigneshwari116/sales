@@ -8,7 +8,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('stores thermal and a4 printers independently', () async {
+  test('stores thermal, a4, and fast printers independently', () async {
     await PrinterSettingsService.setDefaultPrinter(
       PrinterType.thermal,
       'thermal-printer-url',
@@ -16,6 +16,10 @@ void main() {
     await PrinterSettingsService.setDefaultPrinter(
       PrinterType.a4,
       'a4-printer-url',
+    );
+    await PrinterSettingsService.setDefaultPrinter(
+      PrinterType.fast,
+      'fast-printer-url',
     );
 
     expect(
@@ -26,6 +30,22 @@ void main() {
       await PrinterSettingsService.getDefaultPrinter(PrinterType.a4),
       'a4-printer-url',
     );
+    expect(
+      await PrinterSettingsService.getDefaultPrinter(PrinterType.fast),
+      'fast-printer-url',
+    );
+  });
+
+  test('uses separate SharedPreferences keys per printer type', () async {
+    await PrinterSettingsService.setDefaultPrinter(
+      PrinterType.fast,
+      'device-fast',
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('default_printer_fast'), 'device-fast');
+    expect(prefs.containsKey('default_printer_thermal'), isFalse);
+    expect(prefs.containsKey('default_printer_a4'), isFalse);
   });
 
   test('migrates legacy default_printer to thermal', () async {
@@ -39,6 +59,10 @@ void main() {
     );
     expect(
       await PrinterSettingsService.getDefaultPrinter(PrinterType.a4),
+      isNull,
+    );
+    expect(
+      await PrinterSettingsService.getDefaultPrinter(PrinterType.fast),
       isNull,
     );
 
@@ -55,16 +79,24 @@ void main() {
       PrinterType.a4,
       'a4-printer',
     );
+    await PrinterSettingsService.setDefaultPrinter(
+      PrinterType.fast,
+      'fast-printer',
+    );
 
-    await PrinterSettingsService.clearDefaultPrinter(PrinterType.thermal);
+    await PrinterSettingsService.clearDefaultPrinter(PrinterType.fast);
 
     expect(
       await PrinterSettingsService.getDefaultPrinter(PrinterType.thermal),
-      isNull,
+      'thermal-printer',
     );
     expect(
       await PrinterSettingsService.getDefaultPrinter(PrinterType.a4),
       'a4-printer',
+    );
+    expect(
+      await PrinterSettingsService.getDefaultPrinter(PrinterType.fast),
+      isNull,
     );
   });
 

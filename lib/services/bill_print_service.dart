@@ -26,6 +26,14 @@ class BillPrintService {
     required String printerName,
     PrinterType type = PrinterType.thermal,
   }) async {
+    if (type == PrinterType.fast) {
+      throw UnsupportedError(
+        'Fast printer routing is not configured yet. '
+        'Persist a fast printer in settings, but assign its print flow '
+        'before calling printReceipt with PrinterType.fast.',
+      );
+    }
+
     final printers = await Printing.listPrinters();
     Printer? printer;
 

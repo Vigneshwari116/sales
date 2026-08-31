@@ -21,8 +21,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   final Map<PrinterType, String?> _savedPrinters = {};
   final Map<PrinterType, String?> _selectedPrinters = {};
   final Map<PrinterType, bool> _saving = {
-    PrinterType.thermal: false,
-    PrinterType.a4: false,
+    for (final type in PrinterType.values) type: false,
   };
 
   @override

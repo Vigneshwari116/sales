@@ -2,7 +2,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum PrinterType {
   thermal,
-  a4;
+  a4,
+  fast;
 
   String get label {
     switch (this) {
@@ -10,6 +11,8 @@ enum PrinterType {
         return 'Thermal Receipt';
       case PrinterType.a4:
         return 'A4 / Office';
+      case PrinterType.fast:
+        return 'Fast Printer';
     }
   }
 
@@ -19,6 +22,8 @@ enum PrinterType {
         return 'THERMAL RECEIPT PRINTER';
       case PrinterType.a4:
         return 'A4 / OFFICE PRINTER';
+      case PrinterType.fast:
+        return 'FAST PRINTER';
     }
   }
 }
