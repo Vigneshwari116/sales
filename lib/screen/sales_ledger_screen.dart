@@ -23,12 +23,17 @@ class SalesLedgerScreen extends StatefulWidget {
   @visibleForTesting
   final Future<SaleBill?> Function(String localId)? loadBillOverride;
 
+  /// When set (tests only), bypasses [LedgerRepository.softDeleteBill].
+  @visibleForTesting
+  final Future<void> Function(String localId)? softDeleteBillOverride;
+
   const SalesLedgerScreen({
     super.key,
     required this.location,
     this.autoRefreshOnOpen = true,
     this.loadLedgerOverride,
     this.loadBillOverride,
+    this.softDeleteBillOverride,
   });
 
   @override
@@ -163,7 +168,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   Future<void> _deleteBill(LocalLedgerEntry entry) async {
-    await LedgerRepository.softDeleteBill(entry.localId);
+    if (widget.softDeleteBillOverride != null) {
+      await widget.softDeleteBillOverride!(entry.localId);
+    } else {
+      await LedgerRepository.softDeleteBill(entry.localId);
+    }
     await _loadLedger();
   }
 
