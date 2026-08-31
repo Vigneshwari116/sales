@@ -4,8 +4,10 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:meta/meta.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/models/sale_bill.dart';
 
 class ManualPushResult {
   final bool ok;
@@ -50,11 +52,31 @@ class SyncService with WidgetsBindingObserver {
 
   final ValueNotifier<bool> manualPushInProgress = ValueNotifier(false);
 
+  /// When set, replaces [SalesApi.saveBill] (for tests only).
+  @visibleForTesting
+  Future<SalesApiResult<int>> Function(SaleBill bill)? saveBillOverride;
+
+  /// When set, replaces connectivity check (for tests only).
+  @visibleForTesting
+  Future<bool> Function()? isOnlineOverride;
+
   SyncService._();
 
   static SyncService get instance {
     _instance ??= SyncService._();
     return _instance!;
+  }
+
+  @visibleForTesting
+  static Future<void> resetForTesting() async {
+    final current = _instance;
+    if (current != null) {
+      current.stop();
+      current.saveBillOverride = null;
+      current.isOnlineOverride = null;
+      current.manualPushInProgress.value = false;
+    }
+    _instance = null;
   }
 
   void start({required String location}) {
@@ -161,7 +183,7 @@ class SyncService with WidgetsBindingObserver {
       );
     }
 
-    if (!await _isOnline()) {
+    if (!await (isOnlineOverride?.call() ?? _isOnline())) {
       return const ManualPushResult(
         ok: false,
         syncedCount: 0,
@@ -180,8 +202,10 @@ class SyncService with WidgetsBindingObserver {
         location: location,
       );
 
+      final saveBill = saveBillOverride ?? SalesApi.saveBill;
+
       for (final stored in pending) {
-        final result = await SalesApi.saveBill(stored.bill);
+        final result = await saveBill(stored.bill);
 
         if (result.ok) {
           await LocalDb.instance.markSynced(stored.localId);
