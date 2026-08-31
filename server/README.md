@@ -1,18 +1,15 @@
-# Sales Bill API
+# Sales Bill API (PostgreSQL)
 
-Node.js API for saving bills, loading previous bills, and sales ledger reports.
+Node.js API for login, saving bills, previous bill, and sales ledger.
 
-## Endpoints
+**Requires `DATABASE_URL`** — SQLite is no longer supported.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/login` | Login (`admin` / `admin` by default) |
-| GET | `/api/bills/next-number?location=Location%201` | Next bill number |
-| GET | `/api/bills/:billNo?location=Location%201` | Load bill by number |
-| GET | `/api/bills/by-number/previous?billNo=5&location=Location%201` | Previous saved bill |
-| POST | `/api/bills` | Save or update bill |
-| GET | `/api/ledger?location=Location%201` | Sales ledger |
+## Environment
+
+```bash
+export DATABASE_URL="postgresql://USER:PASSWORD@HOST:5434/salesbill_db"
+export PORT=3003
+```
 
 ## Run locally
 
@@ -22,11 +19,43 @@ npm install
 npm start
 ```
 
-The API listens on port **3003** (same as the Flutter app's `api config.dart`).
+Health check: `GET /api/health` → `{"ok":true,"db":"connected","engine":"postgresql"}`
 
-## Deploy to your VPS
+## Docker deploy (VPS)
 
-Copy the `server/` folder to your VPS and restart the Node process on port 3003.  
-If you already have a login server running, merge the bill/ledger routes from `index.js` into your existing app.
+1. Edit `docker-compose.yml` — set `DATABASE_URL` to your Postgres on port **5434**, database **salesbill_db**
+2. Rebuild and start:
 
-Default login: **admin** / **admin**
+```bash
+cd server
+docker compose up -d --build
+```
+
+## Tables (auto-created on startup)
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Login (`id`, `username`, `password_hash`) |
+| `bills` | All saved sales bills |
+
+If `users` is empty, default **admin / admin** is created.
+
+## API routes (unchanged)
+
+| Method | Path |
+|--------|------|
+| GET | `/api/health` |
+| POST | `/api/login` |
+| GET | `/api/bills/next-number?location=Win1` |
+| GET | `/api/bills/:billNo?location=Win1` |
+| GET | `/api/bills/by-number/previous?billNo=5&location=Win1` |
+| POST | `/api/bills` |
+| GET | `/api/ledger?location=Win1` |
+
+## View data in DBeaver
+
+```sql
+SELECT bill_no, bill_date, customer_name, payment_mode, grand_total
+FROM bills
+ORDER BY bill_no DESC;
+```

@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:sales/api/api%20config.dart';
+import 'package:sales/config/app_config.dart';
+import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 
 class LedgerEntry {
@@ -154,6 +157,46 @@ class SalesApi {
     }
   }
 
+  static Future<
+      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>>
+      getBillUpdatesSince({
+    required String location,
+    required DateTime since,
+  }) async {
+    final uri =
+        Uri.parse('$salesBillApiBaseUrl/api/bills/updates-since').replace(
+      queryParameters: {
+        'location': location,
+        'since': since.toUtc().toIso8601String(),
+      },
+    );
+
+    try {
+      final res = await http.get(uri).timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode == 200 && body['ok'] == true) {
+        final billsJson = body['bills'] as List<dynamic>? ?? [];
+        final bills = billsJson
+            .map((entry) => SaleBill.fromJson(entry as Map<String, dynamic>))
+            .toList(growable: false);
+        final serverTimeRaw = body['serverTime'] as String?;
+        final serverTime = serverTimeRaw != null
+            ? DateTime.tryParse(serverTimeRaw)?.toUtc() ??
+                DateTime.now().toUtc()
+            : DateTime.now().toUtc();
+
+        return SalesApiResult.success((bills: bills, serverTime: serverTime));
+      }
+
+      return SalesApiResult.failure(
+        body['error'] as String? ?? 'Could not load bill updates',
+      );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
   static Future<SalesApiResult<int>> saveBill(SaleBill bill) async {
     final uri = Uri.parse('$salesBillApiBaseUrl/api/bills');
 
@@ -215,5 +258,96 @@ class SalesApi {
     } catch (_) {
       return SalesApiResult.failure('Could not reach the server.');
     }
+  }
+
+  static Future<SalesApiResult<String>> pullGstMasterData(
+      String locationCode) async {
+    final uri =
+        Uri.parse('$salesBillApiBaseUrl/api/gst/sync').replace(
+      queryParameters: {'location': locationCode},
+    );
+
+    try {
+      final res = await http.get(uri).timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode != 200 || body['ok'] != true) {
+        return SalesApiResult.failure(
+          body['error'] as String? ?? 'Could not sync GST data',
+        );
+      }
+
+      final dbName = body['db_name'] as String? ?? '';
+      final expected = '${locationCode}_gst';
+
+      if (dbName != expected) {
+        developer.log(
+          'GST sync rejected: server db_name "$dbName" does not match '
+          'expected "$expected" for location $locationCode',
+          name: 'SalesApi',
+        );
+        return SalesApiResult.failure('Sync rejected: database mismatch.');
+      }
+
+      final version = body['version'] as String? ?? '';
+      final data = body['data'] as List<dynamic>? ?? [];
+      final rows = data.map((entry) {
+        final map = entry as Map<String, dynamic>;
+        return {
+          'key': map['key'] as String,
+          'value': map['value'] as String,
+        };
+      }).toList();
+
+      await LocalDb.instance.replaceGstMaster(rows);
+      await LocalDb.instance.updateSyncMeta(
+        location: locationCode,
+        expectedDbName: expected,
+        lastGstVersion: version,
+      );
+
+      return SalesApiResult.success(version);
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
+  static Future<SalesApiResult<void>> updateGstConfig({
+    required String locationCode,
+    required double cgstPct,
+    required double sgstPct,
+  }) async {
+    final uri = Uri.parse('$salesBillApiBaseUrl/api/gst/config');
+
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'location': locationCode,
+              'cgstPct': cgstPct,
+              'sgstPct': sgstPct,
+            }),
+          )
+          .timeout(_timeout);
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode != 200 || body['ok'] != true) {
+        return SalesApiResult.failure(
+          body['error'] as String? ?? 'Could not save GST config',
+        );
+      }
+
+      return SalesApiResult.success(null);
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
+  /// Returns true when [serverDbName] matches this build's expected GST DB.
+  static bool isGstDbNameValid(String serverDbName) {
+    return serverDbName == AppConfig.expectedGstDbName;
   }
 }

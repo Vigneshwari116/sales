@@ -1,13 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/models/sale_bill.dart';
+import 'package:sales/repositories/ledger_repository.dart';
+import 'package:sales/screen/ledger_bill_detail_screen.dart';
+import 'package:sales/services/sync_gate_service.dart';
+import 'package:sales/services/sync_service.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
+  final bool autoRefreshOnOpen;
+  final bool embeddedInDashboard;
+  final bool readOnly;
+  final int refreshGeneration;
+
+  @visibleForTesting
+  final Future<
+      ({
+        List<LocalLedgerEntry> entries,
+        LedgerSummary summary,
+      })>? Function()? loadLedgerOverride;
+
+  @visibleForTesting
+  final Future<SaleBill?> Function(String localId)? loadBillOverride;
 
   const SalesLedgerScreen({
     super.key,
     required this.location,
+    this.autoRefreshOnOpen = true,
+    this.embeddedInDashboard = false,
+    this.readOnly = false,
+    this.refreshGeneration = 0,
+    this.loadLedgerOverride,
+    this.loadBillOverride,
   });
 
   @override
@@ -18,39 +43,122 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _background = Color(0xFFC5F6C5);
   static const Color _header = Color(0xFFFFF5C5);
   static const Color _border = Color(0xFF888888);
+  static const Color _navSurface = Color(0xFFE8F5E8);
+  static const double _tableMinWidth = 980;
 
   bool _loading = true;
-  String? _error;
-  List<LedgerEntry> _entries = [];
+  bool _pulling = false;
+  bool _pushing = false;
+  List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
 
   @override
   void initState() {
     super.initState();
     _loadLedger();
+    if (widget.autoRefreshOnOpen) {
+      _pullInBackground();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SalesLedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.location != oldWidget.location ||
+        widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadLedger();
+    }
   }
 
   Future<void> _loadLedger() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
 
-    final result = await SalesApi.getLedger(location: widget.location);
+    final ({
+      List<LocalLedgerEntry> entries,
+      LedgerSummary summary,
+    }) result;
+
+    if (widget.loadLedgerOverride != null) {
+      result = await widget.loadLedgerOverride!()!;
+    } else {
+      result = await LedgerRepository.getLedger(
+        location: widget.location,
+      );
+    }
 
     if (!mounted) return;
 
-    if (result.ok && result.data != null) {
-      setState(() {
-        _entries = result.data!.entries;
-        _summary = result.data!.summary;
-        _loading = false;
-      });
-    } else {
-      setState(() {
-        _error = result.error ?? 'Could not load ledger';
-        _loading = false;
-      });
+    setState(() {
+      _entries = result.entries;
+      _summary = result.summary;
+      _loading = false;
+    });
+  }
+
+  Future<void> _pullInBackground() async {
+    setState(() => _pulling = true);
+
+    await SyncService.instance.pullAdminUpdates(widget.location);
+
+    if (!mounted) return;
+
+    setState(() => _pulling = false);
+    await _loadLedger();
+  }
+
+  Future<void> _syncNow() async {
+    final allowed = await SyncGateService.confirmSync(context);
+    if (!allowed || !mounted) return;
+
+    setState(() => _pushing = true);
+
+    final result = await SyncService.instance.manualSync(widget.location);
+
+    if (!mounted) return;
+
+    setState(() => _pushing = false);
+    await _loadLedger();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.summaryMessage)),
+    );
+  }
+
+  Future<void> _refreshLedger() async {
+    await _pullInBackground();
+  }
+
+  Future<void> _viewBill(LocalLedgerEntry entry) async {
+    final bill = widget.loadBillOverride != null
+        ? await widget.loadBillOverride!(entry.localId)
+        : await LedgerRepository.getBillByLocalId(entry.localId);
+
+    if (!mounted) return;
+
+    if (bill == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load bill')),
+      );
+      return;
+    }
+
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => LedgerBillDetailScreen(
+          bill: bill,
+          localId: entry.localId,
+          syncStatus: entry.syncStatus,
+          readOnly: widget.readOnly,
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      await _loadLedger();
     }
   }
 
@@ -71,71 +179,98 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      appBar: AppBar(
-        title: const Text(
-          'SALES LEDGER',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
-        actions: [
-          IconButton(
-            onPressed: _loadLedger,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: widget.embeddedInDashboard
+          ? AppBar(
+              title: const Text(
+                'SALES LEDGER',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              backgroundColor: _navSurface,
+              foregroundColor: Colors.black,
+              automaticallyImplyLeading: false,
+              actions: _buildAppBarActions(),
+            )
+          : AppBar(
+              title: const Text(
+                'SALES LEDGER',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              backgroundColor: const Color(0xFFD5D8D5),
+              foregroundColor: Colors.black,
+              actions: _buildAppBarActions(),
+            ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: _loadLedger,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Text(
-                        widget.location,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: SingleChildScrollView(
+          : Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final tableWidth = constraints.maxWidth > _tableMinWidth
+                            ? constraints.maxWidth
+                            : _tableMinWidth;
+
+                        return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: SingleChildScrollView(
-                            child: _buildTable(),
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: _buildTable(),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    return [
+      if (_pulling)
+        const Padding(
+          padding: EdgeInsets.only(right: 4),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      if (!widget.readOnly)
+        TextButton.icon(
+          onPressed: _pushing ? null : _syncNow,
+          icon: _pushing
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.cloud_upload_outlined, size: 18),
+          label: const Text('Sync Now'),
+        ),
+      IconButton(
+        onPressed: _refreshLedger,
+        icon: const Icon(Icons.refresh),
+        tooltip: 'Refresh',
+      ),
+    ];
   }
 
   Widget _buildTable() {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         border: Border.all(color: _border),
         color: Colors.white,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _headerRow(),
           ..._entries.map(_dataRow),
@@ -150,31 +285,39 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: _header,
       child: Row(
         children: [
-          _cell('BILLNO', 80, bold: true),
-          _cell('DATE', 90, bold: true),
-          _cell('', 80, bold: true),
-          _cell('TOTAL', 90, bold: true, alignRight: true),
-          _cell('CGST', 80, bold: true, alignRight: true),
-          _cell('SGST', 80, bold: true, alignRight: true),
-          _cell('IGST', 80, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 110, bold: true, alignRight: true),
+          _cell('BILLNO', 70, bold: true),
+          _cell('DATE', 80, bold: true),
+          _cell('NAME', 130, bold: true),
+          _cell('MOBILE', 110, bold: true),
+          _cell('PAY', 70, bold: true),
+          _cell('TOTAL', 80, bold: true, alignRight: true),
+          _cell('CGST', 70, bold: true, alignRight: true),
+          _cell('SGST', 70, bold: true, alignRight: true),
+          _cell('IGST', 70, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', 90, bold: true, alignRight: true),
         ],
       ),
     );
   }
 
-  Widget _dataRow(LedgerEntry entry) {
-    return Row(
-      children: [
-        _cell('${entry.billNo}', 80),
-        _cell(_formatDate(entry.date), 90),
-        _cell(entry.paymentMode, 80),
-        _cell(_formatMoney(entry.total), 90, alignRight: true),
-        _cell(_formatMoney(entry.cgst), 80, alignRight: true),
-        _cell(_formatMoney(entry.sgst), 80, alignRight: true),
-        _cell(_formatMoney(entry.igst), 80, alignRight: true),
-        _cell(_formatMoney(entry.grandTotal), 110, alignRight: true),
-      ],
+  Widget _dataRow(LocalLedgerEntry entry) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _viewBill(entry),
+      child: Row(
+        children: [
+          _cell('${entry.billNo}', 70),
+          _cell(_formatDate(entry.date), 80),
+          _cell(entry.customerName, 130),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, 110),
+          _cell(entry.paymentMode, 70),
+          _cell(_formatMoney(entry.total), 80, alignRight: true),
+          _cell(_formatMoney(entry.cgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.sgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.igst), 70, alignRight: true),
+          _cell(_formatMoney(entry.grandTotal), 90, alignRight: true),
+        ],
+      ),
     );
   }
 
@@ -184,16 +327,18 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: const Color(0xFFE8F4E8),
       child: Row(
         children: [
+          _cell('', 70, bold: true),
           _cell('', 80, bold: true),
-          _cell('', 90, bold: true),
-          _cell('', 80, bold: true),
-          _cell(_formatMoney(summary.total), 90, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 80, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 80, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 80, bold: true, alignRight: true),
+          _cell('', 130, bold: true),
+          _cell('', 110, bold: true),
+          _cell('', 70, bold: true),
+          _cell(_formatMoney(summary.total), 80, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst), 70, bold: true, alignRight: true),
           _cell(
             _formatMoney(summary.grandTotal),
-            110,
+            90,
             bold: true,
             alignRight: true,
           ),
@@ -208,21 +353,24 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     bool bold = false,
     bool alignRight = false,
   }) {
-    return Container(
+    return SizedBox(
       width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: _border, width: 0.6),
-          bottom: BorderSide(color: _border, width: 0.6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: _border, width: 0.6),
+            bottom: BorderSide(color: _border, width: 0.6),
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        textAlign: alignRight ? TextAlign.right : TextAlign.left,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        child: Text(
+          text,
+          textAlign: alignRight ? TextAlign.right : TextAlign.left,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );

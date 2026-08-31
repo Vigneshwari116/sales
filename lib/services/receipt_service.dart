@@ -8,64 +8,130 @@ class ReceiptService {
       '47/3/4, 2nd Cross KUDULU MAIN ROAD, Bangalore-68';
   static const String gstin = '29FNIPS8082N1ZS';
 
+  static const int _width = 44;
+  static const int _snoWidth = 5;
+  static const int _rateWidth = 10;
+  static const int _qtyWidth = 11;
+  static const int _amountWidth =
+      _width - _snoWidth - _rateWidth - _qtyWidth;
+
   static String buildReceiptText(SaleBill bill) {
     final buffer = StringBuffer();
     final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
-    final line = '-' * 47;
+    final line = '-' * _width;
 
     buffer.writeln(_center(businessName));
     buffer.writeln(_center(businessAddress));
     buffer.writeln(_center('GSTIN: $gstin'));
     buffer.writeln();
-    buffer.writeln('Bill No: ${bill.billNo}${' ' * 30}Date: $dateText');
+    buffer.writeln(_billDateLine(bill.billNo, dateText));
+    buffer.writeln('NAME: ${bill.customerName}');
+    buffer.writeln('MOBILE: ${bill.mobile}');
     buffer.writeln();
-    buffer.writeln(
-      'Customer Name: ${bill.customerName}${' ' * (20 - bill.customerName.length.clamp(0, 20))}Mobile: ${bill.mobile}',
-    );
-    buffer.writeln();
-    buffer.writeln('SNO   RATE        QTY        AMOUNT');
+    buffer.writeln(_itemHeader());
     buffer.writeln(line);
 
     for (var i = 0; i < bill.items.length; i++) {
       final BillItem item = bill.items[i];
+      buffer.writeln(_itemLine(i + 1, item));
       buffer.writeln(
-        '${(i + 1).toString().padRight(5)}'
-        '${_money(item.rate).padRight(12)}'
-        '${_money(item.qty).padRight(11)}'
-        '${_money(item.grossAmt)}',
-      );
-      buffer.writeln(
-        '      CGST% ${_formatPct(item.cgstPct)}  SGST% ${_formatPct(item.sgstPct)}',
+        '      CGST% ${_formatPct(item.cgstPct)}SGST% ${_formatPct(item.sgstPct)}',
       );
     }
 
+    buffer.writeln(line);
+    final totalGross =
+        bill.items.fold(0.0, (sum, item) => sum + item.grossAmt);
+    buffer.writeln(_totalLine(bill.totalQty, totalGross));
+    buffer.writeln(_taxTotalLine('CGST', bill.totalCgst));
+    buffer.writeln(_taxTotalLine('SGST', bill.totalSgst));
     buffer.writeln();
-    buffer.writeln(
-      'Total Qty: ${_money(bill.totalQty)}${' ' * 30}${_money(bill.grandTotal)}',
-    );
-    buffer.writeln('CGST: ${_money(bill.totalCgst)}');
-    buffer.writeln('SGST: ${_money(bill.totalSgst)}');
-    buffer.writeln('Grand Total: ${_money(bill.grandTotal)}');
+    buffer.writeln(_grandTotalLine(bill.grandTotal));
     buffer.writeln();
-    buffer.writeln('Terms and Conditions: EXCHANGE ONLY 3 DAYS');
+    buffer.writeln('TERMS AND CONDITION');
+    buffer.writeln('EXCHANGE ONLY 3 DAYS');
     buffer.writeln('AMOUNT NOT REFUND');
     buffer.writeln();
     buffer.writeln(_center('THANK YOU VISIT AGAIN'));
-    buffer.writeln('VB');
 
     return buffer.toString();
   }
 
-  static String _center(String text, [int width = 47]) {
-    if (text.length >= width) return text;
-    final pad = ((width - text.length) / 2).floor();
+  static String _itemHeader() {
+    return '${_padRight('SNO', _snoWidth)}'
+        '${_padRight('RATE', _rateWidth)}'
+        '${_padRight('QTY', _qtyWidth)}'
+        '${_padLeft('AMOUNT', _amountWidth)}';
+  }
+
+  static String _itemLine(int sno, BillItem item) {
+    return '${_padRight('$sno', _snoWidth)}'
+        '${_padRight(_money(item.rate), _rateWidth)}'
+        '${_padRight(_money(item.qty), _qtyWidth)}'
+        '${_padLeft(_money(item.grossAmt), _amountWidth)}';
+  }
+
+  static String _totalLine(double totalQty, double totalAmount) {
+    const label = 'TOTAL';
+    final qtyText = _money(totalQty);
+    final amountText = _money(totalAmount);
+    final qtyStart = _snoWidth + _rateWidth;
+    final amountStart = qtyStart + _qtyWidth;
+
+    final buffer = StringBuffer(_padRight(label, qtyStart));
+    while (buffer.length < qtyStart + _qtyWidth - qtyText.length) {
+      buffer.write(' ');
+    }
+    buffer.write(_padRight(qtyText, _qtyWidth));
+    buffer.write(_padLeft(amountText, _amountWidth));
+    return buffer.toString();
+  }
+
+  static String _taxTotalLine(String label, double amount) {
+    final amountText = _money(amount);
+    final labelPart = '               $label';
+    final spaces = _width - labelPart.length - amountText.length;
+    return '$labelPart${' ' * spaces.clamp(1, _width)}$amountText';
+  }
+
+  static String _grandTotalLine(double grandTotal) {
+    const label = 'GRAND TOTAL';
+    final amountText = _money(grandTotal);
+    final labelPart = '               $label';
+    final spaces = _width - labelPart.length - amountText.length - 1;
+    return '$labelPart${' ' * spaces.clamp(1, _width)} $amountText';
+  }
+
+  static String _billDateLine(int billNo, String dateText) {
+    final left = 'BILL NO: $billNo';
+    final right = 'DATE: $dateText';
+    final gap = _width - left.length - right.length;
+    return '$left${' ' * gap.clamp(1, _width)}$right';
+  }
+
+  static String _center(String text) {
+    if (text.length >= _width) {
+      return text;
+    }
+    final pad = ((_width - text.length) / 2).floor();
     return '${' ' * pad}$text';
   }
 
-  static String _money(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(2);
+  static String _padRight(String text, int width) {
+    if (text.length >= width) {
+      return text.substring(0, width);
     }
+    return text.padRight(width);
+  }
+
+  static String _padLeft(String text, int width) {
+    if (text.length >= width) {
+      return text.substring(text.length - width);
+    }
+    return text.padLeft(width);
+  }
+
+  static String _money(double value) {
     return value.toStringAsFixed(2);
   }
 

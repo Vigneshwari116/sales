@@ -1,0 +1,10 @@
+services:
+  sales-bill-api:
+    build: .
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      # Update user/password/host to match your VPS Postgres (port 5434, salesbill_db)
+      DATABASE_URL: postgresql://postgres:YOUR_PASSWORD@host.docker.internal:5434/salesbill_db
+    restart: unless-stopped
