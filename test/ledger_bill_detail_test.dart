@@ -54,7 +54,7 @@ void main() {
     expect(find.text('Grand Total'), findsOneWidget);
   });
 
-  testWidgets('tapping mobile shows compact password field', (tester) async {
+  testWidgets('double-tapping mobile shows compact password field', (tester) async {
     final bill = _sampleBill();
 
     await tester.pumpWidget(
@@ -66,6 +66,10 @@ void main() {
         ),
       ),
     );
+
+    await tester.tap(find.text('9876543210'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Password'), findsNothing);
 
     await tester.tap(find.text('9876543210'));
     await tester.pumpAndSettle();

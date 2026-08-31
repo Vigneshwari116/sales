@@ -4,7 +4,6 @@ import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_abstract_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
-import 'package:sales/screen/sales_reports_screen.dart';
 import 'package:sales/screen/staff_sales_dashboard_screen.dart';
 import 'package:sales/screen/staff_thermal_printer_screen.dart';
 import 'package:sales/services/app_session_service.dart';
@@ -18,7 +17,6 @@ enum _StaffSection {
   bill,
   abstract,
   ledger,
-  reports,
   printer,
   sync,
 }
@@ -60,8 +58,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   bool _isLocalDataSection(_StaffSection section) {
     return section == _StaffSection.dashboard ||
         section == _StaffSection.abstract ||
-        section == _StaffSection.ledger ||
-        section == _StaffSection.reports;
+        section == _StaffSection.ledger;
   }
 
   Future<void> _logout() async {
@@ -87,8 +84,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         return 'ABSTRACT';
       case _StaffSection.ledger:
         return 'LEDGER';
-      case _StaffSection.reports:
-        return 'REPORTS';
       case _StaffSection.printer:
         return 'PRINTER';
       case _StaffSection.sync:
@@ -106,8 +101,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         return Icons.summarize_outlined;
       case _StaffSection.ledger:
         return Icons.menu_book_outlined;
-      case _StaffSection.reports:
-        return Icons.phone_android_outlined;
       case _StaffSection.printer:
         return Icons.print_outlined;
       case _StaffSection.sync:
@@ -137,10 +130,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
               embeddedInDashboard: true,
               refreshGeneration: _refreshGeneration,
             ),
-        SalesReportsScreen(
-          location: _location,
-          refreshGeneration: _refreshGeneration,
-        ),
         const StaffThermalPrinterScreen(),
         const _StaffSyncPanel(),
       ],

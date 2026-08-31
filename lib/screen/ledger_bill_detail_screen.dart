@@ -309,7 +309,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           _readOnlyField('Name', _bill.customerName),
           const SizedBox(height: 4),
           GestureDetector(
-            onTap: _onMobileDoubleTap,
+            onDoubleTap: _onMobileDoubleTap,
             child: _readOnlyField('Mobile', _bill.mobile),
           ),
           if (_showPasswordField && !_editUnlocked) ...[

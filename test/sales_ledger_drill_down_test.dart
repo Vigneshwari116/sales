@@ -92,6 +92,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Drill Down Customer'), findsOneWidget);
+    expect(find.text('9999999999'), findsOneWidget);
 
     await tester.tap(find.text('Drill Down Customer'));
     await tester.pumpAndSettle();
