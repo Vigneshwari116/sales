@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/local_credentials.dart';
-import 'package:sales/screen/admin_login_screen.dart';
+import 'package:sales/screen/admin_dashboard_screen.dart';
+import 'package:sales/screen/login_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
-import 'sales_bill_screen.dart';
 
-/// Local login gate — credentials checked offline; location picked separately.
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+/// Admin login gate — separate credentials from staff POS login.
+class AdminLoginScreen extends StatefulWidget {
+  const AdminLoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<AdminLoginScreen> createState() => _AdminLoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _AdminLoginScreenState extends State<AdminLoginScreen> {
   static const Color _btn = Color(0xFF9C1C1C);
 
   final _formKey = GlobalKey<FormState>();
@@ -42,11 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    var username = _userCtrl.text.trim();
-    var password = _passCtrl.text.trim();
+    final username = _userCtrl.text.trim();
+    final password = _passCtrl.text.trim();
 
-    if (username != staffUsername || password != staffPassword) {
-      setState(() => _error = 'Incorrect username or password.');
+    if (username != adminUsername || password != adminPassword) {
+      setState(() => _error = 'Incorrect admin username or password.');
       return;
     }
 
@@ -55,18 +55,18 @@ class _LoginScreenState extends State<LoginScreen> {
     await SessionService.clearBillSession();
     await AppConfig.setLocation(_selectedLocationCode);
     await AppSessionService.onLoginComplete();
-    await SessionService.saveLogin(username, role: SessionRole.staff);
+    await SessionService.saveLogin(username, role: SessionRole.admin);
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const SalesBillScreen()),
+      MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
     );
   }
 
-  void _openAdminLogin() {
+  void _openStaffLogin() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 
@@ -99,10 +99,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.storefront, size: 48, color: _btn),
+                    const Icon(Icons.admin_panel_settings,
+                        size: 48, color: _btn),
                     const SizedBox(height: 8),
                     const Text(
-                      'Sales Bill Login',
+                      'Admin Login',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
@@ -138,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       enableSuggestions: false,
                       textCapitalization: TextCapitalization.none,
                       decoration: const InputDecoration(
-                        labelText: 'Username',
+                        labelText: 'Admin username',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_outline),
                       ),
@@ -164,7 +165,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _login(),
                     ),
@@ -188,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: const Text(
-                          'LOGIN',
+                          'ADMIN LOGIN',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1,
@@ -198,8 +200,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: _openAdminLogin,
-                      child: const Text('Admin login'),
+                      onPressed: _openStaffLogin,
+                      child: const Text('Staff login'),
                     ),
                   ],
                 ),

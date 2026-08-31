@@ -3,9 +3,15 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sales/screen/bill_item.dart';
 
+enum SessionRole {
+  staff,
+  admin,
+}
+
 class SessionService {
   static const String _loggedInKey = 'session_logged_in';
   static const String _usernameKey = 'session_username';
+  static const String _roleKey = 'session_role';
   static const String _locationKey = 'session_location';
   static const String _billNoKey = 'session_bill_no';
   static const String _billDateKey = 'session_bill_date';
@@ -20,16 +26,37 @@ class SessionService {
     return prefs.getBool(_loggedInKey) ?? false;
   }
 
-  static Future<void> saveLogin(String username) async {
+  static Future<SessionRole?> getRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString(_roleKey);
+    switch (role) {
+      case 'staff':
+        return SessionRole.staff;
+      case 'admin':
+        return SessionRole.admin;
+      default:
+        return null;
+    }
+  }
+
+  static Future<void> saveLogin(
+    String username, {
+    required SessionRole role,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loggedInKey, true);
     await prefs.setString(_usernameKey, username);
+    await prefs.setString(
+      _roleKey,
+      role == SessionRole.admin ? 'admin' : 'staff',
+    );
   }
 
   static Future<void> clearLogin() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loggedInKey, false);
     await prefs.remove(_usernameKey);
+    await prefs.remove(_roleKey);
     await clearBillSession();
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/app_session_service.dart';
@@ -52,11 +53,18 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Future<Widget> _resolveHome() async {
-    var loggedIn = await SessionService.isLoggedIn();
+    final loggedIn = await SessionService.isLoggedIn();
 
     if (loggedIn && AppConfig.isLocationSet) {
+      final role = await SessionService.getRole();
       await AppSessionService.onLoginComplete();
-      return const SalesBillScreen();
+
+      if (role == SessionRole.admin) {
+        return const AdminDashboardScreen();
+      }
+      if (role == SessionRole.staff) {
+        return const SalesBillScreen();
+      }
     }
 
     if (loggedIn) {

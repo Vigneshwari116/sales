@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:sales/config/app_config.dart';
-import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
@@ -14,9 +13,7 @@ import 'package:sales/services/session_service.dart';
 import 'bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
-import 'sales_abstract_screen.dart';
 import 'sales_ledger_screen.dart';
-import 'printer_settings_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/services/owner_delete_service.dart';
@@ -161,6 +158,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
   }
 
+  bool get _isEntryLocked => _busy || _manualPushInProgress;
+
   Future<void> _syncNow() async {
     final result =
         await SyncService.instance.manualPush(_selectedLocation);
@@ -169,8 +168,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     _showMessage(result.summaryMessage);
   }
-
-  bool get _isEntryLocked => _busy || _manualPushInProgress;
 
   Future<void> _restoreSessionOrLoadBill() async {
     final session = await SessionService.loadBillSession();
@@ -552,22 +549,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  void _openAbstract() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SalesAbstractScreen(location: _selectedLocation),
-      ),
-    );
-  }
-
-  void _openPrinterSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PrinterSettingsScreen(),
-      ),
-    );
-  }
-
   SaleBill _buildCurrentBill() {
     return SaleBill(
       billNo: _billNo,
@@ -904,6 +885,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
+  /// Staff POS menu — ledger + sync stay here for offline locations without
+  /// an admin present. Abstract and printer settings are admin-dashboard only.
   Widget _buildMenuPanel({required VoidCallback onClose}) {
     return Material(
       color: Colors.white,
@@ -911,37 +894,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ExpansionTile(
-              initiallyExpanded: true,
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-              childrenPadding: EdgeInsets.zero,
-              title: const Text(
-                'REPORTS',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
-                  leading: const Icon(Icons.menu_book, size: 20),
-                  title: const Text('LEDGER'),
-                  onTap: () {
-                    onClose();
-                    _openLedger();
-                  },
-                ),
-                ListTile(
-                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
-                  leading: const Icon(Icons.summarize_outlined, size: 20),
-                  title: const Text('ABSTRACT'),
-                  onTap: () {
-                    onClose();
-                    _openAbstract();
-                  },
-                ),
-              ],
+            ListTile(
+              leading: const Icon(Icons.menu_book, size: 20),
+              title: const Text('LEDGER'),
+              onTap: () {
+                onClose();
+                _openLedger();
+              },
             ),
             ListTile(
               leading: const Icon(Icons.cloud_upload_outlined),
@@ -953,14 +912,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                       onClose();
                       _syncNow();
                     },
-            ),
-            ListTile(
-              leading: const Icon(Icons.print_outlined),
-              title: const Text('PRINTER SETTINGS'),
-              onTap: () {
-                onClose();
-                _openPrinterSettings();
-              },
             ),
             const Spacer(),
             ListTile(
@@ -976,10 +927,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       ),
     );
   }
-
-  // ============================================================
-  // TOP AREA
-  // ============================================================
 
   Widget _buildTopArea() {
     return Row(

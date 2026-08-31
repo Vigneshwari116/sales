@@ -12,7 +12,7 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/repositories/ledger_repository.dart' as ledger_repo;
-import 'package:sales/screen/sales_bill_screen.dart';
+import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -44,7 +44,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    tempDir = await Directory.systemTemp.createTemp('sales_bill_menu_test_');
+    tempDir = await Directory.systemTemp.createTemp('admin_dashboard_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     SharedPreferences.setMockInitialValues({});
     sqfliteFfiInit();
@@ -59,24 +59,23 @@ void main() {
 
   setUp(() async {
     await AppConfig.setLocation(_testLocationCode);
-    await SessionService.clearBillSession();
+    await SessionService.clearLogin();
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
     await LocalDb.instance.initialize();
-    await LocalDb.instance.getNextBillNumber(
-      AppConfig.displayLocationName,
-    );
+    await SessionService.saveLogin('admin', role: SessionRole.admin);
   });
 
   tearDown(() async {
     await SyncService.resetForTesting();
     await LocalDb.resetForTesting();
     await _deleteTestDb();
+    await SessionService.clearLogin();
     await AppConfig.clearLocation();
   });
 
-  Future<void> pumpBillScreen(WidgetTester tester) async {
+  Future<void> pumpAdminDashboard(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -84,7 +83,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: SalesBillScreen(
+        home: AdminDashboardScreen(
           ledgerScreenBuilder: (location) => SalesLedgerScreen(
             location: location,
             autoRefreshOnOpen: false,
@@ -105,47 +104,43 @@ void main() {
 
     for (var i = 0; i < 50; i++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (find.text('BILL NO:').evaluate().isNotEmpty) {
+      if (find.byKey(const Key('admin_navigation_rail')).evaluate().isNotEmpty) {
         break;
       }
     }
-
-    expect(find.text('BILL NO:'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('staff menu keeps ledger and sync; admin-only items stay out',
+  testWidgets('admin dashboard shows NavigationRail and abstract by default',
       (tester) async {
-    await pumpBillScreen(tester);
+    await pumpAdminDashboard(tester);
 
-    await tester.tap(find.byIcon(Icons.menu));
-    await tester.pump();
-
-    expect(find.text('LEDGER'), findsOneWidget);
-    expect(find.text('SYNC NOW'), findsOneWidget);
-    expect(find.text('ABSTRACT'), findsNothing);
-    expect(find.text('PRINTER SETTINGS'), findsNothing);
+    expect(find.byKey(const Key('admin_navigation_rail')), findsOneWidget);
+    expect(find.text('SALES ABSTRACT'), findsOneWidget);
   });
 
-  testWidgets('ledger menu navigation works while manual push is in progress',
-      (tester) async {
-    await pumpBillScreen(tester);
+  testWidgets('navigation rail switches to ledger section', (tester) async {
+    await pumpAdminDashboard(tester);
 
-    SyncService.instance.manualPushInProgress.value = true;
+    final rail = tester.widget<NavigationRail>(
+      find.byKey(const Key('admin_navigation_rail')),
+    );
+    expect(rail.selectedIndex, 0);
+
+    await tester.tap(find.byIcon(Icons.menu_book_outlined));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Syncing bills to server...'), findsOneWidget);
+    expect(find.text('SALES LEDGER'), findsOneWidget);
+  });
 
-    await tester.tap(find.byIcon(Icons.menu));
+  testWidgets('navigation rail switches to sync section', (tester) async {
+    await pumpAdminDashboard(tester);
+
+    await tester.tap(find.byIcon(Icons.cloud_upload_outlined));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('LEDGER'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(SalesLedgerScreen), findsOneWidget);
-
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('admin_sync_now_button')), findsOneWidget);
   });
 }
