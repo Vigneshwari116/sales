@@ -8,6 +8,7 @@ class LocalLedgerEntry {
   final int billNo;
   final String date;
   final String customerName;
+  final String mobile;
   final String paymentMode;
   final double total;
   final double cgst;
@@ -21,6 +22,7 @@ class LocalLedgerEntry {
     required this.billNo,
     required this.date,
     required this.customerName,
+    required this.mobile,
     required this.paymentMode,
     required this.total,
     required this.cgst,
@@ -52,6 +54,7 @@ class LedgerRepository {
               billNo: row.billNo,
               date: row.billDate,
               customerName: row.customerName,
+              mobile: row.mobile,
               paymentMode: row.paymentMode,
               total: row.totalAmount,
               cgst: row.totalCgst,

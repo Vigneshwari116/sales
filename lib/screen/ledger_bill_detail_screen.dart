@@ -84,7 +84,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       _items.fold(0.0, (sum, item) => sum + item.grossAmt);
 
   void _onMobileDoubleTap() {
-    if (widget.readOnly || _editUnlocked) return;
+    if (widget.readOnly || _editUnlocked || _showPasswordField) return;
 
     setState(() {
       _showPasswordField = true;

@@ -17,6 +17,7 @@ LocalLedgerEntry _sampleLedgerEntry() {
     billNo: 7,
     date: '2026-08-31',
     customerName: 'Drill Down Customer',
+    mobile: '9999999999',
     paymentMode: 'CASH',
     total: 100,
     cgst: 2.5,
@@ -91,6 +92,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Drill Down Customer'), findsOneWidget);
+    expect(find.text('9999999999'), findsOneWidget);
 
     await tester.tap(find.text('Drill Down Customer'));
     await tester.pumpAndSettle();

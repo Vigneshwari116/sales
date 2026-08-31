@@ -12,6 +12,7 @@ class SalesLedgerScreen extends StatefulWidget {
   final bool autoRefreshOnOpen;
   final bool embeddedInDashboard;
   final bool readOnly;
+  final int refreshGeneration;
 
   @visibleForTesting
   final Future<
@@ -29,6 +30,7 @@ class SalesLedgerScreen extends StatefulWidget {
     this.autoRefreshOnOpen = true,
     this.embeddedInDashboard = false,
     this.readOnly = false,
+    this.refreshGeneration = 0,
     this.loadLedgerOverride,
     this.loadBillOverride,
   });
@@ -42,6 +44,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _header = Color(0xFFFFF5C5);
   static const Color _border = Color(0xFF888888);
   static const Color _navSurface = Color(0xFFE8F5E8);
+  static const double _tableMinWidth = 980;
 
   bool _loading = true;
   bool _pulling = false;
@@ -55,6 +58,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     _loadLedger();
     if (widget.autoRefreshOnOpen) {
       _pullInBackground();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SalesLedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.location != oldWidget.location ||
+        widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadLedger();
     }
   }
 
@@ -197,10 +209,17 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
+                        final tableWidth = constraints.maxWidth > _tableMinWidth
+                            ? constraints.maxWidth
+                            : _tableMinWidth;
+
                         return SingleChildScrollView(
-                          child: SizedBox(
-                            width: constraints.maxWidth,
-                            child: _buildTable(),
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: _buildTable(),
+                            ),
                           ),
                         );
                       },
@@ -266,15 +285,16 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: _header,
       child: Row(
         children: [
-          _cell('BILLNO', 1, bold: true),
-          _cell('DATE', 1, bold: true),
-          _cell('NAME', 2, bold: true),
-          _cell('', 1, bold: true),
-          _cell('TOTAL', 1, bold: true, alignRight: true),
-          _cell('CGST', 1, bold: true, alignRight: true),
-          _cell('SGST', 1, bold: true, alignRight: true),
-          _cell('IGST', 1, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 1, bold: true, alignRight: true),
+          _cell('BILLNO', 70, bold: true),
+          _cell('DATE', 80, bold: true),
+          _cell('NAME', 130, bold: true),
+          _cell('MOBILE', 110, bold: true),
+          _cell('PAY', 70, bold: true),
+          _cell('TOTAL', 80, bold: true, alignRight: true),
+          _cell('CGST', 70, bold: true, alignRight: true),
+          _cell('SGST', 70, bold: true, alignRight: true),
+          _cell('IGST', 70, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', 90, bold: true, alignRight: true),
         ],
       ),
     );
@@ -286,15 +306,16 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       onTap: () => _viewBill(entry),
       child: Row(
         children: [
-          _cell('${entry.billNo}', 1),
-          _cell(_formatDate(entry.date), 1),
-          _cell(entry.customerName, 2),
-          _cell(entry.paymentMode, 1),
-          _cell(_formatMoney(entry.total), 1, alignRight: true),
-          _cell(_formatMoney(entry.cgst), 1, alignRight: true),
-          _cell(_formatMoney(entry.sgst), 1, alignRight: true),
-          _cell(_formatMoney(entry.igst), 1, alignRight: true),
-          _cell(_formatMoney(entry.grandTotal), 1, alignRight: true),
+          _cell('${entry.billNo}', 70),
+          _cell(_formatDate(entry.date), 80),
+          _cell(entry.customerName, 130),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, 110),
+          _cell(entry.paymentMode, 70),
+          _cell(_formatMoney(entry.total), 80, alignRight: true),
+          _cell(_formatMoney(entry.cgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.sgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.igst), 70, alignRight: true),
+          _cell(_formatMoney(entry.grandTotal), 90, alignRight: true),
         ],
       ),
     );
@@ -306,17 +327,18 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: const Color(0xFFE8F4E8),
       child: Row(
         children: [
-          _cell('', 1, bold: true),
-          _cell('', 1, bold: true),
-          _cell('', 2, bold: true),
-          _cell('', 1, bold: true),
-          _cell(_formatMoney(summary.total), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 1, bold: true, alignRight: true),
+          _cell('', 70, bold: true),
+          _cell('', 80, bold: true),
+          _cell('', 130, bold: true),
+          _cell('', 110, bold: true),
+          _cell('', 70, bold: true),
+          _cell(_formatMoney(summary.total), 80, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst), 70, bold: true, alignRight: true),
           _cell(
             _formatMoney(summary.grandTotal),
-            1,
+            90,
             bold: true,
             alignRight: true,
           ),
@@ -327,12 +349,12 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   Widget _cell(
     String text,
-    int flex, {
+    double width, {
     bool bold = false,
     bool alignRight = false,
   }) {
-    return Expanded(
-      flex: flex,
+    return SizedBox(
+      width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
