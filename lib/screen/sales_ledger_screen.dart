@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/ledger_repository.dart';
+import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/services/owner_delete_service.dart';
 import 'package:sales/services/sync_service.dart';
 
@@ -17,11 +19,16 @@ class SalesLedgerScreen extends StatefulWidget {
         LedgerSummary summary,
       })>? Function()? loadLedgerOverride;
 
+  /// When set (tests only), bypasses [LedgerRepository.getBillByLocalId].
+  @visibleForTesting
+  final Future<SaleBill?> Function(String localId)? loadBillOverride;
+
   const SalesLedgerScreen({
     super.key,
     required this.location,
     this.autoRefreshOnOpen = true,
     this.loadLedgerOverride,
+    this.loadBillOverride,
   });
 
   @override
@@ -158,6 +165,30 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Future<void> _deleteBill(LocalLedgerEntry entry) async {
     await LedgerRepository.softDeleteBill(entry.localId);
     await _loadLedger();
+  }
+
+  Future<void> _viewBill(LocalLedgerEntry entry) async {
+    final bill = widget.loadBillOverride != null
+        ? await widget.loadBillOverride!(entry.localId)
+        : await LedgerRepository.getBillByLocalId(entry.localId);
+
+    if (!mounted) return;
+
+    if (bill == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load bill')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LedgerBillDetailScreen(
+          bill: bill,
+          syncStatus: entry.syncStatus,
+        ),
+      ),
+    );
   }
 
   String _formatMoney(double value) {
@@ -335,15 +366,25 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Widget _dataRow(LocalLedgerEntry entry, bool deleteEnabled) {
     return Row(
       children: [
-        _cell('${entry.billNo}', 1),
-        _cell(_formatDate(entry.date), 1),
-        _cell(entry.customerName, 2),
-        _cell(entry.paymentMode, 1),
-        _cell(_formatMoney(entry.total), 1, alignRight: true),
-        _cell(_formatMoney(entry.cgst), 1, alignRight: true),
-        _cell(_formatMoney(entry.sgst), 1, alignRight: true),
-        _cell(_formatMoney(entry.igst), 1, alignRight: true),
-        _cell(_formatMoney(entry.grandTotal), 1, alignRight: true),
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _viewBill(entry),
+            child: Row(
+              children: [
+                _cell('${entry.billNo}', 1),
+                _cell(_formatDate(entry.date), 1),
+                _cell(entry.customerName, 2),
+                _cell(entry.paymentMode, 1),
+                _cell(_formatMoney(entry.total), 1, alignRight: true),
+                _cell(_formatMoney(entry.cgst), 1, alignRight: true),
+                _cell(_formatMoney(entry.sgst), 1, alignRight: true),
+                _cell(_formatMoney(entry.igst), 1, alignRight: true),
+                _cell(_formatMoney(entry.grandTotal), 1, alignRight: true),
+              ],
+            ),
+          ),
+        ),
         if (deleteEnabled) _deleteCell(entry),
       ],
     );
