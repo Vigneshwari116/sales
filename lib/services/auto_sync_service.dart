@@ -5,7 +5,6 @@ import 'package:flutter/widgets.dart';
 
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
-import 'package:sales/services/sync_service.dart';
 
 class AutoSyncService with WidgetsBindingObserver {
   static AutoSyncService? _instance;

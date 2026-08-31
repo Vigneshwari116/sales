@@ -83,7 +83,7 @@ class LocalDb {
     _instance = null;
   }
 
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
   Future<void> initialize() async {
     await database;
@@ -131,8 +131,8 @@ class LocalDb {
   }) async {
     final db = await database;
     final where = location == null
-        ? 'sync_status = ?'
-        : 'sync_status = ? AND location = ?';
+        ? 'sync_status = ? AND deleted = 0'
+        : 'sync_status = ? AND location = ? AND deleted = 0';
     final whereArgs =
         location == null ? [syncStatus] : [syncStatus, location];
 
@@ -208,7 +208,7 @@ class LocalDb {
     String? to,
   }) async {
     final db = await database;
-    final whereParts = <String>['location = ?'];
+    final whereParts = <String>['location = ?', 'deleted = 0'];
     final whereArgs = <Object?>[location];
 
     if (from != null) {
@@ -368,8 +368,20 @@ class LocalDb {
     return applied;
   }
 
-  // ---------------------------------------------------------------------------
-  // Backward-compatible shims (removed in later phases as callers migrate)
+  /// Soft-deletes a bill (row kept for audit; hidden from ledger/sync).
+  Future<void> markBillDeleted(String localId) async {
+    final db = await database;
+    await db.update(
+      'bills',
+      {
+        'deleted': 1,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
   // ---------------------------------------------------------------------------
 
   Future<String> insertPendingBill(SaleBill bill) {
@@ -629,6 +641,7 @@ class LocalDb {
         grand_total REAL NOT NULL,
         sync_status TEXT NOT NULL DEFAULT 'pending',
         updated_at TEXT NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0,
         UNIQUE (bill_no, location)
       )
     ''');
@@ -668,6 +681,20 @@ class LocalDb {
     if (oldVersion < 2) {
       await _migrateV1ToV2(db);
     }
+    if (oldVersion < 3) {
+      await _migrateV2ToV3(db);
+    }
+  }
+
+  Future<void> _migrateV2ToV3(Database db) async {
+    final hasDeleted = await _tableHasColumn(db, 'bills', 'deleted');
+    if (hasDeleted) {
+      return;
+    }
+
+    await db.execute(
+      'ALTER TABLE bills ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0',
+    );
   }
 
   Future<void> _migrateV1ToV2(Database db) async {
@@ -750,6 +777,7 @@ class LocalDb {
           grand_total REAL NOT NULL,
           sync_status TEXT NOT NULL DEFAULT 'pending',
           updated_at TEXT NOT NULL,
+          deleted INTEGER NOT NULL DEFAULT 0,
           UNIQUE (bill_no, location)
         )
       ''');

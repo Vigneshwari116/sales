@@ -324,6 +324,30 @@ void main() {
       expect(stored!.bill.customerName, 'Local Pending');
       expect(stored.syncStatus, 'pending');
     });
+
+    test('markBillDeleted hides bill from ledger but keeps row in database',
+        () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final localId = await db.insertBill(SaleBill.fromJson(_sampleBillJson()));
+      await db.markBillDeleted(localId);
+
+      final entries = await db.getLedgerEntries(_testLocationName);
+      expect(entries, isEmpty);
+
+      final stored = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 1,
+      );
+      expect(stored, isNotNull);
+
+      final pending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(pending, isEmpty);
+    });
   });
 
   group('V1 to V2 migration', () {

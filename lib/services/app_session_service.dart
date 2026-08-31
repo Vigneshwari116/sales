@@ -1,6 +1,7 @@
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/services/auto_sync_service.dart';
+import 'package:sales/services/owner_delete_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class AppSessionService {
@@ -13,6 +14,7 @@ class AppSessionService {
   static Future<void> onLogout() async {
     SyncService.instance.stop();
     AutoSyncService.instance.stop();
+    OwnerDeleteService.instance.disable();
     await LocalDb.instance.close();
   }
 }

@@ -20,16 +20,7 @@ import 'sales_ledger_screen.dart';
 import 'printer_settings_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/sync_service.dart';
-
-enum _ItemCellField {
-  qty,
-  rate,
-  amount,
-  grossAmt,
-  cgstPct,
-  sgstPct,
-  igstPct,
-}
+import 'package:sales/services/owner_delete_service.dart';
 
 class SalesBillScreen extends StatefulWidget {
   const SalesBillScreen({super.key});
@@ -70,13 +61,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   bool _busy = false;
   bool _manualPushInProgress = false;
-  bool _editModeEnabled = false;
-  bool _showEditPasswordField = false;
-  String? _editPasswordError;
+  bool _showOwnerPasswordField = false;
+  String? _ownerPasswordError;
   String? _currentBillLocalId;
-  int? _editingRow;
-  _ItemCellField? _editingField;
-  TextEditingController? _cellEditController;
 
   // ============================================================
   // BILL DATE
@@ -106,7 +93,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final TextEditingController _mobileController =
   TextEditingController();
 
-  final TextEditingController _editPasswordController =
+  final TextEditingController _ownerPasswordController =
       TextEditingController();
 
   // ============================================================
@@ -202,14 +189,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ..addAll(session.items);
         _billSaved = session.billSaved;
         _selectedIndex = null;
-        _editModeEnabled = false;
         _currentBillLocalId = null;
       });
       return;
     }
 
     setState(() {
-      _editModeEnabled = false;
       _currentBillLocalId = null;
     });
 
@@ -456,15 +441,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         _selectedIndex = _selectedIndex! - 1;
       }
 
-      if (_editingRow == index) {
-        _editingRow = null;
-        _editingField = null;
-        _cellEditController?.dispose();
-        _cellEditController = null;
-      } else if (_editingRow != null && _editingRow! > index) {
-        _editingRow = _editingRow! - 1;
-      }
-
       _billSaved = false;
     });
 
@@ -493,122 +469,36 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _selectedIndex = null;
 
     _billSaved = false;
-    _editModeEnabled = false;
-    _showEditPasswordField = false;
-    _editPasswordError = null;
-    _editPasswordController.clear();
+    _showOwnerPasswordField = false;
+    _ownerPasswordError = null;
+    _ownerPasswordController.clear();
     _currentBillLocalId = null;
-    _editingRow = null;
-    _editingField = null;
-    _cellEditController?.dispose();
-    _cellEditController = null;
   }
 
-  void _onMobileDoubleTap() {
-    if (_editModeEnabled) {
+  void _onNameDoubleTap() {
+    if (OwnerDeleteService.instance.isDeleteEnabled) {
       return;
     }
 
     setState(() {
-      _showEditPasswordField = true;
-      _editPasswordError = null;
-      _editPasswordController.clear();
+      _showOwnerPasswordField = true;
+      _ownerPasswordError = null;
+      _ownerPasswordController.clear();
     });
   }
 
-  void _tryUnlockEditMode() {
-    if (_editPasswordController.text != appPassword) {
-      setState(() => _editPasswordError = 'Incorrect password');
+  void _tryUnlockOwnerDelete() {
+    if (_ownerPasswordController.text != appPassword) {
+      setState(() => _ownerPasswordError = 'Incorrect password');
       return;
     }
 
+    OwnerDeleteService.instance.enable();
     setState(() {
-      _editModeEnabled = true;
-      _showEditPasswordField = false;
-      _editPasswordError = null;
-      _editPasswordController.clear();
+      _showOwnerPasswordField = false;
+      _ownerPasswordError = null;
+      _ownerPasswordController.clear();
     });
-  }
-
-  void _startCellEdit(int rowIndex, _ItemCellField field, String value) {
-    _cellEditController?.dispose();
-    _cellEditController = TextEditingController(text: value);
-
-    setState(() {
-      _editingRow = rowIndex;
-      _editingField = field;
-    });
-  }
-
-  void _commitCellEdit(int rowIndex, _ItemCellField field) {
-    var text = _cellEditController?.text.trim() ?? '';
-    _applyCellEdit(rowIndex, field, text);
-
-    _cellEditController?.dispose();
-    _cellEditController = null;
-
-    setState(() {
-      _editingRow = null;
-      _editingField = null;
-    });
-  }
-
-  void _applyCellEdit(int rowIndex, _ItemCellField field, String text) {
-    var value = double.tryParse(text);
-    if (value == null) {
-      return;
-    }
-
-    var item = _items[rowIndex];
-
-    switch (field) {
-      case _ItemCellField.qty:
-        if (value <= 0) return;
-        item = item.copyWith(qty: value);
-      case _ItemCellField.rate:
-        if (value <= 0) return;
-        item = item.copyWith(rate: value);
-      case _ItemCellField.amount:
-        var taxPct = item.totalTaxPct;
-        var gross = taxPct == 0 ? value : value * (1 + taxPct / 100);
-        if (item.qty <= 0) return;
-        item = item.copyWith(rate: gross / item.qty);
-      case _ItemCellField.grossAmt:
-        if (item.qty <= 0) return;
-        item = item.copyWith(rate: value / item.qty);
-      case _ItemCellField.cgstPct:
-        item = item.copyWith(cgstPct: value);
-      case _ItemCellField.sgstPct:
-        item = item.copyWith(sgstPct: value);
-      case _ItemCellField.igstPct:
-        item = item.copyWith(igstPct: value);
-    }
-
-    setState(() {
-      _items[rowIndex] = item;
-      _billSaved = false;
-    });
-
-    _persistSession();
-  }
-
-  String _cellEditValue(BillItem item, _ItemCellField field) {
-    switch (field) {
-      case _ItemCellField.qty:
-        return _format(item.qty);
-      case _ItemCellField.rate:
-        return _format(item.rate);
-      case _ItemCellField.amount:
-        return _format(item.amount);
-      case _ItemCellField.grossAmt:
-        return _format(item.grossAmt);
-      case _ItemCellField.cgstPct:
-        return _format(item.cgstPct);
-      case _ItemCellField.sgstPct:
-        return _format(item.sgstPct);
-      case _ItemCellField.igstPct:
-        return _format(item.igstPct);
-    }
   }
 
   // ============================================================
@@ -1448,8 +1338,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               ),
 
               Expanded(
-                child: _smallTextField(
-                  _customerNameController,
+                child: GestureDetector(
+                  onDoubleTap: _onNameDoubleTap,
+                  child: _smallTextField(
+                    _customerNameController,
+                  ),
                 ),
               ),
             ],
@@ -1470,18 +1363,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               ),
 
               Expanded(
-                child: GestureDetector(
-                  onDoubleTap: _onMobileDoubleTap,
-                  child: _smallTextField(
-                    _mobileController,
-                    number: true,
-                  ),
+                child: _smallTextField(
+                  _mobileController,
+                  number: true,
                 ),
               ),
             ],
           ),
 
-          if (_showEditPasswordField && !_editModeEnabled) ...[
+          if (_showOwnerPasswordField &&
+              !OwnerDeleteService.instance.isDeleteEnabled) ...[
             const SizedBox(height: 5),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1500,10 +1391,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                       SizedBox(
                         height: 27,
                         child: TextField(
-                          controller: _editPasswordController,
+                          controller: _ownerPasswordController,
                           obscureText: true,
                           autofocus: true,
-                          onSubmitted: (_) => _tryUnlockEditMode(),
+                          onSubmitted: (_) => _tryUnlockOwnerDelete(),
                           decoration: const InputDecoration(
                             filled: true,
                             fillColor: Colors.white,
@@ -1516,10 +1407,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                           style: const TextStyle(fontSize: 10),
                         ),
                       ),
-                      if (_editPasswordError != null) ...[
+                      if (_ownerPasswordError != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          _editPasswordError!,
+                          _ownerPasswordError!,
                           style: const TextStyle(
                             color: Colors.red,
                             fontSize: 10,
@@ -1911,64 +1802,32 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     final BillItem item =
     _items[index];
 
-    final bool selected =
-        _selectedIndex == index && !_editModeEnabled;
-
-    Widget rowContent = Row(
-      children: [
-        _tableDataCell('${index + 1}', 55),
-        _buildGridCell(index, _ItemCellField.qty, item, 65),
-        _buildGridCell(index, _ItemCellField.rate, item, 75),
-        _buildGridCell(index, _ItemCellField.amount, item, 95),
-        _buildGridCell(
-          index,
-          _ItemCellField.grossAmt,
-          item,
-          95,
-          last: !showTax,
-        ),
-        if (showTax) ...[
-          _buildGridCell(index, _ItemCellField.cgstPct, item, 70),
-          _buildGridCell(index, _ItemCellField.sgstPct, item, 70),
-          _buildGridCell(
-            index,
-            _ItemCellField.igstPct,
-            item,
-            65,
-            displayOverride: _format(item.igst),
-            editOverride: _format(item.igstPct),
-          ),
-        ],
-        _buildDeleteCell(index),
-      ],
-    );
-
-    if (_editModeEnabled) {
-      return Container(
-        height: 34,
-        color: backgroundColor,
-        child: rowContent,
-      );
-    }
+    final bool selected = _selectedIndex == index;
 
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedIndex =
-          selected ? null : index;
+          _selectedIndex = selected ? null : index;
         });
       },
-
       child: Container(
         height: 34,
-
-        color: selected
-            ? const Color(
-          0xFFFFE5A0,
-        )
-            : backgroundColor,
-
-        child: rowContent,
+        color: selected ? const Color(0xFFFFE5A0) : backgroundColor,
+        child: Row(
+          children: [
+            _tableDataCell('${index + 1}', 55),
+            _tableDataCell(_format(item.qty), 65),
+            _tableDataCell(_format(item.rate), 75),
+            _tableDataCell(_format(item.amount), 95),
+            _tableDataCell(_format(item.grossAmt), 95, last: !showTax),
+            if (showTax) ...[
+              _tableDataCell(_format(item.cgstPct), 70),
+              _tableDataCell(_format(item.sgstPct), 70),
+              _tableDataCell(_format(item.igst), 65, last: true),
+            ],
+            _buildDeleteCell(index),
+          ],
+        ),
       ),
     );
   }
@@ -1990,75 +1849,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           tooltip: 'Remove item',
           onPressed: () => _removeItem(index),
         ),
-      ),
-    );
-  }
-
-  Widget _buildGridCell(
-    int rowIndex,
-    _ItemCellField field,
-    BillItem item,
-    int flex, {
-    bool last = false,
-    String? displayOverride,
-    String? editOverride,
-  }) {
-    var displayText = displayOverride ?? _cellEditValue(item, field);
-    var editText = editOverride ?? _cellEditValue(item, field);
-
-    if (!_editModeEnabled) {
-      return _tableDataCell(displayText, flex, last: last);
-    }
-
-    var isEditing =
-        _editingRow == rowIndex && _editingField == field;
-
-    return Expanded(
-      flex: flex,
-      child: Container(
-        height: 34,
-        decoration: BoxDecoration(
-          border: Border(
-            right: last
-                ? BorderSide.none
-                : BorderSide(color: borderColor, width: 0.6),
-            bottom: BorderSide(color: borderColor, width: 0.6),
-          ),
-        ),
-        alignment: Alignment.center,
-        child: isEditing
-            ? TextField(
-                controller: _cellEditController,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
-                style: const TextStyle(fontSize: 10, height: 1),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 4),
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _commitCellEdit(rowIndex, field),
-                onEditingComplete: () => _commitCellEdit(rowIndex, field),
-              )
-            : GestureDetector(
-                onTap: () => _startCellEdit(rowIndex, field, editText),
-                child: Container(
-                  width: double.infinity,
-                  alignment: Alignment.center,
-                  color: const Color(0xFFE8F8FF),
-                  child: Text(
-                    displayText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, height: 1),
-                  ),
-                ),
-              ),
       ),
     );
   }
@@ -2246,14 +2036,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         .removeListener(_onManualPushChanged);
     _rateTimer?.cancel();
     _qtyTimer?.cancel();
-    _cellEditController?.dispose();
     _persistSession();
 
     _customerNameController.dispose();
 
     _mobileController.dispose();
 
-    _editPasswordController.dispose();
+    _ownerPasswordController.dispose();
 
     _rateController.dispose();
 
