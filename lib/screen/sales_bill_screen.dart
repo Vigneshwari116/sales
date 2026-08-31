@@ -23,7 +23,14 @@ import 'package:sales/services/sync_service.dart';
 import 'package:sales/services/owner_delete_service.dart';
 
 class SalesBillScreen extends StatefulWidget {
-  const SalesBillScreen({super.key});
+  /// When set (tests only), replaces the default [SalesLedgerScreen] route.
+  @visibleForTesting
+  final Widget Function(String location)? ledgerScreenBuilder;
+
+  const SalesBillScreen({
+    super.key,
+    this.ledgerScreenBuilder,
+  });
 
   @override
   State<SalesBillScreen> createState() => _SalesBillScreenState();
@@ -140,6 +147,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateController.text = '0';
     _qtyController.text = '0';
 
+    _manualPushInProgress = SyncService.instance.manualPushInProgress.value;
     SyncService.instance.manualPushInProgress.addListener(_onManualPushChanged);
 
     _restoreSessionOrLoadBill().then((_) {
@@ -601,7 +609,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void _openLedger() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SalesLedgerScreen(location: _selectedLocation),
+        builder: (_) => widget.ledgerScreenBuilder?.call(_selectedLocation) ??
+            SalesLedgerScreen(location: _selectedLocation),
       ),
     );
   }
@@ -812,22 +821,20 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           mobileBillLayout: mobileBillLayout,
           useSidebarLayout: true,
         ),
-        body: _buildLockedBody(
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_sidebarOpen) ...[
-                SizedBox(
-                  width: _sidebarWidth,
-                  child: _buildMenuPanel(
-                    onClose: () => setState(() => _sidebarOpen = false),
-                  ),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_sidebarOpen) ...[
+              SizedBox(
+                width: _sidebarWidth,
+                child: _buildMenuPanel(
+                  onClose: () => setState(() => _sidebarOpen = false),
                 ),
-                const VerticalDivider(width: 1, thickness: 1),
-              ],
-              Expanded(child: body),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
             ],
-          ),
+            Expanded(child: _buildLockedBody(body)),
+          ],
         ),
       );
     }
