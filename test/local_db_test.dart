@@ -375,19 +375,47 @@ void main() {
       expect(pending.first.bill.deleted, isTrue);
     });
 
-    test('markBillDeleted on never-synced bill does not queue server push',
+    test('never-synced pending delete soft-deletes row and preserves bill number gap',
         () async {
       final db = LocalDb.instance;
       await db.initialize();
 
-      final localId = await db.insertBill(SaleBill.fromJson(_sampleBillJson()));
+      expect(await db.getNextBillNumber(_testLocationName), 1);
+
+      final localId = await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson(billNo: 1)),
+      );
+      expect(await db.getNextBillNumber(_testLocationName), 2);
+
       await db.markBillDeleted(localId);
+
+      final sqlite = await db.database;
+      final rows = await sqlite.query(
+        'bills',
+        where: 'local_id = ?',
+        whereArgs: [localId],
+      );
+      expect(rows, hasLength(1));
+      expect(rows.first['deleted'], 1);
+      expect(rows.first['sync_status'], 'synced');
+
+      final stored = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 1,
+      );
+      expect(stored, isNotNull);
+      expect(stored!.bill.deleted, isTrue);
 
       final pending = await db.getBillsBySyncStatus(
         'pending',
         location: _testLocationName,
       );
       expect(pending, isEmpty);
+
+      expect(await db.getNextBillNumber(_testLocationName), 2);
+
+      await db.insertBill(SaleBill.fromJson(_sampleBillJson(billNo: 2)));
+      expect(await db.getNextBillNumber(_testLocationName), 3);
     });
   });
 
