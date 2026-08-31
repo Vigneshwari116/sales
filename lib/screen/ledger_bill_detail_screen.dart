@@ -84,7 +84,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       _items.fold(0.0, (sum, item) => sum + item.grossAmt);
 
   void _onMobileDoubleTap() {
-    if (widget.readOnly || _editUnlocked) return;
+    if (widget.readOnly || _editUnlocked || _showPasswordField) return;
 
     setState(() {
       _showPasswordField = true;
@@ -309,7 +309,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           _readOnlyField('Name', _bill.customerName),
           const SizedBox(height: 4),
           GestureDetector(
-            onDoubleTap: _onMobileDoubleTap,
+            onTap: _onMobileDoubleTap,
             child: _readOnlyField('Mobile', _bill.mobile),
           ),
           if (_showPasswordField && !_editUnlocked) ...[

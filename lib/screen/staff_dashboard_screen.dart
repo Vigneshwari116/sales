@@ -4,21 +4,26 @@ import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_abstract_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
+import 'package:sales/screen/sales_reports_screen.dart';
+import 'package:sales/screen/staff_sales_dashboard_screen.dart';
 import 'package:sales/screen/staff_thermal_printer_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/widgets/collapsible_sidebar.dart';
 
 enum _StaffSection {
+  dashboard,
   bill,
   abstract,
   ledger,
+  reports,
   printer,
   sync,
 }
 
-/// Staff shell with icon-only [NavigationRail] on wide layouts.
+/// Staff shell with collapsible green sidebar (icon-only or icon + label row).
 class StaffDashboardScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
@@ -34,17 +39,29 @@ class StaffDashboardScreen extends StatefulWidget {
 
 class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   static const Color _background = Color(0xFFC5F6C5);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-  static const double _railBreakpoint = 700;
 
   _StaffSection _selectedSection = _StaffSection.bill;
+  bool _sidebarExpanded = true;
+  int _refreshGeneration = 0;
 
   String get _location => AppConfig.displayLocationName;
 
   int get _selectedIndex => _selectedSection.index;
 
   void _selectSection(_StaffSection section) {
-    setState(() => _selectedSection = section);
+    setState(() {
+      _selectedSection = section;
+      if (_isLocalDataSection(section)) {
+        _refreshGeneration++;
+      }
+    });
+  }
+
+  bool _isLocalDataSection(_StaffSection section) {
+    return section == _StaffSection.dashboard ||
+        section == _StaffSection.abstract ||
+        section == _StaffSection.ledger ||
+        section == _StaffSection.reports;
   }
 
   Future<void> _logout() async {
@@ -60,29 +77,37 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     );
   }
 
-  Widget _sectionLabel(_StaffSection section) {
+  String _sectionLabel(_StaffSection section) {
     switch (section) {
+      case _StaffSection.dashboard:
+        return 'DASHBOARD';
       case _StaffSection.bill:
-        return const Text('BILL');
+        return 'BILL';
       case _StaffSection.abstract:
-        return const Text('ABSTRACT');
+        return 'ABSTRACT';
       case _StaffSection.ledger:
-        return const Text('LEDGER');
+        return 'LEDGER';
+      case _StaffSection.reports:
+        return 'REPORTS';
       case _StaffSection.printer:
-        return const Text('PRINTER');
+        return 'PRINTER';
       case _StaffSection.sync:
-        return const Text('SYNC');
+        return 'SYNC';
     }
   }
 
   IconData _sectionIcon(_StaffSection section) {
     switch (section) {
+      case _StaffSection.dashboard:
+        return Icons.dashboard_outlined;
       case _StaffSection.bill:
         return Icons.receipt_long_outlined;
       case _StaffSection.abstract:
         return Icons.summarize_outlined;
       case _StaffSection.ledger:
         return Icons.menu_book_outlined;
+      case _StaffSection.reports:
+        return Icons.phone_android_outlined;
       case _StaffSection.printer:
         return Icons.print_outlined;
       case _StaffSection.sync:
@@ -90,159 +115,105 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
   }
 
-  Widget _buildNavigationList({VoidCallback? onNavigate}) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        DrawerHeader(
-          decoration: const BoxDecoration(color: _navSurface),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              const Text(
-                'Sales',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _location,
-                style: const TextStyle(fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        for (final section in _StaffSection.values)
-          ListTile(
-            key: Key('staff_nav_${section.name}'),
-            leading: Icon(_sectionIcon(section)),
-            title: _sectionLabel(section),
-            selected: _selectedSection == section,
-            onTap: () {
-              onNavigate?.call();
-              _selectSection(section);
-            },
-          ),
-        const Divider(),
-        ListTile(
-          key: const Key('staff_nav_logout'),
-          leading: const Icon(Icons.logout),
-          title: const Text('LOGOUT'),
-          onTap: () {
-            onNavigate?.call();
-            _logout();
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionBody() {
     return IndexedStack(
       index: _selectedIndex,
       children: [
+        StaffSalesDashboardScreen(
+          location: _location,
+          refreshGeneration: _refreshGeneration,
+        ),
         SalesBillScreen(
           embeddedInDashboard: true,
           ledgerScreenBuilder: widget.ledgerScreenBuilder,
         ),
-        SalesAbstractScreen(location: _location),
+        SalesAbstractScreen(
+          location: _location,
+          refreshGeneration: _refreshGeneration,
+        ),
         widget.ledgerScreenBuilder?.call(_location) ??
             SalesLedgerScreen(
               location: _location,
               embeddedInDashboard: true,
+              refreshGeneration: _refreshGeneration,
             ),
+        SalesReportsScreen(
+          location: _location,
+          refreshGeneration: _refreshGeneration,
+        ),
         const StaffThermalPrinterScreen(),
-        _StaffSyncPanel(location: _location),
+        const _StaffSyncPanel(),
       ],
     );
   }
 
+  List<SidebarNavItem> _navItems() {
+    return [
+      for (final section in _StaffSection.values)
+        SidebarNavItem(
+          key: Key('staff_nav_${section.name}'),
+          icon: _sectionIcon(section),
+          label: _sectionLabel(section),
+          selected: _selectedSection == section,
+          onTap: () => _selectSection(section),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final useRail = width > _railBreakpoint;
-
-    if (useRail) {
-      return Scaffold(
-        backgroundColor: _background,
-        body: Row(
-          children: [
-            NavigationRail(
-              key: const Key('staff_navigation_rail'),
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (index) {
-                _selectSection(_StaffSection.values[index]);
-              },
-              labelType: width > 900
-                  ? NavigationRailLabelType.all
-                  : NavigationRailLabelType.selected,
-              backgroundColor: _navSurface,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Column(
-                  children: [
-                    const Icon(Icons.storefront, size: 28),
-                    const SizedBox(height: 4),
-                    Text(
-                      _location,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: IconButton(
-                      key: const Key('staff_rail_logout'),
-                      tooltip: 'Logout',
-                      icon: const Icon(Icons.logout),
-                      onPressed: _logout,
-                    ),
-                  ),
-                ),
-              ),
-              destinations: [
-                for (final section in _StaffSection.values)
-                  NavigationRailDestination(
-                    icon: Icon(_sectionIcon(section)),
-                    label: _sectionLabel(section),
-                  ),
-              ],
-            ),
-            const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: _buildSectionBody()),
-          ],
-        ),
-      );
-    }
-
     return Scaffold(
-      key: const Key('staff_dashboard_drawer_shell'),
+      key: const Key('staff_dashboard_shell'),
       backgroundColor: _background,
-      drawer: Drawer(
-        backgroundColor: _background,
-        child: _buildNavigationList(),
+      body: Row(
+        children: [
+          CollapsibleSidebar(
+            key: const Key('staff_collapsible_sidebar'),
+            expanded: _sidebarExpanded,
+            onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+            backgroundColor: _background,
+            header: _sidebarExpanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Sales',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _location,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
+            footer: Tooltip(
+              message: 'LOGOUT',
+              child: IconButton(
+                key: const Key('staff_nav_logout'),
+                tooltip: _sidebarExpanded ? null : 'LOGOUT',
+                onPressed: _logout,
+                icon: const Icon(Icons.logout),
+              ),
+            ),
+            items: _navItems(),
+          ),
+          const VerticalDivider(width: 1, thickness: 1),
+          Expanded(child: _buildSectionBody()),
+        ],
       ),
-      appBar: AppBar(
-        title: _sectionLabel(_selectedSection),
-        backgroundColor: _navSurface,
-        foregroundColor: Colors.black,
-      ),
-      body: _buildSectionBody(),
     );
   }
 }
 
 class _StaffSyncPanel extends StatefulWidget {
-  final String location;
-
-  const _StaffSyncPanel({required this.location});
+  const _StaffSyncPanel();
 
   @override
   State<_StaffSyncPanel> createState() => _StaffSyncPanelState();
@@ -250,6 +221,7 @@ class _StaffSyncPanel extends StatefulWidget {
 
 class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   static const Color _background = Color(0xFFC5F6C5);
+  static const Color _navSurface = Color(0xFFE8F5E8);
 
   bool _syncing = false;
   String? _message;
@@ -263,7 +235,9 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
       _message = null;
     });
 
-    final result = await SyncService.instance.manualSync(widget.location);
+    final result = await SyncService.instance.manualSync(
+      AppConfig.displayLocationName,
+    );
 
     if (!mounted) return;
 
@@ -282,7 +256,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
           'SYNC',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        backgroundColor: const Color(0xFFE8F5E8),
+        backgroundColor: _navSurface,
         foregroundColor: Colors.black,
         automaticallyImplyLeading: false,
       ),
@@ -296,10 +270,10 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Push pending bills and pull admin updates for ${widget.location}.',
+                  const Text(
+                    'Push pending bills and pull admin updates.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(

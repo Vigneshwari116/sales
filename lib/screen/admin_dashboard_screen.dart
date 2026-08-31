@@ -11,6 +11,7 @@ import 'package:sales/services/sync_service.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/services/gst_config_service.dart';
+import 'package:sales/widgets/collapsible_sidebar.dart';
 
 enum _AdminSection {
   dashboard,
@@ -19,7 +20,7 @@ enum _AdminSection {
   sync,
 }
 
-/// Admin shell with [NavigationRail] on wide layouts and a drawer on narrow.
+/// Admin shell with collapsible green sidebar (icon-only or icon + label row).
 class AdminDashboardScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
@@ -35,16 +36,21 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   static const Color _background = Color(0xFFC5F6C5);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-  static const double _railBreakpoint = 700;
 
   _AdminSection _selectedSection = _AdminSection.dashboard;
   String _ledgerLocation = displayNameForLocationCode('win1');
+  bool _sidebarExpanded = true;
+  int _refreshGeneration = 0;
 
   int get _selectedIndex => _selectedSection.index;
 
   void _selectSection(_AdminSection section) {
-    setState(() => _selectedSection = section);
+    setState(() {
+      _selectedSection = section;
+      if (section == _AdminSection.ledger) {
+        _refreshGeneration++;
+      }
+    });
   }
 
   Future<void> _logout() async {
@@ -60,16 +66,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _sectionLabel(_AdminSection section) {
+  String _sectionLabel(_AdminSection section) {
     switch (section) {
       case _AdminSection.dashboard:
-        return const Text('DASHBOARD');
+        return 'DASHBOARD';
       case _AdminSection.abstract:
-        return const Text('ABSTRACT');
+        return 'ABSTRACT';
       case _AdminSection.ledger:
-        return const Text('LEDGER');
+        return 'LEDGER';
       case _AdminSection.sync:
-        return const Text('SYNC');
+        return 'SYNC';
     }
   }
 
@@ -86,53 +92,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  Widget _buildNavigationList({VoidCallback? onNavigate}) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        const DrawerHeader(
-          decoration: BoxDecoration(color: _navSurface),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                'Admin',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'All locations',
-                style: TextStyle(fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        for (final section in _AdminSection.values)
-          ListTile(
-            key: Key('admin_nav_${section.name}'),
-            leading: Icon(_sectionIcon(section)),
-            title: _sectionLabel(section),
-            selected: _selectedSection == section,
-            onTap: () {
-              onNavigate?.call();
-              _selectSection(section);
-            },
-          ),
-        const Divider(),
-        ListTile(
-          key: const Key('admin_nav_logout'),
-          leading: const Icon(Icons.logout),
-          title: const Text('LOGOUT'),
-          onTap: () {
-            onNavigate?.call();
-            _logout();
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionBody() {
     switch (_selectedSection) {
       case _AdminSection.dashboard:
@@ -145,7 +104,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: DropdownButtonFormField<String>(
-                initialValue: _ledgerLocation,
+                value: _ledgerLocation,
                 decoration: const InputDecoration(
                   labelText: 'Ledger location',
                   border: OutlineInputBorder(),
@@ -161,7 +120,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     .toList(),
                 onChanged: (value) {
                   if (value == null) return;
-                  setState(() => _ledgerLocation = value);
+                  setState(() {
+                    _ledgerLocation = value;
+                    _refreshGeneration++;
+                  });
                 },
               ),
             ),
@@ -171,6 +133,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     location: _ledgerLocation,
                     embeddedInDashboard: true,
                     readOnly: true,
+                    refreshGeneration: _refreshGeneration,
                   ),
             ),
           ],
@@ -180,84 +143,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  List<SidebarNavItem> _navItems() {
+    return [
+      for (final section in _AdminSection.values)
+        SidebarNavItem(
+          key: Key('admin_nav_${section.name}'),
+          icon: _sectionIcon(section),
+          label: _sectionLabel(section),
+          selected: _selectedSection == section,
+          onTap: () => _selectSection(section),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final useRail = width > _railBreakpoint;
-
-    if (useRail) {
-      return Scaffold(
-        backgroundColor: _background,
-        body: Row(
-          children: [
-            NavigationRail(
-              key: const Key('admin_navigation_rail'),
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (index) {
-                _selectSection(_AdminSection.values[index]);
-              },
-              labelType: width > 900
-                  ? NavigationRailLabelType.all
-                  : NavigationRailLabelType.selected,
-              backgroundColor: _navSurface,
-              leading: const Padding(
-                padding: EdgeInsets.only(top: 12, bottom: 8),
-                child: Column(
-                  children: [
-                    Icon(Icons.admin_panel_settings, size: 28),
-                    SizedBox(height: 4),
-                    Text(
-                      'Admin',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: IconButton(
-                      key: const Key('admin_rail_logout'),
-                      tooltip: 'Logout',
-                      icon: const Icon(Icons.logout),
-                      onPressed: _logout,
-                    ),
-                  ),
-                ),
-              ),
-              destinations: [
-                for (final section in _AdminSection.values)
-                  NavigationRailDestination(
-                    icon: Icon(_sectionIcon(section)),
-                    label: _sectionLabel(section),
-                  ),
-              ],
-            ),
-            const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: _buildSectionBody()),
-          ],
-        ),
-      );
-    }
-
     return Scaffold(
-      key: const Key('admin_dashboard_drawer_shell'),
+      key: const Key('admin_dashboard_shell'),
       backgroundColor: _background,
-      drawer: Drawer(
-        backgroundColor: _background,
-        child: _buildNavigationList(),
+      body: Row(
+        children: [
+          CollapsibleSidebar(
+            key: const Key('admin_collapsible_sidebar'),
+            expanded: _sidebarExpanded,
+            onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+            backgroundColor: _background,
+            header: _sidebarExpanded
+                ? const Padding(
+                    padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Admin',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'All locations',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
+            footer: Tooltip(
+              message: 'LOGOUT',
+              child: IconButton(
+                key: const Key('admin_nav_logout'),
+                tooltip: _sidebarExpanded ? null : 'LOGOUT',
+                onPressed: _logout,
+                icon: const Icon(Icons.logout),
+              ),
+            ),
+            items: _navItems(),
+          ),
+          const VerticalDivider(width: 1, thickness: 1),
+          Expanded(child: _buildSectionBody()),
+        ],
       ),
-      appBar: AppBar(
-        title: _sectionLabel(_selectedSection),
-        backgroundColor: _navSurface,
-        foregroundColor: Colors.black,
-      ),
-      body: _buildSectionBody(),
     );
   }
 }
@@ -271,6 +217,7 @@ class _AdminSyncPanel extends StatefulWidget {
 
 class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   static const Color _background = Color(0xFFC5F6C5);
+  static const Color _navSurface = Color(0xFFE8F5E8);
 
   final _cgstCtrl = TextEditingController(
     text: GstConfigService.defaultCgstPct.toString(),
@@ -349,7 +296,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
           'SYNC & GST CONFIG',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        backgroundColor: const Color(0xFFE8F5E8),
+        backgroundColor: _navSurface,
         foregroundColor: Colors.black,
         automaticallyImplyLeading: false,
       ),

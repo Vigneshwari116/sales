@@ -12,6 +12,7 @@ class SalesLedgerScreen extends StatefulWidget {
   final bool autoRefreshOnOpen;
   final bool embeddedInDashboard;
   final bool readOnly;
+  final int refreshGeneration;
 
   @visibleForTesting
   final Future<
@@ -29,6 +30,7 @@ class SalesLedgerScreen extends StatefulWidget {
     this.autoRefreshOnOpen = true,
     this.embeddedInDashboard = false,
     this.readOnly = false,
+    this.refreshGeneration = 0,
     this.loadLedgerOverride,
     this.loadBillOverride,
   });
@@ -55,6 +57,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     _loadLedger();
     if (widget.autoRefreshOnOpen) {
       _pullInBackground();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SalesLedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.location != oldWidget.location ||
+        widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadLedger();
     }
   }
 
@@ -269,7 +280,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('BILLNO', 1, bold: true),
           _cell('DATE', 1, bold: true),
           _cell('NAME', 2, bold: true),
-          _cell('', 1, bold: true),
+          _cell('MOBILE', 2, bold: true),
+          _cell('PAY', 1, bold: true),
           _cell('TOTAL', 1, bold: true, alignRight: true),
           _cell('CGST', 1, bold: true, alignRight: true),
           _cell('SGST', 1, bold: true, alignRight: true),
@@ -289,6 +301,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('${entry.billNo}', 1),
           _cell(_formatDate(entry.date), 1),
           _cell(entry.customerName, 2),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, 2),
           _cell(entry.paymentMode, 1),
           _cell(_formatMoney(entry.total), 1, alignRight: true),
           _cell(_formatMoney(entry.cgst), 1, alignRight: true),
@@ -308,6 +321,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         children: [
           _cell('', 1, bold: true),
           _cell('', 1, bold: true),
+          _cell('', 2, bold: true),
           _cell('', 2, bold: true),
           _cell('', 1, bold: true),
           _cell(_formatMoney(summary.total), 1, bold: true, alignRight: true),

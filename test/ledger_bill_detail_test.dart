@@ -54,6 +54,26 @@ void main() {
     expect(find.text('Grand Total'), findsOneWidget);
   });
 
+  testWidgets('tapping mobile shows compact password field', (tester) async {
+    final bill = _sampleBill();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LedgerBillDetailScreen(
+          bill: bill,
+          localId: 'detail-test-id',
+          syncStatus: 'synced',
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('9876543210'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
+  });
+
   testWidgets('shows empty items message when bill has no line items', (tester) async {
     final bill = SaleBill(
       billNo: 1,

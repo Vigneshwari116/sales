@@ -16,6 +16,7 @@ import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/widgets/collapsible_sidebar.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -106,7 +107,7 @@ void main() {
 
     for (var i = 0; i < 50; i++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (find.byKey(const Key('admin_navigation_rail')).evaluate().isNotEmpty) {
+      if (find.byKey(const Key('admin_collapsible_sidebar')).evaluate().isNotEmpty) {
         break;
       }
     }
@@ -118,33 +119,42 @@ void main() {
     }
   }
 
-  testWidgets('admin dashboard shows NavigationRail and location grid by default',
+  testWidgets('admin dashboard shows collapsible sidebar and location grid',
       (tester) async {
     await pumpAdminDashboard(tester);
 
-    expect(find.byKey(const Key('admin_navigation_rail')), findsOneWidget);
+    expect(find.byKey(const Key('admin_collapsible_sidebar')), findsOneWidget);
     expect(find.byKey(const Key('admin_location_card_win1')), findsOneWidget);
   });
 
-  testWidgets('navigation rail switches to ledger section', (tester) async {
+  testWidgets('sidebar hamburger toggles expanded/collapsed', (tester) async {
     await pumpAdminDashboard(tester);
 
-    final rail = tester.widget<NavigationRail>(
-      find.byKey(const Key('admin_navigation_rail')),
-    );
-    expect(rail.selectedIndex, 0);
+    expect(find.byKey(const Key('admin_nav_dashboard')), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.menu_book_outlined));
+    await tester.tap(find.byKey(const Key('sidebar_hamburger_toggle')));
+    await tester.pumpAndSettle();
+
+    final sidebar = tester.widget<CollapsibleSidebar>(
+      find.byKey(const Key('admin_collapsible_sidebar')),
+    );
+    expect(sidebar.expanded, isFalse);
+  });
+
+  testWidgets('sidebar switches to ledger section', (tester) async {
+    await pumpAdminDashboard(tester);
+
+    await tester.tap(find.text('LEDGER'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('SALES LEDGER'), findsOneWidget);
   });
 
-  testWidgets('navigation rail switches to sync section', (tester) async {
+  testWidgets('sidebar switches to sync section', (tester) async {
     await pumpAdminDashboard(tester);
 
-    await tester.tap(find.byIcon(Icons.cloud_upload_outlined));
+    await tester.tap(find.text('SYNC'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

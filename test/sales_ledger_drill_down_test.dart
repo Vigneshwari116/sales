@@ -17,6 +17,7 @@ LocalLedgerEntry _sampleLedgerEntry() {
     billNo: 7,
     date: '2026-08-31',
     customerName: 'Drill Down Customer',
+    mobile: '9999999999',
     paymentMode: 'CASH',
     total: 100,
     cgst: 2.5,
