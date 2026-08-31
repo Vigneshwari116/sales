@@ -87,7 +87,6 @@ class AutoSyncService with WidgetsBindingObserver {
   }
 
   Future<void> _runAutoSync() async {
-    await SyncService.instance.pushPendingBills();
     await SalesApi.pullGstMasterData(AppConfig.locationCode);
   }
 }

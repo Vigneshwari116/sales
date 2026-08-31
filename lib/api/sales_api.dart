@@ -157,6 +157,46 @@ class SalesApi {
     }
   }
 
+  static Future<
+      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>>
+      getBillUpdatesSince({
+    required String location,
+    required DateTime since,
+  }) async {
+    final uri =
+        Uri.parse('$salesBillApiBaseUrl/api/bills/updates-since').replace(
+      queryParameters: {
+        'location': location,
+        'since': since.toUtc().toIso8601String(),
+      },
+    );
+
+    try {
+      final res = await http.get(uri).timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode == 200 && body['ok'] == true) {
+        final billsJson = body['bills'] as List<dynamic>? ?? [];
+        final bills = billsJson
+            .map((entry) => SaleBill.fromJson(entry as Map<String, dynamic>))
+            .toList(growable: false);
+        final serverTimeRaw = body['serverTime'] as String?;
+        final serverTime = serverTimeRaw != null
+            ? DateTime.tryParse(serverTimeRaw)?.toUtc() ??
+                DateTime.now().toUtc()
+            : DateTime.now().toUtc();
+
+        return SalesApiResult.success((bills: bills, serverTime: serverTime));
+      }
+
+      return SalesApiResult.failure(
+        body['error'] as String? ?? 'Could not load bill updates',
+      );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
   static Future<SalesApiResult<int>> saveBill(SaleBill bill) async {
     final uri = Uri.parse('$salesBillApiBaseUrl/api/bills');
 

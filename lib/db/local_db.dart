@@ -302,6 +302,72 @@ class LocalDb {
     );
   }
 
+  /// Overwrites local rows with admin-edited server versions (auto-pull).
+  /// Skips local rows still marked `pending` (not yet manually pushed).
+  /// Returns the number of bills written.
+  Future<int> applyPulledBills(List<SaleBill> bills) async {
+    if (bills.isEmpty) {
+      return 0;
+    }
+
+    final db = await database;
+    var applied = 0;
+
+    await db.transaction((txn) async {
+      for (final bill in bills) {
+        final existingRows = await txn.query(
+          'bills',
+          where: 'location = ? AND bill_no = ?',
+          whereArgs: [bill.location, bill.billNo],
+          limit: 1,
+        );
+
+        if (existingRows.isNotEmpty) {
+          final syncStatus = existingRows.first['sync_status'] as String?;
+          if (syncStatus == 'pending') {
+            continue;
+          }
+
+          final localId = existingRows.first['local_id'] as String;
+          final now = DateTime.now().toUtc().toIso8601String();
+          await txn.update(
+            'bills',
+            _billToRow(
+              bill,
+              localId: localId,
+              syncStatus: 'synced',
+              updatedAt: now,
+            ),
+            where: 'local_id = ?',
+            whereArgs: [localId],
+          );
+        } else {
+          final localId = const Uuid().v4();
+          final now = DateTime.now().toUtc().toIso8601String();
+          await txn.insert(
+            'bills',
+            _billToRow(
+              bill,
+              localId: localId,
+              syncStatus: 'synced',
+              updatedAt: now,
+            ),
+            conflictAlgorithm: ConflictAlgorithm.abort,
+          );
+        }
+
+        applied++;
+      }
+    });
+
+    final locations = bills.map((bill) => bill.location).toSet();
+    for (final location in locations) {
+      await _refreshNextBillNoFromBills(location);
+    }
+
+    return applied;
+  }
+
   // ---------------------------------------------------------------------------
   // Backward-compatible shims (removed in later phases as callers migrate)
   // ---------------------------------------------------------------------------
@@ -758,6 +824,21 @@ class LocalDb {
       ''',
       [next, location],
     );
+  }
+
+  Future<void> _refreshNextBillNoFromBills(String location) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT MAX(bill_no) AS max_no FROM bills WHERE location = ?',
+      [location],
+    );
+
+    final maxNo = result.first['max_no'];
+    if (maxNo == null) {
+      return;
+    }
+
+    await _advanceNextBillNo(location, (maxNo as num).toInt());
   }
 
   static Map<String, Object?> _billToRow(

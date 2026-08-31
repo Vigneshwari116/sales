@@ -19,6 +19,7 @@ import 'sales_abstract_screen.dart';
 import 'sales_ledger_screen.dart';
 import 'printer_settings_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
+import 'package:sales/services/sync_service.dart';
 
 enum _ItemCellField {
   qty,
@@ -68,6 +69,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   bool _billSaved = false;
 
   bool _busy = false;
+  bool _manualPushInProgress = false;
   bool _editModeEnabled = false;
   bool _showEditPasswordField = false;
   String? _editPasswordError;
@@ -151,12 +153,33 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateController.text = '0';
     _qtyController.text = '0';
 
+    SyncService.instance.manualPushInProgress.addListener(_onManualPushChanged);
+
     _restoreSessionOrLoadBill().then((_) {
       if (mounted) {
         _focusRate();
       }
     });
   }
+
+  void _onManualPushChanged() {
+    if (!mounted) return;
+    setState(() {
+      _manualPushInProgress =
+          SyncService.instance.manualPushInProgress.value;
+    });
+  }
+
+  Future<void> _syncNow() async {
+    final result =
+        await SyncService.instance.manualPush(_selectedLocation);
+
+    if (!mounted) return;
+
+    _showMessage(result.summaryMessage);
+  }
+
+  bool get _isEntryLocked => _busy || _manualPushInProgress;
 
   Future<void> _restoreSessionOrLoadBill() async {
     final session = await SessionService.loadBillSession();
@@ -896,20 +919,22 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           mobileBillLayout: mobileBillLayout,
           useSidebarLayout: true,
         ),
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_sidebarOpen) ...[
-              SizedBox(
-                width: _sidebarWidth,
-                child: _buildMenuPanel(
-                  onClose: () => setState(() => _sidebarOpen = false),
+        body: _buildLockedBody(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_sidebarOpen) ...[
+                SizedBox(
+                  width: _sidebarWidth,
+                  child: _buildMenuPanel(
+                    onClose: () => setState(() => _sidebarOpen = false),
+                  ),
                 ),
-              ),
-              const VerticalDivider(width: 1, thickness: 1),
+                const VerticalDivider(width: 1, thickness: 1),
+              ],
+              Expanded(child: body),
             ],
-            Expanded(child: body),
-          ],
+          ),
         ),
       );
     }
@@ -925,7 +950,39 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         mobileBillLayout: mobileBillLayout,
         useSidebarLayout: false,
       ),
-      body: body,
+      body: _buildLockedBody(body),
+    );
+  }
+
+  Widget _buildLockedBody(Widget child) {
+    return Stack(
+      children: [
+        AbsorbPointer(
+          absorbing: _isEntryLocked,
+          child: child,
+        ),
+        if (_manualPushInProgress)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Color(0x33000000),
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 12),
+                        Text('Syncing bills to server...'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1048,6 +1105,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                   },
                 ),
               ],
+            ),
+            ListTile(
+              leading: const Icon(Icons.cloud_upload_outlined),
+              title: const Text('SYNC NOW'),
+              enabled: !_manualPushInProgress,
+              onTap: _manualPushInProgress
+                  ? null
+                  : () {
+                      onClose();
+                      _syncNow();
+                    },
             ),
             ListTile(
               leading: const Icon(Icons.print_outlined),
@@ -2174,6 +2242,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   @override
   void dispose() {
+    SyncService.instance.manualPushInProgress
+        .removeListener(_onManualPushChanged);
     _rateTimer?.cancel();
     _qtyTimer?.cancel();
     _cellEditController?.dispose();
