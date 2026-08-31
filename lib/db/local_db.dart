@@ -412,6 +412,7 @@ class LocalDb {
 
       if (existing.isNotEmpty) {
         await db.update(
+          'bills',
           {
             'bill_date': entry.date,
             'payment_mode': entry.paymentMode,
