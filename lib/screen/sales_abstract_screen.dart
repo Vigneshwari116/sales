@@ -174,19 +174,13 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                   ],
                   const SizedBox(height: 20),
                   _summaryRow(
-                    'Total Sale Amount',
+                    'Total sales',
                     _formatMoney(_summary?.totalSaleAmount ?? 0),
                   ),
                   const SizedBox(height: 10),
                   _summaryRow(
                     'Total GST',
                     _formatMoney(_summary?.totalGst ?? 0),
-                  ),
-                  const SizedBox(height: 10),
-                  _summaryRow(
-                    'Grand Total',
-                    _formatMoney(_summary?.grandTotal ?? 0),
-                    bold: true,
                   ),
                 ],
               ),

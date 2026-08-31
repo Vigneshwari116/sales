@@ -6,10 +6,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/login_screen.dart';
-import 'package:sales/screen/owner_setup_screen.dart';
-import 'package:sales/screen/sales_bill_screen.dart';
+import 'package:sales/screen/staff_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
-import 'package:sales/services/credential_service.dart';
 import 'package:sales/services/session_service.dart';
 
 Future<void> main() async {
@@ -55,10 +53,6 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Future<Widget> _resolveHome() async {
-    if (!await CredentialService.isConfigured()) {
-      return const OwnerSetupScreen();
-    }
-
     final loggedIn = await SessionService.isLoggedIn();
 
     if (loggedIn && AppConfig.isLocationSet) {
@@ -69,7 +63,7 @@ class _AppRootState extends State<AppRoot> {
         return const AdminDashboardScreen();
       }
       if (role == SessionRole.staff) {
-        return const SalesBillScreen();
+        return const StaffDashboardScreen();
       }
     }
 

@@ -36,6 +36,7 @@ void main() {
       MaterialApp(
         home: LedgerBillDetailScreen(
           bill: bill,
+          localId: 'detail-test-id',
           syncStatus: 'synced',
         ),
       ),
@@ -72,7 +73,11 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: LedgerBillDetailScreen(bill: bill, syncStatus: 'pending'),
+        home: LedgerBillDetailScreen(
+          bill: bill,
+          localId: 'empty-bill-id',
+          syncStatus: 'pending',
+        ),
       ),
     );
 

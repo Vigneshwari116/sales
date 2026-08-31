@@ -261,10 +261,10 @@ class SalesApi {
   }
 
   static Future<SalesApiResult<String>> pullGstMasterData(
-      String location) async {
+      String locationCode) async {
     final uri =
         Uri.parse('$salesBillApiBaseUrl/api/gst/sync').replace(
-      queryParameters: {'location': location},
+      queryParameters: {'location': locationCode},
     );
 
     try {
@@ -278,12 +278,12 @@ class SalesApi {
       }
 
       final dbName = body['db_name'] as String? ?? '';
-      final expected = AppConfig.expectedGstDbName;
+      final expected = '${locationCode}_gst';
 
       if (dbName != expected) {
         developer.log(
           'GST sync rejected: server db_name "$dbName" does not match '
-          'expected "$expected" for build LOCATION_CODE=${AppConfig.locationCode}',
+          'expected "$expected" for location $locationCode',
           name: 'SalesApi',
         );
         return SalesApiResult.failure('Sync rejected: database mismatch.');
@@ -301,12 +301,46 @@ class SalesApi {
 
       await LocalDb.instance.replaceGstMaster(rows);
       await LocalDb.instance.updateSyncMeta(
-        location: location,
+        location: locationCode,
         expectedDbName: expected,
         lastGstVersion: version,
       );
 
       return SalesApiResult.success(version);
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
+  static Future<SalesApiResult<void>> updateGstConfig({
+    required String locationCode,
+    required double cgstPct,
+    required double sgstPct,
+  }) async {
+    final uri = Uri.parse('$salesBillApiBaseUrl/api/gst/config');
+
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'location': locationCode,
+              'cgstPct': cgstPct,
+              'sgstPct': sgstPct,
+            }),
+          )
+          .timeout(_timeout);
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode != 200 || body['ok'] != true) {
+        return SalesApiResult.failure(
+          body['error'] as String? ?? 'Could not save GST config',
+        );
+      }
+
+      return SalesApiResult.success(null);
     } catch (_) {
       return SalesApiResult.failure('Could not reach the server.');
     }

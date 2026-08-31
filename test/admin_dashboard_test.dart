@@ -17,8 +17,6 @@ import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
-import 'credential_test_helpers.dart';
-
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
@@ -62,7 +60,6 @@ void main() {
   setUp(() async {
     await AppConfig.setLocation(_testLocationCode);
     await SessionService.clearLogin();
-    await seedTestCredentials();
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
@@ -76,7 +73,6 @@ void main() {
     await _deleteTestDb();
     await SessionService.clearLogin();
     await AppConfig.clearLocation();
-    await resetTestCredentials();
   });
 
   Future<void> pumpAdminDashboard(WidgetTester tester) async {
@@ -91,6 +87,8 @@ void main() {
           ledgerScreenBuilder: (location) => SalesLedgerScreen(
             location: location,
             autoRefreshOnOpen: false,
+            embeddedInDashboard: true,
+            readOnly: true,
             loadLedgerOverride: () async => (
               entries: <ledger_repo.LocalLedgerEntry>[],
               summary: LedgerSummary(
@@ -112,15 +110,20 @@ void main() {
         break;
       }
     }
-    await tester.pump(const Duration(milliseconds: 300));
+    for (var i = 0; i < 50; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('admin_location_card_win1')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
   }
 
-  testWidgets('admin dashboard shows NavigationRail and abstract by default',
+  testWidgets('admin dashboard shows NavigationRail and location grid by default',
       (tester) async {
     await pumpAdminDashboard(tester);
 
     expect(find.byKey(const Key('admin_navigation_rail')), findsOneWidget);
-    expect(find.text('SALES ABSTRACT'), findsOneWidget);
+    expect(find.byKey(const Key('admin_location_card_win1')), findsOneWidget);
   });
 
   testWidgets('navigation rail switches to ledger section', (tester) async {

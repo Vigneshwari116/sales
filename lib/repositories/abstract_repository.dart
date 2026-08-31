@@ -1,17 +1,24 @@
-import 'dart:convert';
+import 'dart:io';
 
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'package:sales/config/app_config.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
 
 class AbstractSummary {
   final double totalSaleAmount;
   final double totalGst;
-  final double grandTotal;
 
   AbstractSummary({
     required this.totalSaleAmount,
     required this.totalGst,
-    required this.grandTotal,
   });
+
+  static AbstractSummary zero() =>
+      AbstractSummary(totalSaleAmount: 0, totalGst: 0);
 }
 
 class AbstractRepository {
@@ -20,69 +27,149 @@ class AbstractRepository {
     required DateTime fromDate,
     required DateTime toDate,
   }) async {
+    final code = _locationCodeFromDisplayName(location);
+    return getSummaryForLocationCode(
+      locationCode: code,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+  }
+
+  static Future<AbstractSummary> getSummaryForLocationCode({
+    required String locationCode,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
     try {
-      var fromKey = _formatDate(fromDate);
-      var toKey = _formatDate(toDate);
-      var rows =
-          await LocalDb.instance.getBillsForLedger(location: location);
+      final fromKey = _formatDate(fromDate);
+      final toKey = _formatDate(toDate);
+      final rows = await _readBillsForLocationCode(locationCode);
 
       var totalSaleAmount = 0.0;
       var totalGst = 0.0;
-      var grandTotal = 0.0;
 
-      for (var row in rows) {
-        var totals = _totalsForRow(row, fromKey: fromKey, toKey: toKey);
-        if (totals == null) {
-          continue;
-        }
-
+      for (final row in rows) {
+        final totals = _totalsForRow(row, fromKey: fromKey, toKey: toKey);
+        if (totals == null) continue;
         totalSaleAmount += totals.$1;
         totalGst += totals.$2;
-        grandTotal += totals.$3;
       }
 
       return AbstractSummary(
         totalSaleAmount: totalSaleAmount,
         totalGst: totalGst,
-        grandTotal: grandTotal,
       );
     } catch (_) {
-      return AbstractSummary(
-        totalSaleAmount: 0,
-        totalGst: 0,
-        grandTotal: 0,
-      );
+      return AbstractSummary.zero();
     }
   }
 
-  static (double, double, double)? _totalsForRow(
+  static Future<AbstractSummary> getCrossLocationSummary({
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    var totalSale = 0.0;
+    var totalGst = 0.0;
+
+    for (final code in allLocationCodes) {
+      final summary = await getSummaryForLocationCode(
+        locationCode: code,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+      totalSale += summary.totalSaleAmount;
+      totalGst += summary.totalGst;
+    }
+
+    return AbstractSummary(
+      totalSaleAmount: totalSale,
+      totalGst: totalGst,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> _readBillsForLocationCode(
+    String locationCode,
+  ) async {
+    final locationName = displayNameForLocationCode(locationCode);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        final entries = await LocalDb.instance.getLedgerEntries(locationName);
+        return entries
+            .map(
+              (entry) => {
+                'bill_date': entry.billDate,
+                'total_amount': entry.totalAmount,
+                'total_cgst': entry.totalCgst,
+                'total_sgst': entry.totalSgst,
+                'total_igst': entry.totalIgst,
+              },
+            )
+            .toList(growable: false);
+      } catch (_) {
+        return const [];
+      }
+    }
+
+    final supportDir = await getApplicationSupportDirectory();
+    final path = join(supportDir.path, '${locationCode}_sales.db');
+    final file = File(path);
+    if (!await file.exists()) {
+      return const [];
+    }
+
+    final db = await openDatabase(path, readOnly: true);
+
+    try {
+      return await db.query(
+        'bills',
+        where: 'deleted = 0 AND location = ?',
+        whereArgs: [locationName],
+        columns: [
+          'bill_date',
+          'total_amount',
+          'total_cgst',
+          'total_sgst',
+          'total_igst',
+        ],
+      );
+    } finally {
+      await db.close();
+    }
+  }
+
+  static String _locationCodeFromDisplayName(String location) {
+    switch (location) {
+      case 'Win1':
+        return 'win1';
+      case 'Win2':
+        return 'win2';
+      case 'Win3':
+        return 'win3';
+      case 'Win4':
+        return 'win4';
+      default:
+        return location.toLowerCase();
+    }
+  }
+
+  static (double, double)? _totalsForRow(
     Map<String, dynamic> row, {
     required String fromKey,
     required String toKey,
   }) {
-    try {
-      var payloadRaw = row['payload'] as String?;
-      if (payloadRaw == null || payloadRaw.isEmpty) {
-        return null;
-      }
-
-      var payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
-      var billDate = payload['billDate'] as String? ?? '';
-
-      if (billDate.compareTo(fromKey) < 0 || billDate.compareTo(toKey) > 0) {
-        return null;
-      }
-
-      var saleAmount = (payload['totalAmount'] as num?)?.toDouble() ?? 0;
-      var cgst = (payload['totalCgst'] as num?)?.toDouble() ?? 0;
-      var sgst = (payload['totalSgst'] as num?)?.toDouble() ?? 0;
-      var igst = (payload['totalIgst'] as num?)?.toDouble() ?? 0;
-      var grand = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
-
-      return (saleAmount, cgst + sgst + igst, grand);
-    } catch (_) {
+    final billDate = row['bill_date'] as String?;
+    if (billDate == null) return null;
+    if (billDate.compareTo(fromKey) < 0 || billDate.compareTo(toKey) > 0) {
       return null;
     }
+
+    final saleAmount = (row['total_amount'] as num?)?.toDouble() ?? 0;
+    final cgst = (row['total_cgst'] as num?)?.toDouble() ?? 0;
+    final sgst = (row['total_sgst'] as num?)?.toDouble() ?? 0;
+    final igst = (row['total_igst'] as num?)?.toDouble() ?? 0;
+
+    return (saleAmount, cgst + sgst + igst);
   }
 
   static String _formatDate(DateTime date) {

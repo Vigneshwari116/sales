@@ -67,6 +67,7 @@ void main() {
     await LocalDb.instance.getNextBillNumber(
       AppConfig.displayLocationName,
     );
+    SyncService.instance.start(location: AppConfig.displayLocationName);
   });
 
   tearDown(() async {
@@ -85,6 +86,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: SalesBillScreen(
+          initialBillNo: 1,
           ledgerScreenBuilder: (location) => SalesLedgerScreen(
             location: location,
             autoRefreshOnOpen: false,
@@ -125,6 +127,8 @@ void main() {
     expect(find.text('SYNC NOW'), findsOneWidget);
     expect(find.text('ABSTRACT'), findsNothing);
     expect(find.text('PRINTER SETTINGS'), findsNothing);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pump(const Duration(milliseconds: 500));
   });
 
   testWidgets('ledger menu navigation works while manual push is in progress',
@@ -145,7 +149,7 @@ void main() {
 
     expect(find.byType(SalesLedgerScreen), findsOneWidget);
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pump(const Duration(milliseconds: 500));
   });
 }

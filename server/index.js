@@ -49,6 +49,14 @@ async function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
       ON bills (location, updated_at);
+
+    CREATE TABLE IF NOT EXISTS gst_config (
+      location TEXT PRIMARY KEY,
+      cgst_pct DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+      sgst_pct DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+      version TEXT NOT NULL DEFAULT '1',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await pool.query(`
@@ -74,6 +82,15 @@ async function initDatabase() {
       ['admin', hash]
     );
     console.log('Default user created: admin / admin');
+  }
+
+  for (const loc of ['win1', 'win2', 'win3', 'win4']) {
+    await pool.query(
+      `INSERT INTO gst_config (location, cgst_pct, sgst_pct, version)
+       VALUES ($1, 2.5, 2.5, '1')
+       ON CONFLICT (location) DO NOTHING`,
+      [loc]
+    );
   }
 }
 
@@ -360,6 +377,66 @@ app.post('/api/bills', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Failed to save bill' });
+  }
+});
+
+app.get('/api/gst/sync', async (req, res) => {
+  const location = String(req.query.location ?? '').trim().toLowerCase();
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'location parameter is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM gst_config WHERE location = $1 LIMIT 1',
+      [location]
+    );
+    const row = result.rows[0] ?? { cgst_pct: 2.5, sgst_pct: 2.5, version: '1' };
+
+    res.json({
+      ok: true,
+      db_name: `${location}_gst`,
+      version: String(row.version ?? '1'),
+      data: [
+        { key: 'cgst_pct', value: String(row.cgst_pct ?? 2.5) },
+        { key: 'sgst_pct', value: String(row.sgst_pct ?? 2.5) },
+      ],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not load GST config' });
+  }
+});
+
+app.post('/api/gst/config', async (req, res) => {
+  const location = String(req.body?.location ?? '').trim().toLowerCase();
+  const cgstPct = Number(req.body?.cgstPct);
+  const sgstPct = Number(req.body?.sgstPct);
+
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'location is required' });
+  }
+  if (!Number.isFinite(cgstPct) || !Number.isFinite(sgstPct)) {
+    return res.status(400).json({ ok: false, error: 'Invalid GST percentages' });
+  }
+
+  try {
+    const version = Date.now().toString();
+    await pool.query(
+      `INSERT INTO gst_config (location, cgst_pct, sgst_pct, version, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (location) DO UPDATE SET
+         cgst_pct = EXCLUDED.cgst_pct,
+         sgst_pct = EXCLUDED.sgst_pct,
+         version = EXCLUDED.version,
+         updated_at = NOW()`,
+      [location, cgstPct, sgstPct, version]
+    );
+
+    res.json({ ok: true, version });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not save GST config' });
   }
 });
 
