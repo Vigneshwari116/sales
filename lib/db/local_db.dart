@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
+import 'package:meta/meta.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -71,6 +73,14 @@ class LocalDb {
   static LocalDb get instance {
     _instance ??= LocalDb._();
     return _instance!;
+  }
+
+  /// Clears the singleton so tests can open a fresh database.
+  @visibleForTesting
+  static Future<void> resetForTesting() async {
+    await _instance?._database?.close();
+    _instance?._database = null;
+    _instance = null;
   }
 
   static const int _dbVersion = 2;
@@ -601,80 +611,112 @@ class LocalDb {
     }
 
     final oldRows = await db.query('bills');
-    await db.execute('DROP TABLE IF EXISTS bills');
-
-    await db.execute('''
-      CREATE TABLE bills (
-        local_id TEXT PRIMARY KEY,
-        bill_no INTEGER NOT NULL,
-        location TEXT NOT NULL,
-        bill_date TEXT NOT NULL,
-        payment_mode TEXT NOT NULL,
-        customer_name TEXT NOT NULL DEFAULT '',
-        mobile TEXT NOT NULL DEFAULT '',
-        items_json TEXT NOT NULL,
-        total_qty REAL NOT NULL,
-        total_amount REAL NOT NULL,
-        total_cgst REAL NOT NULL,
-        total_sgst REAL NOT NULL,
-        total_igst REAL NOT NULL,
-        grand_total REAL NOT NULL,
-        sync_status TEXT NOT NULL DEFAULT 'pending',
-        updated_at TEXT NOT NULL,
-        UNIQUE (bill_no, location)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS location_meta (
-        location TEXT PRIMARY KEY,
-        next_bill_no INTEGER NOT NULL DEFAULT 1,
-        last_pull_at TEXT
-      )
-    ''');
-
-    var maxBillNoByLocation = <String, int>{};
+    final migratedRows = <Map<String, Object?>>[];
+    final maxBillNoByLocation = <String, int>{};
+    final parseErrors = <String>[];
 
     for (final row in oldRows) {
+      final localId = row['local_id'] as String? ?? '(missing local_id)';
       try {
-        final payload = jsonDecode(row['payload'] as String)
-            as Map<String, dynamic>;
+        final payloadRaw = row['payload'];
+        if (payloadRaw is! String || payloadRaw.isEmpty) {
+          throw const FormatException('payload is empty or not a string');
+        }
+
+        final payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
         final bill = SaleBill.fromJson(payload);
-        final localId = row['local_id'] as String? ?? const Uuid().v4();
+        final resolvedLocalId = row['local_id'] as String? ?? const Uuid().v4();
         final syncStatus = row['sync_status'] as String? ?? 'pending';
         final updatedAt = row['created_at'] as String? ??
             DateTime.now().toUtc().toIso8601String();
 
-        await db.insert(
-          'bills',
+        migratedRows.add(
           _billToRow(
             bill,
-            localId: localId,
+            localId: resolvedLocalId,
             syncStatus: syncStatus,
             updatedAt: updatedAt,
           ),
-          conflictAlgorithm: ConflictAlgorithm.abort,
         );
 
         final currentMax = maxBillNoByLocation[bill.location] ?? 0;
         if (bill.billNo > currentMax) {
           maxBillNoByLocation[bill.location] = bill.billNo;
         }
-      } catch (_) {
-        // Skip rows that cannot be migrated.
+      } catch (e, stackTrace) {
+        final message = 'Bill $localId: $e';
+        parseErrors.add(message);
+        developer.log(
+          message,
+          name: 'LocalDb',
+          error: e,
+          stackTrace: stackTrace,
+        );
       }
     }
 
-    for (final entry in maxBillNoByLocation.entries) {
-      await db.insert(
-        'location_meta',
-        {
-          'location': entry.key,
-          'next_bill_no': entry.value + 1,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+    if (parseErrors.isNotEmpty) {
+      throw StateError(
+        'V1→V2 migration aborted: ${parseErrors.length} of ${oldRows.length} '
+        'bill(s) could not be parsed. No schema changes were made.\n'
+        '${parseErrors.join('\n')}',
       );
     }
+
+    await db.transaction((txn) async {
+      await txn.execute('ALTER TABLE bills RENAME TO bills_v1_backup');
+
+      await txn.execute('''
+        CREATE TABLE bills (
+          local_id TEXT PRIMARY KEY,
+          bill_no INTEGER NOT NULL,
+          location TEXT NOT NULL,
+          bill_date TEXT NOT NULL,
+          payment_mode TEXT NOT NULL,
+          customer_name TEXT NOT NULL DEFAULT '',
+          mobile TEXT NOT NULL DEFAULT '',
+          items_json TEXT NOT NULL,
+          total_qty REAL NOT NULL,
+          total_amount REAL NOT NULL,
+          total_cgst REAL NOT NULL,
+          total_sgst REAL NOT NULL,
+          total_igst REAL NOT NULL,
+          grand_total REAL NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          UNIQUE (bill_no, location)
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS location_meta (
+          location TEXT PRIMARY KEY,
+          next_bill_no INTEGER NOT NULL DEFAULT 1,
+          last_pull_at TEXT
+        )
+      ''');
+
+      for (final migratedRow in migratedRows) {
+        await txn.insert(
+          'bills',
+          migratedRow,
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        );
+      }
+
+      for (final entry in maxBillNoByLocation.entries) {
+        await txn.insert(
+          'location_meta',
+          {
+            'location': entry.key,
+            'next_bill_no': entry.value + 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      await txn.execute('DROP TABLE bills_v1_backup');
+    });
   }
 
   Future<bool> _tableHasColumn(
