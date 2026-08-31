@@ -324,6 +324,99 @@ void main() {
       expect(stored!.bill.customerName, 'Local Pending');
       expect(stored.syncStatus, 'pending');
     });
+
+    test('applyPulledBills applies server-side soft delete', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson()),
+        syncStatus: 'synced',
+      );
+
+      final pulled = SaleBill.fromJson({
+        ..._sampleBillJson(),
+        'deleted': true,
+      });
+
+      final applied = await db.applyPulledBills([pulled]);
+
+      expect(applied, 1);
+
+      final entries = await db.getLedgerEntries(_testLocationName);
+      expect(entries, isEmpty);
+    });
+
+    test('markBillDeleted hides bill from ledger but keeps row in database',
+        () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final localId = await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson()),
+        syncStatus: 'synced',
+      );
+      await db.markBillDeleted(localId);
+
+      final entries = await db.getLedgerEntries(_testLocationName);
+      expect(entries, isEmpty);
+
+      final stored = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 1,
+      );
+      expect(stored, isNotNull);
+
+      final pending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(pending, hasLength(1));
+      expect(pending.first.bill.deleted, isTrue);
+    });
+
+    test('never-synced pending delete soft-deletes row and preserves bill number gap',
+        () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      expect(await db.getNextBillNumber(_testLocationName), 1);
+
+      final localId = await db.insertBill(
+        SaleBill.fromJson(_sampleBillJson(billNo: 1)),
+      );
+      expect(await db.getNextBillNumber(_testLocationName), 2);
+
+      await db.markBillDeleted(localId);
+
+      final sqlite = await db.database;
+      final rows = await sqlite.query(
+        'bills',
+        where: 'local_id = ?',
+        whereArgs: [localId],
+      );
+      expect(rows, hasLength(1));
+      expect(rows.first['deleted'], 1);
+      expect(rows.first['sync_status'], 'synced');
+
+      final stored = await db.getBillByNumber(
+        location: _testLocationName,
+        billNo: 1,
+      );
+      expect(stored, isNotNull);
+      expect(stored!.bill.deleted, isTrue);
+
+      final pending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(pending, isEmpty);
+
+      expect(await db.getNextBillNumber(_testLocationName), 2);
+
+      await db.insertBill(SaleBill.fromJson(_sampleBillJson(billNo: 2)));
+      expect(await db.getNextBillNumber(_testLocationName), 3);
+    });
   });
 
   group('V1 to V2 migration', () {

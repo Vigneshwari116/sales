@@ -57,6 +57,11 @@ async function initDatabase() {
   `);
 
   await pool.query(`
+    ALTER TABLE bills
+    ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
       ON bills (location, updated_at)
   `);
@@ -99,6 +104,7 @@ function mapBillRow(row) {
         : row.updated_at
           ? String(row.updated_at)
           : null,
+    deleted: Boolean(row.deleted),
   };
 }
 
@@ -212,7 +218,7 @@ app.get('/api/bills/by-number/previous', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM bills
-       WHERE location = $1 AND bill_no < $2
+       WHERE location = $1 AND bill_no < $2 AND deleted IS NOT TRUE
        ORDER BY bill_no DESC
        LIMIT 1`,
       [location, billNo]
@@ -282,6 +288,7 @@ app.post('/api/bills', async (req, res) => {
   }
 
   try {
+    const deleted = Boolean(bill.deleted);
     const existing = await pool.query(
       'SELECT id FROM bills WHERE location = $1 AND bill_no = $2 LIMIT 1',
       [bill.location, bill.billNo]
@@ -303,8 +310,9 @@ app.post('/api/bills', async (req, res) => {
           total_igst = $9,
           grand_total = $10,
           items_json = $11::jsonb,
+          deleted = $12,
           updated_at = NOW()
-        WHERE location = $12 AND bill_no = $13`,
+        WHERE location = $13 AND bill_no = $14`,
         [
           bill.billDate,
           bill.paymentMode,
@@ -317,6 +325,7 @@ app.post('/api/bills', async (req, res) => {
           bill.totalIgst,
           bill.grandTotal,
           itemsJson,
+          deleted,
           bill.location,
           bill.billNo,
         ]
@@ -326,8 +335,8 @@ app.post('/api/bills', async (req, res) => {
         `INSERT INTO bills (
           bill_no, location, bill_date, payment_mode, customer_name, mobile,
           total_qty, total_amount, total_cgst, total_sgst, total_igst, grand_total,
-          items_json, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,NOW())`,
+          items_json, deleted, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,NOW())`,
         [
           bill.billNo,
           bill.location,
@@ -342,6 +351,7 @@ app.post('/api/bills', async (req, res) => {
           bill.totalIgst,
           bill.grandTotal,
           itemsJson,
+          deleted,
         ]
       );
     }
@@ -364,7 +374,7 @@ app.get('/api/ledger', async (req, res) => {
     let sql = `SELECT bill_no, bill_date, payment_mode, total_amount, total_cgst,
                       total_sgst, total_igst, grand_total
                FROM bills
-               WHERE location = $1`;
+               WHERE location = $1 AND deleted IS NOT TRUE`;
     const params = [location];
 
     if (from) {

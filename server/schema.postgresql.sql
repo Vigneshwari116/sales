@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS bills (
   items_json JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted BOOLEAN NOT NULL DEFAULT FALSE,
   UNIQUE (location, bill_no)
 );
 
