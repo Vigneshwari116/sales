@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/owner_delete_service.dart';
+
+import 'credential_test_helpers.dart';
 
 LocalLedgerEntry _sampleLedgerEntry() {
   return LocalLedgerEntry(
@@ -41,8 +44,16 @@ Future<
 }
 
 void main() {
-  tearDown(() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await seedTestCredentials(ownerDeletePin: 'delete99');
+  });
+
+  tearDown(() async {
     OwnerDeleteService.instance.disable();
+    await resetTestCredentials();
   });
 
   Future<void> pumpLedger(WidgetTester tester) async {
@@ -100,6 +111,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'not-the-owner-password');
     await tester.tap(find.text('Unlock'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(OwnerDeleteService.instance.isDeleteEnabled, isFalse);
     expect(find.byTooltip('Delete bill'), findsNothing);

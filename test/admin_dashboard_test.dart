@@ -17,6 +17,8 @@ import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
+import 'credential_test_helpers.dart';
+
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
@@ -60,6 +62,7 @@ void main() {
   setUp(() async {
     await AppConfig.setLocation(_testLocationCode);
     await SessionService.clearLogin();
+    await seedTestCredentials();
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
@@ -73,6 +76,7 @@ void main() {
     await _deleteTestDb();
     await SessionService.clearLogin();
     await AppConfig.clearLocation();
+    await resetTestCredentials();
   });
 
   Future<void> pumpAdminDashboard(WidgetTester tester) async {

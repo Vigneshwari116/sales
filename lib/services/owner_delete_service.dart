@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:sales/config/local_credentials.dart';
+import 'package:sales/services/credential_service.dart';
 
 /// Owner-only gate for soft-deleting saved bills from the ledger.
 class OwnerDeleteService extends ChangeNotifier {
@@ -11,9 +11,9 @@ class OwnerDeleteService extends ChangeNotifier {
 
   bool get isDeleteEnabled => _deleteEnabled;
 
-  /// Returns `true` only when [password] matches the owner password.
-  bool tryUnlockWithPassword(String password) {
-    if (password != appPassword) {
+  /// Returns `true` only when [pin] matches the stored owner-delete PIN.
+  Future<bool> tryUnlockWithPin(String pin) async {
+    if (!await CredentialService.verifyOwnerDeletePin(pin)) {
       return false;
     }
 
