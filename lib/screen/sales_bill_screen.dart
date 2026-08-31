@@ -13,12 +13,20 @@ import 'package:sales/services/session_service.dart';
 import 'bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
+import 'sales_ledger_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/services/owner_delete_service.dart';
 
 class SalesBillScreen extends StatefulWidget {
-  const SalesBillScreen({super.key});
+  /// When set (tests only), replaces the default [SalesLedgerScreen] route.
+  @visibleForTesting
+  final Widget Function(String location)? ledgerScreenBuilder;
+
+  const SalesBillScreen({
+    super.key,
+    this.ledgerScreenBuilder,
+  });
 
   @override
   State<SalesBillScreen> createState() => _SalesBillScreenState();
@@ -37,6 +45,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   static const double _entryBoxWidth = 100;
   static const double _entryBoxHeight = 42;
   static const double _desktopBreakpoint = 900;
+  static const double _sidebarBreakpoint = 700;
+  static const double _sidebarWidth = 200;
+
+  bool _sidebarOpen = false;
 
   // ============================================================
   // LOCATION (from login — not shown on screen)
@@ -147,6 +159,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   bool get _isEntryLocked => _busy || _manualPushInProgress;
+
+  Future<void> _syncNow() async {
+    final result =
+        await SyncService.instance.manualPush(_selectedLocation);
+
+    if (!mounted) return;
+
+    _showMessage(result.summaryMessage);
+  }
 
   Future<void> _restoreSessionOrLoadBill() async {
     final session = await SessionService.loadBillSession();
@@ -519,6 +540,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
   }
 
+  void _openLedger() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => widget.ledgerScreenBuilder?.call(_selectedLocation) ??
+            SalesLedgerScreen(location: _selectedLocation),
+      ),
+    );
+  }
+
   SaleBill _buildCurrentBill() {
     return SaleBill(
       billNo: _billNo,
@@ -683,25 +713,61 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _updateAmountDisplay();
 
     final width = MediaQuery.sizeOf(context).width;
+    final useSidebarLayout = width > _sidebarBreakpoint;
     final mobileBillLayout = width < _desktopBreakpoint;
 
     return _buildRootScaffold(
       context,
+      useSidebarLayout: useSidebarLayout,
       mobileBillLayout: mobileBillLayout,
     );
   }
 
   Widget _buildRootScaffold(
     BuildContext context, {
+    required bool useSidebarLayout,
     required bool mobileBillLayout,
   }) {
     final body = mobileBillLayout
         ? _buildMobileBody(context)
         : _buildDesktopBody();
 
+    if (useSidebarLayout) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: _buildAppBar(
+          mobileBillLayout: mobileBillLayout,
+          useSidebarLayout: true,
+        ),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_sidebarOpen) ...[
+              SizedBox(
+                width: _sidebarWidth,
+                child: _buildMenuPanel(
+                  onClose: () => setState(() => _sidebarOpen = false),
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+            ],
+            Expanded(child: _buildLockedBody(body)),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: backgroundColor,
-      appBar: _buildAppBar(mobileBillLayout: mobileBillLayout),
+      drawer: Drawer(
+        child: _buildMenuPanel(
+          onClose: () => Navigator.pop(context),
+        ),
+      ),
+      appBar: _buildAppBar(
+        mobileBillLayout: mobileBillLayout,
+        useSidebarLayout: false,
+      ),
       body: _buildLockedBody(body),
     );
   }
@@ -740,14 +806,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   PreferredSizeWidget _buildAppBar({
     required bool mobileBillLayout,
+    required bool useSidebarLayout,
   }) {
-    final logoutButton = IconButton(
-      key: const Key('bill_logout_button'),
-      icon: const Icon(Icons.logout),
-      tooltip: 'Logout',
-      onPressed: _exitScreen,
-    );
-
     if (mobileBillLayout) {
       return AppBar(
         title: const Text(
@@ -757,7 +817,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         backgroundColor: const Color(0xFFD5D8D5),
         foregroundColor: Colors.black,
         elevation: 0,
-        actions: [logoutButton],
+        automaticallyImplyLeading: !useSidebarLayout,
+        leading: useSidebarLayout
+            ? IconButton(
+                icon: Icon(_sidebarOpen ? Icons.menu_open : Icons.menu),
+                tooltip: _sidebarOpen ? 'Close menu' : 'Open menu',
+                onPressed: () {
+                  setState(() => _sidebarOpen = !_sidebarOpen);
+                },
+              )
+            : null,
       );
     }
 
@@ -767,7 +836,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       backgroundColor: const Color(0xFFD5D8D5),
       foregroundColor: Colors.black,
       elevation: 0,
-      actions: [logoutButton],
+      automaticallyImplyLeading: !useSidebarLayout,
+      leading: useSidebarLayout
+          ? IconButton(
+              icon: Icon(_sidebarOpen ? Icons.menu_open : Icons.menu),
+              tooltip: _sidebarOpen ? 'Close menu' : 'Open menu',
+              onPressed: () {
+                setState(() => _sidebarOpen = !_sidebarOpen);
+              },
+            )
+          : null,
     );
   }
 
@@ -803,6 +881,49 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           const SizedBox(height: 10),
           _buildTotals(pinToBottom: false),
         ],
+      ),
+    );
+  }
+
+  /// Staff POS menu — ledger + sync stay here for offline locations without
+  /// an admin present. Abstract and printer settings are admin-dashboard only.
+  Widget _buildMenuPanel({required VoidCallback onClose}) {
+    return Material(
+      color: Colors.white,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.menu_book, size: 20),
+              title: const Text('LEDGER'),
+              onTap: () {
+                onClose();
+                _openLedger();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.cloud_upload_outlined),
+              title: const Text('SYNC NOW'),
+              enabled: !_manualPushInProgress,
+              onTap: _manualPushInProgress
+                  ? null
+                  : () {
+                      onClose();
+                      _syncNow();
+                    },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app),
+              title: const Text('EXIT'),
+              onTap: () {
+                onClose();
+                _exitScreen();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -8,9 +8,12 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/repositories/ledger_repository.dart' as ledger_repo;
 import 'package:sales/screen/sales_bill_screen.dart';
+import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
 
@@ -80,8 +83,23 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: SalesBillScreen(),
+      MaterialApp(
+        home: SalesBillScreen(
+          ledgerScreenBuilder: (location) => SalesLedgerScreen(
+            location: location,
+            autoRefreshOnOpen: false,
+            loadLedgerOverride: () async => (
+              entries: <ledger_repo.LocalLedgerEntry>[],
+              summary: LedgerSummary(
+                total: 0,
+                cgst: 0,
+                sgst: 0,
+                igst: 0,
+                grandTotal: 0,
+              ),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -96,18 +114,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('sales bill screen no longer exposes admin menu items',
+  testWidgets('staff menu keeps ledger and sync; admin-only items stay out',
       (tester) async {
     await pumpBillScreen(tester);
 
-    expect(find.text('LEDGER'), findsNothing);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pump();
+
+    expect(find.text('LEDGER'), findsOneWidget);
+    expect(find.text('SYNC NOW'), findsOneWidget);
     expect(find.text('ABSTRACT'), findsNothing);
     expect(find.text('PRINTER SETTINGS'), findsNothing);
-    expect(find.text('SYNC NOW'), findsNothing);
-    expect(find.byKey(const Key('bill_logout_button')), findsOneWidget);
   });
 
-  testWidgets('bill entry stays usable while manual push is in progress',
+  testWidgets('ledger menu navigation works while manual push is in progress',
       (tester) async {
     await pumpBillScreen(tester);
 
@@ -115,6 +135,17 @@ void main() {
     await tester.pump();
 
     expect(find.text('Syncing bills to server...'), findsOneWidget);
-    expect(find.byKey(const Key('bill_rate_field')), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pump();
+
+    await tester.tap(find.text('LEDGER'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(SalesLedgerScreen), findsOneWidget);
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(milliseconds: 200));
   });
 }
