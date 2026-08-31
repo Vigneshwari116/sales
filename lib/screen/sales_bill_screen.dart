@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -121,11 +120,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final FocusNode _qtyFocus = FocusNode();
 
   // ============================================================
-  // AUTO FOCUS TIMERS
+  // AUTO FOCUS TIMERS — removed; field advance is Enter-only.
   // ============================================================
-
-  Timer? _rateTimer;
-  Timer? _qtyTimer;
 
   // ============================================================
   // ITEMS
@@ -268,80 +264,18 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // RATE CHANGED
-  //
-  // Automatically moves to QTY after the user stops typing.
+  // RATE CHANGED — updates live amount display only (no auto-advance).
   // ============================================================
 
   void _rateChanged(String value) {
-    _rateTimer?.cancel();
-
-    final text = value.trim();
-
-    if (text.isEmpty || text == '0') {
-      return;
-    }
-
-    final rate = double.tryParse(text);
-
-    if (rate == null || rate <= 0) {
-      return;
-    }
-
-    _rateTimer = Timer(
-      const Duration(milliseconds: 700),
-          () {
-        if (!mounted) return;
-
-        final currentRate =
-            double.tryParse(_rateController.text) ?? 0;
-
-        if (currentRate > 0) {
-          _focusQty();
-        }
-      },
-    );
-
     setState(() {});
   }
 
   // ============================================================
-  // QTY CHANGED
-  //
-  // Automatically adds item after the user stops typing.
+  // QTY CHANGED — updates live amount display only (no auto-add).
   // ============================================================
 
   void _qtyChanged(String value) {
-    _qtyTimer?.cancel();
-
-    final text = value.trim();
-
-    if (text.isEmpty || text == '0') {
-      setState(() {});
-      return;
-    }
-
-    final qty = double.tryParse(text);
-
-    if (qty == null || qty <= 0) {
-      setState(() {});
-      return;
-    }
-
-    _qtyTimer = Timer(
-      const Duration(milliseconds: 700),
-          () {
-        if (!mounted) return;
-
-        final currentQty =
-            double.tryParse(_qtyController.text) ?? 0;
-
-        if (currentQty > 0) {
-          _addItem();
-        }
-      },
-    );
-
     setState(() {});
   }
 
@@ -1518,28 +1452,48 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     VoidCallback? onSubmitted,
     bool readOnly = false,
     bool fullWidth = false,
+    bool blockTabTraversal = false,
+    TextInputAction? textInputAction,
+    Key? fieldKey,
   }) {
+    Widget field = TextField(
+      key: fieldKey,
+      controller: controller,
+      focusNode: focusNode,
+      readOnly: readOnly,
+      showCursor: !readOnly,
+      enableInteractiveSelection: !readOnly,
+      textAlign: TextAlign.center,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      textInputAction: textInputAction,
+      inputFormatters: readOnly
+          ? null
+          : [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+      onChanged: onChanged,
+      onSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
+      decoration: _entryDecoration(),
+      style: const TextStyle(fontSize: 15, height: 1),
+    );
+
+    if (blockTabTraversal) {
+      field = Focus(
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.tab) {
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: field,
+      );
+    }
+
     return _buildEntryBox(
       label: label,
       fullWidth: fullWidth,
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        readOnly: readOnly,
-        showCursor: !readOnly,
-        enableInteractiveSelection: !readOnly,
-        textAlign: TextAlign.center,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: readOnly
-            ? null
-            : [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-              ],
-        onChanged: onChanged,
-        onSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
-        decoration: _entryDecoration(),
-        style: const TextStyle(fontSize: 15, height: 1),
-      ),
+      child: field,
     );
   }
 
@@ -1555,6 +1509,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               focusNode: _rateFocus,
               onChanged: _rateChanged,
               onSubmitted: _rateSubmitted,
+              blockTabTraversal: true,
+              textInputAction: TextInputAction.next,
+              fieldKey: const Key('bill_rate_field'),
               fullWidth: true,
             ),
           ),
@@ -1566,6 +1523,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               focusNode: _qtyFocus,
               onChanged: _qtyChanged,
               onSubmitted: _qtySubmitted,
+              blockTabTraversal: true,
+              textInputAction: TextInputAction.done,
+              fieldKey: const Key('bill_qty_field'),
               fullWidth: true,
             ),
           ),
@@ -1592,6 +1552,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           focusNode: _rateFocus,
           onChanged: _rateChanged,
           onSubmitted: _rateSubmitted,
+          blockTabTraversal: true,
+          textInputAction: TextInputAction.next,
+          fieldKey: const Key('bill_rate_field'),
         ),
         const SizedBox(width: 12),
         _buildEntryField(
@@ -1600,6 +1563,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           focusNode: _qtyFocus,
           onChanged: _qtyChanged,
           onSubmitted: _qtySubmitted,
+          blockTabTraversal: true,
+          textInputAction: TextInputAction.done,
+          fieldKey: const Key('bill_qty_field'),
         ),
         const SizedBox(width: 12),
         _buildEntryField(
@@ -2047,8 +2013,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void dispose() {
     SyncService.instance.manualPushInProgress
         .removeListener(_onManualPushChanged);
-    _rateTimer?.cancel();
-    _qtyTimer?.cancel();
     _persistSession();
 
     _customerNameController.dispose();
