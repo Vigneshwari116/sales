@@ -5,13 +5,13 @@ import 'package:sales/services/sync_service.dart';
 
 class AppSessionService {
   static Future<void> onLoginComplete() async {
-    final role = await SessionService.getRole();
+    await LocalDb.instance.initialize();
 
+    final role = await SessionService.getRole();
     if (role == SessionRole.admin) {
       return;
     }
 
-    await LocalDb.instance.initialize();
     SyncService.instance.start(location: AppConfig.displayLocationName);
   }
 

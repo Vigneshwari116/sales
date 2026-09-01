@@ -14,6 +14,7 @@ class LedgerBillDetailScreen extends StatefulWidget {
   final String localId;
   final String? syncStatus;
   final bool readOnly;
+  final bool adminFullEdit;
 
   const LedgerBillDetailScreen({
     super.key,
@@ -21,6 +22,7 @@ class LedgerBillDetailScreen extends StatefulWidget {
     required this.localId,
     this.syncStatus,
     this.readOnly = false,
+    this.adminFullEdit = false,
   });
 
   static const Color background = Color(0xFFC5F6C5);
@@ -45,12 +47,19 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   final _passwordCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController();
+  final _customerNameCtrl = TextEditingController();
+  final _mobileCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _bill = widget.bill;
     _items = widget.bill.items.map((e) => e.copyWith()).toList();
+    _customerNameCtrl.text = _bill.customerName;
+    _mobileCtrl.text = _bill.mobile;
+    if (widget.adminFullEdit) {
+      _editUnlocked = true;
+    }
   }
 
   @override
@@ -58,6 +67,8 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     _passwordCtrl.dispose();
     _rateCtrl.dispose();
     _qtyCtrl.dispose();
+    _customerNameCtrl.dispose();
+    _mobileCtrl.dispose();
     super.dispose();
   }
 
@@ -84,7 +95,12 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       _items.fold(0.0, (sum, item) => sum + item.grossAmt);
 
   void _onMobileDoubleTap() {
-    if (widget.readOnly || _editUnlocked || _showPasswordField) return;
+    if (widget.adminFullEdit ||
+        widget.readOnly ||
+        _editUnlocked ||
+        _showPasswordField) {
+      return;
+    }
 
     setState(() {
       _showPasswordField = true;
@@ -146,8 +162,10 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       location: _bill.location,
       billDate: _bill.billDate,
       paymentMode: _bill.paymentMode,
-      customerName: _bill.customerName,
-      mobile: _bill.mobile,
+      customerName: widget.adminFullEdit
+          ? _customerNameCtrl.text.trim()
+          : _bill.customerName,
+      mobile: widget.adminFullEdit ? _mobileCtrl.text.trim() : _bill.mobile,
       items: _items,
       totalQty: _totalQty,
       totalAmount: _totalAmount,
@@ -306,58 +324,95 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
-          _readOnlyField('Name', _bill.customerName),
-          const SizedBox(height: 4),
-          GestureDetector(
-            onDoubleTap: _onMobileDoubleTap,
-            child: _readOnlyField('Mobile', _bill.mobile),
-          ),
-          if (_showPasswordField && !_editUnlocked) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const SizedBox(
-                  width: 48,
-                  child: Text('Password', style: TextStyle(fontSize: 10)),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _passwordCtrl,
-                    obscureText: true,
-                    autofocus: true,
-                    onSubmitted: (_) => _tryUnlockEdit(),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: OutlineInputBorder(),
+          if (_editUnlocked && widget.adminFullEdit) ...[
+            _editableField('Name', _customerNameCtrl),
+            const SizedBox(height: 4),
+            _editableField('Mobile', _mobileCtrl, number: true),
+          ] else ...[
+            _readOnlyField('Name', _bill.customerName),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onDoubleTap: _onMobileDoubleTap,
+              child: _readOnlyField('Mobile', _bill.mobile),
+            ),
+            if (_showPasswordField && !_editUnlocked) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 48,
+                    child: Text('Password', style: TextStyle(fontSize: 10)),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _passwordCtrl,
+                      obscureText: true,
+                      autofocus: true,
+                      onSubmitted: (_) => _tryUnlockEdit(),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _tryUnlockEdit,
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-            if (_passwordError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  _passwordError!,
-                  style: const TextStyle(color: Colors.red, fontSize: 10),
-                ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _tryUnlockEdit,
+                    child: const Text('OK'),
+                  ),
+                ],
               ),
+              if (_passwordError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _passwordError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 10),
+                  ),
+                ),
+            ],
           ],
           if (_editUnlocked)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Edit mode — tap a line item to correct rate/qty, then SAVE.',
-                style: TextStyle(fontSize: 10, color: Color(0xFF155724)),
+                widget.adminFullEdit
+                    ? 'Admin edit — update customer, line items, then SAVE.'
+                    : 'Edit mode — tap a line item to correct rate/qty, then SAVE.',
+                style: const TextStyle(fontSize: 10, color: Color(0xFF155724)),
               ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _editableField(
+    String label,
+    TextEditingController controller, {
+    bool number = false,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 48,
+          child: Text(label, style: const TextStyle(fontSize: 10)),
+        ),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: number ? TextInputType.phone : TextInputType.text,
+            inputFormatters: number
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

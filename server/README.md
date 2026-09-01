@@ -40,17 +40,26 @@ docker compose up -d --build
 
 If `users` is empty, default **admin / admin** is created.
 
-## API routes (unchanged)
+## API routes
 
 | Method | Path |
 |--------|------|
 | GET | `/api/health` |
 | POST | `/api/login` |
 | GET | `/api/bills/next-number?location=Win1` |
-| GET | `/api/bills/:billNo?location=Win1` |
+| GET | `/api/sync/bill-updates?location=Win1&since=<iso>` |
+| GET | `/api/bills/updates-since?location=Win1&since=<iso>` |
+| GET | `/api/bills/:billNo?location=Win1` (`:billNo` digits only) |
 | GET | `/api/bills/by-number/previous?billNo=5&location=Win1` |
 | POST | `/api/bills` |
 | GET | `/api/ledger?location=Win1` |
+| GET | `/api/gst/sync?location=win1` |
+| POST | `/api/gst/config` |
+
+> Prefer `/api/sync/bill-updates` for pulls. Older VPS builds may still
+> treat `/api/bills/updates-since` as `/api/bills/:billNo` and return
+> `Invalid bill number`; the Flutter client falls back to ledger +
+> per-bill GET when that happens.
 
 ## View data in DBeaver
 

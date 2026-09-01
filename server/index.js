@@ -190,6 +190,15 @@ app.get('/api/bills/next-number', async (req, res) => {
 });
 
 app.get('/api/bills/updates-since', async (req, res) => {
+  return handleBillUpdatesSince(req, res);
+});
+
+/// Preferred pull path — cannot collide with /api/bills/:billNo.
+app.get('/api/sync/bill-updates', async (req, res) => {
+  return handleBillUpdatesSince(req, res);
+});
+
+async function handleBillUpdatesSince(req, res) {
   const location = req.query.location;
   const since = req.query.since;
 
@@ -220,7 +229,7 @@ app.get('/api/bills/updates-since', async (req, res) => {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Could not load bill updates' });
   }
-});
+}
 
 app.get('/api/bills/by-number/previous', async (req, res) => {
   const billNo = parseInt(req.query.billNo, 10);
@@ -251,13 +260,13 @@ app.get('/api/bills/by-number/previous', async (req, res) => {
   }
 });
 
-app.get('/api/bills/:billNo', async (req, res) => {
+app.get('/api/bills/:billNo(\\d+)', async (req, res) => {
   const billNo = parseInt(req.params.billNo, 10);
   const location = req.query.location;
   if (!location) {
     return res.status(400).json({ error: 'location parameter is required' });
   }
-  if (!Number.isFinite(billNo)) {
+  if (!Number.isFinite(billNo) || billNo <= 0) {
     return res.status(400).json({ ok: false, error: 'Invalid bill number' });
   }
 
@@ -299,6 +308,12 @@ app.post('/api/bills', async (req, res) => {
       return res.status(400).json({ ok: false, error: `Missing field: ${key}` });
     }
   }
+
+  const billNo = Number(bill.billNo);
+  if (!Number.isFinite(billNo) || billNo <= 0 || !Number.isInteger(billNo)) {
+    return res.status(400).json({ ok: false, error: 'Invalid bill number' });
+  }
+  bill.billNo = billNo;
 
   if (!Array.isArray(bill.items) || bill.items.length === 0) {
     return res.status(400).json({ ok: false, error: 'At least one item is required' });

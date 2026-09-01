@@ -16,7 +16,11 @@ class BillRepository {
     if (result.ok) {
       try {
         if (updateLocalId != null) {
-          await LocalDb.instance.updateSavedBill(updateLocalId, bill);
+          await LocalDb.instance.updateSavedBill(
+            updateLocalId,
+            bill,
+            syncStatus: 'synced',
+          );
         } else {
           await LocalDb.instance.insertSavedBill(bill, syncStatus: 'synced');
         }

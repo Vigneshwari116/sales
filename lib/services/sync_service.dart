@@ -42,6 +42,73 @@ class ManualPushResult {
   }
 }
 
+class PullResult {
+  final bool ok;
+  final int pulledCount;
+  final String? error;
+
+  const PullResult({
+    required this.ok,
+    required this.pulledCount,
+    this.error,
+  });
+}
+
+class ManualSyncResult {
+  final bool ok;
+  final int pushedCount;
+  final int pushFailedCount;
+  final int pulledCount;
+  final String? error;
+  final String? pullError;
+  final String? gstError;
+
+  const ManualSyncResult({
+    required this.ok,
+    required this.pushedCount,
+    required this.pushFailedCount,
+    required this.pulledCount,
+    this.error,
+    this.pullError,
+    this.gstError,
+  });
+
+  String get summaryMessage {
+    if (error != null &&
+        pushedCount == 0 &&
+        pushFailedCount == 0 &&
+        pulledCount == 0 &&
+        pullError == null) {
+      return 'Sync failed: $error';
+    }
+
+    final pushText = pushFailedCount > 0
+        ? '$pushedCount bills pushed, $pushFailedCount failed'
+        : '$pushedCount bills pushed';
+
+    if (pullError != null) {
+      if (pushedCount > 0 || pushFailedCount > 0) {
+        return 'Partial sync: $pushText; pull failed: $pullError';
+      }
+      return 'Sync failed: $pullError';
+    }
+
+    if (gstError != null && pushedCount == 0 && pulledCount == 0) {
+      return 'Sync failed: $gstError';
+    }
+
+    if (!ok) {
+      return 'Sync failed: $pushText — ${error ?? "unknown error"}';
+    }
+
+    var message = 'Synced: $pushText, $pulledCount updates pulled';
+    if (gstError != null) {
+      message = '$message (GST pull warning: $gstError)';
+    }
+    return message;
+  }
+}
+
 class SyncService with WidgetsBindingObserver {
   static SyncService? _instance;
 
@@ -57,6 +124,13 @@ class SyncService with WidgetsBindingObserver {
   @visibleForTesting
   Future<bool> Function()? isOnlineOverride;
 
+  @visibleForTesting
+  Future<
+      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>> Function({
+    required String location,
+    required DateTime since,
+  })? getBillUpdatesSinceOverride;
+
   SyncService._();
 
   static SyncService get instance {
@@ -71,6 +145,7 @@ class SyncService with WidgetsBindingObserver {
       current.stop();
       current.saveBillOverride = null;
       current.isOnlineOverride = null;
+      current.getBillUpdatesSinceOverride = null;
       current.manualPushInProgress.value = false;
     }
     _instance = null;
@@ -103,13 +178,21 @@ class SyncService with WidgetsBindingObserver {
   }
 
   /// Pull admin edits from the server (admin always wins on conflict).
-  Future<void> pullAdminUpdates(String location) async {
+  Future<PullResult> pullAdminUpdates(String location) async {
     if (_autoPullInProgress) {
-      return;
+      return const PullResult(
+        ok: false,
+        pulledCount: 0,
+        error: 'Pull already in progress',
+      );
     }
 
-    if (!await _isOnline()) {
-      return;
+    if (!await (isOnlineOverride?.call() ?? _isOnline())) {
+      return const PullResult(
+        ok: false,
+        pulledCount: 0,
+        error: 'No internet connection',
+      );
     }
 
     _autoPullInProgress = true;
@@ -118,82 +201,94 @@ class SyncService with WidgetsBindingObserver {
       final since =
           lastPull ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
-      final result = await SalesApi.getBillUpdatesSince(
-        location: location,
-        since: since,
-      );
+      final fetch = getBillUpdatesSinceOverride ?? SalesApi.getBillUpdatesSince;
+      final result = await fetch(location: location, since: since);
 
       if (!result.ok || result.data == null) {
-        return;
+        return PullResult(
+          ok: false,
+          pulledCount: 0,
+          error: result.error ?? 'Could not pull bill updates from server',
+        );
       }
 
       final bills = result.data!.bills;
+      var pulledCount = 0;
       if (bills.isNotEmpty) {
-        await LocalDb.instance.applyPulledBills(bills);
+        pulledCount = await LocalDb.instance.applyPulledBills(bills);
       }
 
       await LocalDb.instance.setLastPullAt(location, result.data!.serverTime);
-    } catch (_) {
-      // Best-effort pull.
+
+      return PullResult(ok: true, pulledCount: pulledCount);
+    } catch (e) {
+      return PullResult(
+        ok: false,
+        pulledCount: 0,
+        error: 'Pull failed: $e',
+      );
     } finally {
       _autoPullInProgress = false;
     }
   }
 
   /// Password-gated manual sync: push pending bills, pull admin bill edits + GST.
-  Future<ManualPushResult> manualSync(String location) async {
+  Future<ManualSyncResult> manualSync(String location) async {
     if (manualPushInProgress.value) {
-      return const ManualPushResult(
+      return ManualSyncResult(
         ok: false,
-        syncedCount: 0,
-        failedCount: 0,
+        pushedCount: 0,
+        pushFailedCount: 0,
+        pulledCount: 0,
         error: 'Sync already in progress',
       );
     }
 
     if (!await (isOnlineOverride?.call() ?? _isOnline())) {
-      return const ManualPushResult(
+      return const ManualSyncResult(
         ok: false,
-        syncedCount: 0,
-        failedCount: 0,
+        pushedCount: 0,
+        pushFailedCount: 0,
+        pulledCount: 0,
         error: 'No internet connection',
       );
     }
 
     manualPushInProgress.value = true;
-    var syncedCount = 0;
-    var failedCount = 0;
 
     try {
-      final pushResult = await manualPush(location);
-      syncedCount = pushResult.syncedCount;
-      failedCount = pushResult.failedCount;
+      final pushResult = await _executePush(location);
+      final pullResult = await pullAdminUpdates(location);
 
-      await pullAdminUpdates(location);
-
-      final locationCode = _locationCodeFromDisplayName(location);
-      await SalesApi.pullGstMasterData(locationCode);
-
-      if (failedCount > 0) {
-        return ManualPushResult(
-          ok: false,
-          syncedCount: syncedCount,
-          failedCount: failedCount,
-          error: pushResult.error,
-        );
+      String? gstError;
+      try {
+        final locationCode = _locationCodeFromDisplayName(location);
+        final gstResult = await SalesApi.pullGstMasterData(locationCode);
+        if (!gstResult.ok) {
+          gstError = gstResult.error ?? 'Could not pull GST config';
+        }
+      } catch (e) {
+        gstError = 'GST pull failed: $e';
       }
 
-      return ManualPushResult(
-        ok: true,
-        syncedCount: syncedCount,
-        failedCount: failedCount,
+      final ok = pushResult.failedCount == 0 && pullResult.ok;
+
+      return ManualSyncResult(
+        ok: ok,
+        pushedCount: pushResult.syncedCount,
+        pushFailedCount: pushResult.failedCount,
+        pulledCount: pullResult.pulledCount,
+        error: pushResult.error,
+        pullError: pullResult.ok ? null : pullResult.error,
+        gstError: gstError,
       );
-    } catch (_) {
-      return ManualPushResult(
+    } catch (e) {
+      return ManualSyncResult(
         ok: false,
-        syncedCount: syncedCount,
-        failedCount: failedCount,
-        error: 'Could not sync',
+        pushedCount: 0,
+        pushFailedCount: 0,
+        pulledCount: 0,
+        error: 'Sync failed: $e',
       );
     } finally {
       manualPushInProgress.value = false;
@@ -221,6 +316,15 @@ class SyncService with WidgetsBindingObserver {
     }
 
     manualPushInProgress.value = true;
+
+    try {
+      return await _executePush(location);
+    } finally {
+      manualPushInProgress.value = false;
+    }
+  }
+
+  Future<ManualPushResult> _executePush(String location) async {
     var syncedCount = 0;
     var failedCount = 0;
 
@@ -249,15 +353,13 @@ class SyncService with WidgetsBindingObserver {
         failedCount: failedCount,
         error: failedCount > 0 ? 'Some bills could not be synced' : null,
       );
-    } catch (_) {
+    } catch (e) {
       return ManualPushResult(
         ok: false,
         syncedCount: syncedCount,
         failedCount: failedCount,
-        error: 'Could not sync bills',
+        error: 'Could not sync bills: $e',
       );
-    } finally {
-      manualPushInProgress.value = false;
     }
   }
 

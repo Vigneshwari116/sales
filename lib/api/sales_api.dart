@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 import 'package:sales/api/api%20config.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
@@ -80,13 +81,24 @@ class SalesApiResult<T> {
 class SalesApi {
   static const Duration _timeout = Duration(seconds: 12);
 
+  /// Optional HTTP client for tests. Production uses the default client.
+  @visibleForTesting
+  static http.Client? clientOverride;
+
+  static http.Client get _client => clientOverride ?? http.Client();
+
+  @visibleForTesting
+  static void resetClientOverride() {
+    clientOverride = null;
+  }
+
   static Future<SalesApiResult<int>> getNextBillNumber(String location) async {
     final uri = Uri.parse('$salesBillApiBaseUrl/api/bills/next-number').replace(
       queryParameters: {'location': location},
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await _client.get(uri).timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
 
       if (res.statusCode == 200 && body['ok'] == true) {
@@ -110,7 +122,7 @@ class SalesApi {
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await _client.get(uri).timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
 
       if (res.statusCode == 200 && body['ok'] == true) {
@@ -140,7 +152,7 @@ class SalesApi {
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await _client.get(uri).timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
 
       if (res.statusCode == 200 && body['ok'] == true) {
@@ -163,8 +175,52 @@ class SalesApi {
     required String location,
     required DateTime since,
   }) async {
-    final uri =
-        Uri.parse('$salesBillApiBaseUrl/api/bills/updates-since').replace(
+    final primary = await _fetchBillUpdatesFromPath(
+      path: '/api/sync/bill-updates',
+      location: location,
+      since: since,
+    );
+    if (primary.ok) {
+      return primary;
+    }
+
+    final legacy = await _fetchBillUpdatesFromPath(
+      path: '/api/bills/updates-since',
+      location: location,
+      since: since,
+    );
+    if (legacy.ok) {
+      return legacy;
+    }
+
+    // Live VPS may still route /api/bills/updates-since onto :billNo and
+    // return "Invalid bill number". Fall back to ledger + per-bill GET.
+    final legacyError = legacy.error ?? primary.error ?? '';
+    if (_isUpdatesRouteCollision(legacyError) ||
+        _isUpdatesRouteCollision(primary.error ?? '')) {
+      return _pullAllBillsViaLedger(location: location);
+    }
+
+    return SalesApiResult.failure(
+      legacy.error ?? primary.error ?? 'Could not load bill updates',
+    );
+  }
+
+  static bool _isUpdatesRouteCollision(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('invalid bill number') ||
+        lower.contains('bill not found') ||
+        lower.contains('could not load bill updates');
+  }
+
+  static Future<
+      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>>
+      _fetchBillUpdatesFromPath({
+    required String path,
+    required String location,
+    required DateTime since,
+  }) async {
+    final uri = Uri.parse('$salesBillApiBaseUrl$path').replace(
       queryParameters: {
         'location': location,
         'since': since.toUtc().toIso8601String(),
@@ -172,8 +228,17 @@ class SalesApi {
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode == 404) {
+        return SalesApiResult.failure('Could not load bill updates');
+      }
+
+      late final Map<String, dynamic> body;
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        return SalesApiResult.failure('Could not load bill updates');
+      }
 
       if (res.statusCode == 200 && body['ok'] == true) {
         final billsJson = body['bills'] as List<dynamic>? ?? [];
@@ -197,11 +262,39 @@ class SalesApi {
     }
   }
 
+  /// Full pull using endpoints that exist on older VPS builds.
+  static Future<
+      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>>
+      _pullAllBillsViaLedger({required String location}) async {
+    final ledgerResult = await getLedger(location: location);
+    if (!ledgerResult.ok || ledgerResult.data == null) {
+      return SalesApiResult.failure(
+        ledgerResult.error ?? 'Could not load ledger for sync pull',
+      );
+    }
+
+    final bills = <SaleBill>[];
+    for (final entry in ledgerResult.data!.entries) {
+      final billResult = await getBill(
+        billNo: entry.billNo,
+        location: location,
+      );
+      if (billResult.ok && billResult.data != null) {
+        bills.add(billResult.data!);
+      }
+    }
+
+    return SalesApiResult.success((
+      bills: bills,
+      serverTime: DateTime.now().toUtc(),
+    ));
+  }
+
   static Future<SalesApiResult<int>> saveBill(SaleBill bill) async {
     final uri = Uri.parse('$salesBillApiBaseUrl/api/bills');
 
     try {
-      final res = await http
+      final res = await _client
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
@@ -239,7 +332,7 @@ class SalesApi {
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await _client.get(uri).timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
 
       if (res.statusCode == 200 && body['ok'] == true) {
@@ -268,7 +361,7 @@ class SalesApi {
     );
 
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await _client.get(uri).timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
 
       if (res.statusCode != 200 || body['ok'] != true) {
@@ -320,7 +413,7 @@ class SalesApi {
     final uri = Uri.parse('$salesBillApiBaseUrl/api/gst/config');
 
     try {
-      final res = await http
+      final res = await _client
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},

@@ -214,6 +214,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
 
   bool _syncing = false;
   String? _message;
+  bool? _lastSyncOk;
 
   Future<void> _syncNow() async {
     final allowed = await SyncGateService.confirmSync(context);
@@ -222,6 +223,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
     setState(() {
       _syncing = true;
       _message = null;
+      _lastSyncOk = null;
     });
 
     final result = await SyncService.instance.manualSync(
@@ -233,6 +235,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
     setState(() {
       _syncing = false;
       _message = result.summaryMessage;
+      _lastSyncOk = result.ok;
     });
   }
 
@@ -289,7 +292,13 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                     Text(
                       _message!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _lastSyncOk == false
+                            ? const Color(0xFF9C1C1C)
+                            : const Color(0xFF155724),
+                      ),
                     ),
                   ],
                 ],
