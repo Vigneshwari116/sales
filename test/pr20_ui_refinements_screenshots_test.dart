@@ -19,7 +19,6 @@ import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_date_range_picker.dart';
-import 'package:sales/widgets/compact_layout.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -45,6 +44,30 @@ Future<void> _savePng(WidgetTester tester, String path) async {
     await file.writeAsBytes(bytes!.buffer.asUint8List());
     print('Wrote $path (${file.lengthSync()} bytes)');
   });
+}
+
+Future<void> _pumpBillScreen(WidgetTester tester) async {
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: const Key('shot_root'),
+      child: MaterialApp(
+        theme: AppTheme.theme,
+        home: SalesBillScreen(
+          embeddedInDashboard: true,
+          initialBillNo: 3,
+        ),
+      ),
+    ),
+  );
+  for (var i = 0; i < 20; i++) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+    if (find.text('BILL NO:').evaluate().isNotEmpty) {
+      break;
+    }
+  }
 }
 
 void main() {
@@ -79,37 +102,51 @@ void main() {
     await AppConfig.clearLocation();
   });
 
-  testWidgets('screenshot sales abstract header and compact cards', (tester) async {
-    tester.view.physicalSize = const Size(1280, 800);
+  testWidgets('screenshot bill empty compact layout', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      RepaintBoundary(
-        key: const Key('shot_root'),
-        child: MaterialApp(
-          theme: AppTheme.theme,
-          home: SalesAbstractScreen(
-            location: 'Win1',
-            refreshGeneration: 0,
-          ),
-        ),
-      ),
-    );
-    for (var i = 0; i < 30; i++) {
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pump();
-      if (find.text('TOTAL SALES').evaluate().isNotEmpty) {
-        break;
-      }
-    }
+    await _pumpBillScreen(tester);
     await _savePng(
       tester,
-      '/opt/cursor/artifacts/screenshots/pr20_sales_abstract.png',
+      '/opt/cursor/artifacts/screenshots/pr20_bill_empty_compact.png',
     );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('screenshot bill with line item and tax headers', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpBillScreen(tester);
+
+    final rateField = find.byKey(const Key('bill_rate_field'));
+    final qtyField = find.byKey(const Key('bill_qty_field'));
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '16000');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+
+    await tester.enterText(qtyField, '2.5');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(find.text('CGST %'), findsOneWidget);
+    expect(find.text('Total'), findsOneWidget);
+    expect(find.text('Grand Total'), findsOneWidget);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_bill_with_item_compact.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('screenshot compact date range popup', (tester) async {
@@ -152,35 +189,5 @@ void main() {
       tester,
       '/opt/cursor/artifacts/screenshots/pr20_date_range_popup.png',
     );
-  });
-
-  testWidgets('screenshot bill layout compact table and save bar', (tester) async {
-    tester.view.physicalSize = const Size(1280, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      RepaintBoundary(
-        key: const Key('shot_root'),
-        child: MaterialApp(
-          theme: AppTheme.theme,
-          home: SalesBillScreen(
-            embeddedInDashboard: true,
-            initialBillNo: 3,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-    });
-    await _savePng(
-      tester,
-      '/opt/cursor/artifacts/screenshots/pr20_bill_layout.png',
-    );
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
   });
 }

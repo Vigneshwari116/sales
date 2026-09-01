@@ -858,19 +858,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 const SizedBox(height: 6),
                 Expanded(
                   child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildItemTable(),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 300),
-                            child: _buildTotals(),
-                          ),
-                        ),
-                      ],
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: _buildItemTableSection(),
                     ),
                   ),
                 ),
@@ -925,15 +915,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 const SizedBox(height: 10),
                 _buildRateQtyAmount(mobile: true),
                 const SizedBox(height: 10),
-                _buildItemTable(mobile: true),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    child: _buildTotals(),
-                  ),
-                ),
+                _buildItemTableSection(mobile: true),
               ],
             ),
           ),
@@ -1494,9 +1476,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               alignment: Alignment.bottomCenter,
               child: Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 11,
                   height: 1,
                 ),
               ),
@@ -1518,21 +1502,50 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
   // ITEM TABLE
   //
-  // BEFORE ITEM:
+  // BEFORE ITEM (Enter on Qty adds first row):
   //
-  // S.NO | QTY | RATE | AMOUNT | T AMT
+  // S.NO | QTY | RATE | AMOUNT | Total
   //
   // AFTER ITEM:
   //
-  // S.NO | QTY | RATE | AMOUNT | T AMT |
-  // CGST % | SGST % | IGST
+  // S.NO | QTY | RATE | AMOUNT | Total | CGST % | SGST % | IGST
   // ============================================================
+
+  double _tableWidth(bool showTax) => showTax ? 624 : 480;
+
+  Widget _buildItemTableSection({bool mobile = false}) {
+    final showTax = _items.isNotEmpty;
+    final width = _tableWidth(showTax);
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildItemTable(mobile: mobile),
+          if (_items.isNotEmpty) ...[
+            SizedBox(
+              width: width,
+              child: _buildGrandTotalFooter(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildItemTable({bool mobile = false}) {
     final bool showTax = _items.isNotEmpty;
-    const double tableWidth = 624;
+    final width = _tableWidth(showTax);
 
     Widget table = SizedBox(
-      width: tableWidth,
+      width: width,
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border),
@@ -1554,10 +1567,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
 
     if (!mobile) {
-      return Align(
-        alignment: Alignment.topLeft,
-        child: table,
-      );
+      return table;
     }
 
     return SingleChildScrollView(
@@ -1578,7 +1588,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           _tableHeaderCell('Qty', 65),
           _tableHeaderCell('RATE', 75),
           _tableHeaderCell('AMOUNT', 95),
-          _tableHeaderCell('t amt', 95, last: !showTax),
+          _tableHeaderCell('Total', 95, last: !showTax),
           if (showTax) ...[
             _tableHeaderCell('CGST %', 70),
             _tableHeaderCell('SGST %', 70),
@@ -1722,119 +1732,58 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // TOTALS
+  // GRAND TOTAL (below item table only)
   // ============================================================
 
-  Widget _buildTotals() {
+  Widget _buildGrandTotalFooter() {
     return Container(
-      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(4),
+        color: AppColors.headerBand,
+        border: Border(
+          left: BorderSide(color: AppColors.border),
+          right: BorderSide(color: AppColors.border),
+          bottom: BorderSide(color: AppColors.border),
+        ),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _totalField('', _format(_totalQty)),
-          const SizedBox(height: 2),
-          _totalField('Total Amt', _format(_totalAmount)),
-          const SizedBox(height: 2),
-          _totalField('CGST', _format(_totalCgst)),
-          const SizedBox(height: 2),
-          _totalField('SGST', _format(_totalSgst)),
-          const SizedBox(height: 2),
-          _totalField('IGST', _format(_totalIgst)),
-          const SizedBox(height: 6),
-          const Text(
-            'Grand Total',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 2),
-          Container(
-            color: AppColors.headerBand,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Text(
-              _format(_grandTotal),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.navy,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              amountInWords(_grandTotal),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: AppColors.mutedBlue,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // TOTAL FIELD
-  // ============================================================
-
-  Widget _totalField(
-      String label,
-      String value,
-      ) {
-    return SizedBox(
-      height: 28,
-
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-
-            child: Text(
-              label,
-
-              style:
-              const TextStyle(
-                fontSize: 10,
-              ),
-            ),
-          ),
-
-          Expanded(
-            child: Container(
-              height: 36,
-
-              color: Colors.white,
-
-              alignment:
-              Alignment.centerRight,
-
-              padding:
-              const EdgeInsets
-                  .symmetric(
-                horizontal: 8,
-              ),
-
-              child: Text(
-                value,
-
-                style:
-                const TextStyle(
-                  fontSize: 11,
+          Row(
+            children: [
+              const Text(
+                'Grand Total',
+                style: TextStyle(
+                  fontSize: AppTextSizes.sectionHeader,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.navy,
                 ),
               ),
+              Expanded(
+                child: Text(
+                  _format(_grandTotal),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: AppTextSizes.statNumber,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            amountInWords(_grandTotal),
+            textAlign: TextAlign.right,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: AppTextSizes.listSubtitle,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedBlue,
             ),
           ),
         ],
