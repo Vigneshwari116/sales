@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:sales/theme/app_theme.dart';
 
@@ -58,7 +60,9 @@ class DateRangeButton extends StatelessWidget {
   }
 }
 
-/// Centers [child] and clamps width for content panels.
+/// Centers [child] at an explicit width capped by [maxWidth].
+/// Using a fixed [SizedBox] width (not only maxWidth) is required so the
+/// panel does not shrink/left-align and leave dead space on wide screens.
 class CenteredContent extends StatelessWidget {
   final Widget child;
   final double maxWidth;
@@ -73,14 +77,19 @@ class CenteredContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: padding,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: child,
-        ),
+    return Padding(
+      padding: padding,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = math.min(constraints.maxWidth, maxWidth);
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: width,
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }

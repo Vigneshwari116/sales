@@ -192,17 +192,20 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                   maxWidth: 1100,
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final available = constraints.maxWidth;
-                      final tableWidth = available >= _tableMinWidth
-                          ? available
-                          : _tableMinWidth;
+                      final needsHScroll =
+                          constraints.maxWidth < _tableMinWidth;
+                      final table = _buildTable();
+
+                      if (!needsHScroll) {
+                        return SingleChildScrollView(child: table);
+                      }
 
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: SingleChildScrollView(
                           child: SizedBox(
-                            width: tableWidth,
-                            child: _buildTable(),
+                            width: _tableMinWidth,
+                            child: table,
                           ),
                         ),
                       );
@@ -270,16 +273,16 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: AppColors.tableHeader,
       child: Row(
         children: [
-          _cell('BILLNO', 70, bold: true),
-          _cell('DATE', 80, bold: true),
-          _cell('NAME', 130, bold: true),
-          _cell('MOBILE', 110, bold: true),
-          _cell('PAY', 70, bold: true),
-          _cell('TOTAL', 80, bold: true, alignRight: true),
-          _cell('CGST', 70, bold: true, alignRight: true),
-          _cell('SGST', 70, bold: true, alignRight: true),
-          _cell('IGST', 70, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 90, bold: true, alignRight: true),
+          _cell('BILLNO', flex: 7, bold: true),
+          _cell('DATE', flex: 8, bold: true),
+          _cell('NAME', flex: 13, bold: true),
+          _cell('MOBILE', flex: 11, bold: true),
+          _cell('PAY', flex: 7, bold: true),
+          _cell('TOTAL', flex: 8, bold: true, alignRight: true),
+          _cell('CGST', flex: 7, bold: true, alignRight: true),
+          _cell('SGST', flex: 7, bold: true, alignRight: true),
+          _cell('IGST', flex: 7, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', flex: 9, bold: true, alignRight: true),
         ],
       ),
     );
@@ -291,16 +294,16 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       onTap: () => _viewBill(entry),
       child: Row(
         children: [
-          _cell('${entry.billNo}', 70),
-          _cell(_formatDate(entry.date), 80),
-          _cell(entry.customerName, 130),
-          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, 110),
-          _cell(entry.paymentMode, 70),
-          _cell(_formatMoney(entry.total), 80, alignRight: true),
-          _cell(_formatMoney(entry.cgst), 70, alignRight: true),
-          _cell(_formatMoney(entry.sgst), 70, alignRight: true),
-          _cell(_formatMoney(entry.igst), 70, alignRight: true),
-          _cell(_formatMoney(entry.grandTotal), 90, alignRight: true),
+          _cell('${entry.billNo}', flex: 7),
+          _cell(_formatDate(entry.date), flex: 8),
+          _cell(entry.customerName, flex: 13),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, flex: 11),
+          _cell(entry.paymentMode, flex: 7),
+          _cell(_formatMoney(entry.total), flex: 8, alignRight: true),
+          _cell(_formatMoney(entry.cgst), flex: 7, alignRight: true),
+          _cell(_formatMoney(entry.sgst), flex: 7, alignRight: true),
+          _cell(_formatMoney(entry.igst), flex: 7, alignRight: true),
+          _cell(_formatMoney(entry.grandTotal), flex: 9, alignRight: true),
         ],
       ),
     );
@@ -312,30 +315,34 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: AppColors.headerBand,
       child: Row(
         children: [
-          _cell('', 70, bold: true),
-          _cell('', 80, bold: true),
-          _cell('', 130, bold: true),
-          _cell('', 110, bold: true),
-          _cell('', 70, bold: true),
-          _cell(_formatMoney(summary.total), 80, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 70, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 70, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 70, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.grandTotal), 90,
-              bold: true, alignRight: true),
+          _cell('', flex: 7, bold: true),
+          _cell('', flex: 8, bold: true),
+          _cell('', flex: 13, bold: true),
+          _cell('', flex: 11, bold: true),
+          _cell('', flex: 7, bold: true),
+          _cell(_formatMoney(summary.total),
+              flex: 8, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst),
+              flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst),
+              flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst),
+              flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.grandTotal),
+              flex: 9, bold: true, alignRight: true),
         ],
       ),
     );
   }
 
   Widget _cell(
-    String text,
-    double width, {
+    String text, {
+    required int flex,
     bool bold = false,
     bool alignRight = false,
   }) {
-    return SizedBox(
-      width: width,
+    return Expanded(
+      flex: flex,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: const BoxDecoration(
