@@ -159,8 +159,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('SALES LEDGER'),
+      appBar: sectionHeaderAppBar(
+        'SALES LEDGER',
         automaticallyImplyLeading: !widget.embeddedInDashboard,
         actions: [
           if (_pulling)
@@ -172,7 +172,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppColors.navy,
                   ),
                 ),
               ),

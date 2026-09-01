@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Staff view: today's sales totals for the logged-in location (LocalDb).
 class StaffSalesDashboardScreen extends StatefulWidget {
@@ -62,17 +63,8 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'TODAY\'S SALES',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
+      appBar: sectionHeaderAppBar(
+        'TODAY\'S SALES',
         actions: [
           IconButton(
             onPressed: _load,

@@ -12,6 +12,7 @@ import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 enum _StaffSection {
   dashboard,
@@ -243,14 +244,8 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'SYNC',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppTextSizes.appBarTitle),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
+      appBar: sectionHeaderAppBar(
+        'SYNC',
       ),
       body: Center(
         child: ConstrainedBox(

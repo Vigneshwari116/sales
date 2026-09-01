@@ -83,8 +83,13 @@ class CenteredContent extends StatelessWidget {
   }
 }
 
-/// Light header band app bar used inside staff/admin dashboard sections.
-PreferredSizeWidget sectionHeaderAppBar(String title) {
+/// Light header band app bar — dark navy title on pale header for readability.
+PreferredSizeWidget sectionHeaderAppBar(
+  String title, {
+  bool automaticallyImplyLeading = false,
+  Widget? leading,
+  List<Widget>? actions,
+}) {
   return AppBar(
     title: Text(
       title,
@@ -97,7 +102,10 @@ PreferredSizeWidget sectionHeaderAppBar(String title) {
     backgroundColor: AppColors.headerBand,
     foregroundColor: AppColors.navy,
     iconTheme: const IconThemeData(color: AppColors.navy),
-    automaticallyImplyLeading: false,
+    actionsIconTheme: const IconThemeData(color: AppColors.navy),
+    automaticallyImplyLeading: automaticallyImplyLeading,
+    leading: leading,
+    actions: actions,
   );
 }
 
@@ -133,8 +141,8 @@ class CompactAbstractSummary extends StatelessWidget {
 
   Widget _statCard(String label, String value) {
     return Container(
-      width: 190,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: 148,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
         borderRadius: BorderRadius.circular(6),
@@ -147,17 +155,17 @@ class CompactAbstractSummary extends StatelessWidget {
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              fontSize: AppTextSizes.listSubtitle,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.mutedBlue,
               letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             value,
             style: const TextStyle(
-              fontSize: AppTextSizes.statNumber,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.navy,
               height: 1.1,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({super.key});
@@ -108,16 +109,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'PRINTER SETTINGS',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
+      appBar: sectionHeaderAppBar(
+        'PRINTER SETTINGS',
         actions: [
           IconButton(
             onPressed: _loading ? null : _loadPrinters,

@@ -14,11 +14,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/screen/admin_cross_abstract_screen.dart';
+import 'package:sales/screen/admin_location_grid_screen.dart';
 import 'package:sales/screen/sales_abstract_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_date_range_picker.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -46,17 +49,38 @@ Future<void> _savePng(WidgetTester tester, String path) async {
   });
 }
 
-Future<void> _pumpBillScreen(WidgetTester tester) async {
+Future<void> _waitForLoadingToFinish(WidgetTester tester) async {
+  for (var i = 0; i < 50; i++) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    if (find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+      return;
+    }
+  }
+}
+
+Future<void> _pumpThemed(WidgetTester tester, Widget home) async {
   await tester.pumpWidget(
     RepaintBoundary(
       key: const Key('shot_root'),
       child: MaterialApp(
         theme: AppTheme.theme,
-        home: SalesBillScreen(
-          embeddedInDashboard: true,
-          initialBillNo: 3,
-        ),
+        home: home,
       ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+Future<void> _pumpBillScreen(WidgetTester tester) async {
+  await _pumpThemed(
+    tester,
+    SalesBillScreen(
+      embeddedInDashboard: true,
+      initialBillNo: 3,
     ),
   );
   for (var i = 0; i < 20; i++) {
@@ -102,6 +126,119 @@ void main() {
     await AppConfig.clearLocation();
   });
 
+  testWidgets('screenshot staff sales abstract', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpThemed(
+      tester,
+      const SalesAbstractScreen(location: 'Win1'),
+    );
+    await _waitForLoadingToFinish(tester);
+
+    expect(find.text('SALES ABSTRACT'), findsOneWidget);
+    expect(find.text('SHOW ALL HISTORY'), findsNothing);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_staff_sales_abstract.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('screenshot admin cross abstract', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpThemed(tester, const AdminCrossAbstractScreen());
+    await _waitForLoadingToFinish(tester);
+
+    expect(find.text('ABSTRACT (ALL LOCATIONS)'), findsOneWidget);
+    expect(find.text('SHOW ALL HISTORY'), findsNothing);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_admin_cross_abstract.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('screenshot admin dashboard location grid', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpThemed(tester, const AdminLocationGridScreen());
+    for (var i = 0; i < 50; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+      if (find.text('Win1').evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    expect(find.text('DASHBOARD'), findsOneWidget);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_admin_dashboard_grid.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('screenshot staff sync panel header', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpThemed(
+      tester,
+      Scaffold(
+        appBar: sectionHeaderAppBar('SYNC'),
+        body: const Center(child: Text('Sync panel body')),
+      ),
+    );
+
+    expect(find.text('SYNC'), findsOneWidget);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_staff_sync_header.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('screenshot admin sync and gst config header', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpThemed(
+      tester,
+      Scaffold(
+        appBar: sectionHeaderAppBar('SYNC & GST CONFIG'),
+        body: const Center(child: Text('Sync & GST config body')),
+      ),
+    );
+
+    expect(find.text('SYNC & GST CONFIG'), findsOneWidget);
+
+    await _savePng(
+      tester,
+      '/opt/cursor/artifacts/screenshots/pr20_admin_sync_gst_header.png',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('screenshot bill empty compact layout', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -118,7 +255,6 @@ void main() {
       '/opt/cursor/artifacts/screenshots/pr20_bill_empty_compact.png',
     );
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
   });
 
   testWidgets('screenshot bill with line item and tax headers', (tester) async {
@@ -150,7 +286,6 @@ void main() {
       '/opt/cursor/artifacts/screenshots/pr20_bill_with_item_compact.png',
     );
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
   });
 
   testWidgets('screenshot compact date range popup', (tester) async {
@@ -167,6 +302,7 @@ void main() {
           home: Builder(
             builder: (context) {
               return Scaffold(
+                appBar: sectionHeaderAppBar('SALES ABSTRACT'),
                 body: Center(
                   child: ElevatedButton(
                     onPressed: () {

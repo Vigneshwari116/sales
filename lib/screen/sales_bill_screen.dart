@@ -19,6 +19,7 @@ import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class SalesBillScreen extends StatefulWidget {
   /// When true, navigation is provided by [StaffDashboardScreen].
@@ -880,14 +881,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     required bool useSidebarLayout,
   }) {
     if (mobileBillLayout) {
-      return AppBar(
-        title: const Text(
-          'Sales Bill',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: Colors.black,
-        elevation: 0,
+      return sectionHeaderAppBar(
+        'Sales Bill',
         automaticallyImplyLeading: !useSidebarLayout,
         leading: useSidebarLayout
             ? IconButton(
@@ -905,7 +900,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       toolbarHeight: 52,
       title: const SizedBox.shrink(),
       backgroundColor: AppColors.headerBand,
-      foregroundColor: Colors.black,
+      foregroundColor: AppColors.navy,
+      iconTheme: const IconThemeData(color: AppColors.navy),
       elevation: 0,
       automaticallyImplyLeading: !useSidebarLayout,
       leading: useSidebarLayout
@@ -925,22 +921,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildTopArea(),
                 const SizedBox(height: 6),
                 Center(child: _buildRateQtyAmount()),
                 const SizedBox(height: 6),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: _buildItemTableSection(),
-                    ),
-                  ),
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: _buildItemTableSection(),
                 ),
               ],
             ),

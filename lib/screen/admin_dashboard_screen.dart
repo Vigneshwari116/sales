@@ -13,6 +13,7 @@ import 'package:sales/config/app_config.dart';
 import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 enum _AdminSection {
   dashboard,
@@ -298,14 +299,8 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'SYNC & GST CONFIG',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppTextSizes.appBarTitle),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
+      appBar: sectionHeaderAppBar(
+        'SYNC & GST CONFIG',
       ),
       body: Center(
         child: ConstrainedBox(

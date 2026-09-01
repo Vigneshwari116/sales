@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Staff-only thermal printer picker — live OS list, thermal devices only.
 class StaffThermalPrinterScreen extends StatefulWidget {
@@ -115,17 +116,8 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'THERMAL PRINTER',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
+      appBar: sectionHeaderAppBar(
+        'THERMAL PRINTER',
         actions: [
           IconButton(
             tooltip: 'Refresh printer list',
