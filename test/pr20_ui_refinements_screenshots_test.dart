@@ -109,6 +109,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await _pumpBillScreen(tester);
+
+    expect(find.text('S.no'), findsNothing);
+    expect(find.text('Grand Total'), findsNothing);
+
     await _savePng(
       tester,
       '/opt/cursor/artifacts/screenshots/pr20_bill_empty_compact.png',

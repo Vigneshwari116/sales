@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/session_service.dart';
@@ -136,6 +137,40 @@ void main() {
     await tester.enterText(qtyField, '2');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
+
+    expect(find.byIcon(Icons.close), findsNothing);
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('double-tap mobile unlocks excel edit and shows delete',
+      (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '100');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+
+    await tester.enterText(qtyField, '2');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(find.byIcon(Icons.close), findsNothing);
+
+    final mobileField = find.byKey(const Key('bill_mobile_field'));
+    await tester.tap(mobileField);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(mobileField);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bill_edit_password_field')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('bill_edit_password_field')),
+      billEditPassword,
+    );
+    await tester.tap(find.byKey(const Key('bill_edit_password_ok')));
+    await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.close), findsOneWidget);
     await tearDownBillScreen(tester);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
@@ -132,6 +133,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final List<BillItem> _items = [];
 
   int? _selectedIndex;
+
+  // Password-gated edit for line items in the excel table.
+  bool _editUnlocked = false;
+  bool _showPasswordField = false;
+  String? _passwordError;
+  final TextEditingController _passwordController = TextEditingController();
+  int? _editingIndex;
+  final TextEditingController _editRateController = TextEditingController();
+  final TextEditingController _editQtyController = TextEditingController();
 
   // ============================================================
   // INIT
@@ -387,7 +397,71 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
   }
 
+  void _onMobileDoubleTap() {
+    if (_editUnlocked || _showPasswordField) {
+      return;
+    }
+
+    setState(() {
+      _showPasswordField = true;
+      _passwordError = null;
+      _passwordController.clear();
+    });
+  }
+
+  void _tryUnlockEdit() {
+    if (_passwordController.text == billEditPassword) {
+      setState(() {
+        _editUnlocked = true;
+        _showPasswordField = false;
+        _passwordError = null;
+      });
+      return;
+    }
+
+    setState(() => _passwordError = 'Incorrect password');
+  }
+
+  void _startEditLine(int index) {
+    if (!_editUnlocked) {
+      return;
+    }
+
+    setState(() {
+      _editingIndex = index;
+      _editRateController.text = _items[index].rate.toString();
+      _editQtyController.text = _items[index].qty.toString();
+    });
+  }
+
+  void _applyLineEdit() {
+    final index = _editingIndex;
+    if (index == null) {
+      return;
+    }
+
+    final rate = double.tryParse(_editRateController.text.trim());
+    final qty = double.tryParse(_editQtyController.text.trim());
+
+    if (rate == null || rate <= 0 || qty == null || qty <= 0) {
+      _showMessage('Enter valid rate and quantity');
+      return;
+    }
+
+    setState(() {
+      _items[index] = _items[index].copyWith(rate: rate, qty: qty);
+      _editingIndex = null;
+      _billSaved = false;
+    });
+
+    _persistSession();
+  }
+
   void _removeItem(int index) {
+    if (!_editUnlocked) {
+      return;
+    }
+
     setState(() {
       _items.removeAt(index);
 
@@ -423,6 +497,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _items.clear();
 
     _selectedIndex = null;
+    _editUnlocked = false;
+    _showPasswordField = false;
+    _passwordError = null;
+    _editingIndex = null;
 
     _billSaved = false;
     _currentBillLocalId = null;
@@ -1200,18 +1278,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                   ),
                 ),
               ),
-
-              Expanded(
+              SizedBox(
+                width: 150,
                 child: _smallTextField(
                   _customerNameController,
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 5),
-
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(
                 width: 45,
@@ -1222,16 +1299,98 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                   ),
                 ),
               ),
-
               Expanded(
-                child: _smallTextField(
-                  _mobileController,
-                  number: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onDoubleTap: _onMobileDoubleTap,
+                      child: SizedBox(
+                        width: 150,
+                        child: _smallTextField(
+                          _mobileController,
+                          number: true,
+                          fieldKey: const Key('bill_mobile_field'),
+                        ),
+                      ),
+                    ),
+                    if (_showPasswordField && !_editUnlocked) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 52,
+                            child: Text(
+                              'Password',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 110,
+                            child: TextField(
+                              key: const Key('bill_edit_password_field'),
+                              controller: _passwordController,
+                              obscureText: true,
+                              autofocus: true,
+                              onSubmitted: (_) => _tryUnlockEdit(),
+                              style: const TextStyle(fontSize: 10),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 6,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          SizedBox(
+                            height: 30,
+                            child: ElevatedButton(
+                              key: const Key('bill_edit_password_ok'),
+                              onPressed: _tryUnlockEdit,
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                minimumSize: const Size(0, 30),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('OK', style: TextStyle(fontSize: 10)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_passwordError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _passwordError!,
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                    ],
+                    if (_editUnlocked)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Edit mode — tap a line to correct rate/qty.',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-
         ],
       ),
     );
@@ -1244,8 +1403,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _smallTextField(
       TextEditingController controller, {
         bool number = false,
+        Key? fieldKey,
       }) {
     return TextField(
+        key: fieldKey,
         controller: controller,
 
         keyboardType: number
@@ -1260,7 +1421,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             : null,
 
         style: const TextStyle(
-          fontSize: AppTextSizes.fieldText,
+          fontSize: 10,
         ),
 
         decoration: const InputDecoration(
@@ -1269,8 +1430,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           fillColor: Colors.white,
           border: OutlineInputBorder(),
           contentPadding: EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 8,
+            horizontal: 6,
+            vertical: 5,
           ),
         ),
       );
@@ -1514,6 +1675,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   double _tableWidth(bool showTax) => showTax ? 624 : 480;
 
   Widget _buildItemTableSection({bool mobile = false}) {
+    if (_items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final showTax = _items.isNotEmpty;
     final width = _tableWidth(showTax);
 
@@ -1556,11 +1721,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildTableHeader(showTax),
-            if (_items.isNotEmpty)
-              ...List.generate(
-                _items.length,
-                (index) => _buildTableRow(index, showTax),
-              ),
+            ...List.generate(_items.length, (index) {
+              if (_editingIndex == index) {
+                return _buildEditRow(index);
+              }
+              return _buildTableRow(index, showTax);
+            }),
           ],
         ),
       ),
@@ -1594,7 +1760,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             _tableHeaderCell('SGST %', 70),
             _tableHeaderCell('IGST', 65),
           ],
-          _tableDeleteHeaderCell(),
+          if (_editUnlocked) _tableDeleteHeaderCell(),
         ],
       ),
     );
@@ -1641,6 +1807,75 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
+  Widget _buildEditRow(int index) {
+    return Container(
+      color: const Color(0xFFFFF8E1),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Row(
+        children: [
+          Text(
+            'Line ${index + 1}',
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 64,
+            height: 30,
+            child: TextField(
+              controller: _editRateController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              style: const TextStyle(fontSize: 10),
+              decoration: const InputDecoration(
+                labelText: 'Rate',
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 64,
+            height: 30,
+            child: TextField(
+              controller: _editQtyController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              style: const TextStyle(fontSize: 10),
+              decoration: const InputDecoration(
+                labelText: 'Qty',
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            height: 30,
+            child: ElevatedButton(
+              key: const Key('bill_edit_line_ok'),
+              onPressed: _applyLineEdit,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 30),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('OK', style: TextStyle(fontSize: 10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ============================================================
   // TABLE ROW
   // ============================================================
@@ -1656,6 +1891,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     return GestureDetector(
       onTap: () {
+        if (_editUnlocked) {
+          _startEditLine(index);
+          return;
+        }
+
         setState(() {
           _selectedIndex = selected ? null : index;
         });
@@ -1673,9 +1913,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             if (showTax) ...[
               _tableDataCell(_format(item.cgstPct), 70),
               _tableDataCell(_format(item.sgstPct), 70),
-              _tableDataCell(_format(item.igst), 65, last: true),
+              _tableDataCell(_format(item.igst), 65, last: !_editUnlocked),
             ],
-            _buildDeleteCell(index),
+            if (_editUnlocked) _buildDeleteCell(index),
           ],
         ),
       ),
@@ -1829,6 +2069,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _customerNameController.dispose();
 
     _mobileController.dispose();
+
+    _passwordController.dispose();
+    _editRateController.dispose();
+    _editQtyController.dispose();
 
     _rateController.dispose();
 
