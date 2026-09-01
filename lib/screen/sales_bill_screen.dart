@@ -17,6 +17,7 @@ import 'sales_ledger_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/theme/app_theme.dart';
 
 class SalesBillScreen extends StatefulWidget {
   /// When true, navigation is provided by [StaffDashboardScreen].
@@ -46,10 +47,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // COLORS
   // ============================================================
 
-  static const Color backgroundColor = Color(0xFFC5F6C5);
-  static const Color buttonColor = Color(0xFF9D1717);
-  static const Color headerColor = Color(0xFFFFF5C5);
-  static const Color borderColor = Color(0xFF888888);
   static const Color billNoColor = Color(0xFF7FE8E8);
   static const double _entryBoxWidth = 100;
   static const double _entryBoxHeight = 42;
@@ -723,14 +720,14 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     if (widget.embeddedInDashboard) {
       return Scaffold(
-        backgroundColor: backgroundColor,
+        backgroundColor: AppColors.background,
         body: _buildLockedBody(body),
       );
     }
 
     if (useSidebarLayout) {
       return Scaffold(
-        backgroundColor: backgroundColor,
+        backgroundColor: AppColors.background,
         appBar: _buildAppBar(
           mobileBillLayout: mobileBillLayout,
           useSidebarLayout: true,
@@ -754,7 +751,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     }
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: AppColors.background,
       drawer: Drawer(
         child: _buildMenuPanel(
           onClose: () => Navigator.pop(context),
@@ -810,7 +807,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           'Sales Bill',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
+        backgroundColor: AppColors.headerBand,
         foregroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: !useSidebarLayout,
@@ -829,7 +826,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return AppBar(
       toolbarHeight: 52,
       title: const SizedBox.shrink(),
-      backgroundColor: const Color(0xFFD5D8D5),
+      backgroundColor: AppColors.headerBand,
       foregroundColor: Colors.black,
       elevation: 0,
       automaticallyImplyLeading: !useSidebarLayout,
@@ -949,7 +946,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
-          color: borderColor,
+          color: AppColors.border,
         ),
       ),
 
@@ -1102,7 +1099,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                     border:
                     Border.all(
                       color:
-                      borderColor,
+                      AppColors.border,
                     ),
                   ),
 
@@ -1150,8 +1147,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
           style:
           ElevatedButton.styleFrom(
-            backgroundColor:
-            buttonColor,
+            backgroundColor: AppColors.navy,
 
             foregroundColor:
             Colors.white,
@@ -1204,7 +1200,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildCustomerDetails() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
+        border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.all(7),
       child: Column(
@@ -1271,10 +1267,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       TextEditingController controller, {
         bool number = false,
       }) {
-    return SizedBox(
-      height: 27,
-
-      child: TextField(
+    return TextField(
         controller: controller,
 
         keyboardType: number
@@ -1288,24 +1281,21 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         ]
             : null,
 
-        decoration:
-        const InputDecoration(
+        style: const TextStyle(
+          fontSize: AppTextSizes.fieldText,
+        ),
+
+        decoration: const InputDecoration(
+          isDense: true,
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(),
-          contentPadding:
-          EdgeInsets.symmetric(
-            horizontal: 6,
-            vertical: 0,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 8,
           ),
         ),
-
-        style:
-        const TextStyle(
-          fontSize: 10,
-        ),
-      ),
-    );
+      );
   }
 
   // ============================================================
@@ -1474,7 +1464,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             alignment: Alignment.centerLeft,
             child: Text(
               _rateError!,
-              style: const TextStyle(color: Colors.red, fontSize: 10),
+              style: const TextStyle(color: AppColors.danger, fontSize: 10),
             ),
           ),
         ],
@@ -1484,7 +1474,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             alignment: Alignment.centerLeft,
             child: Text(
               _qtyError!,
-              style: const TextStyle(color: Colors.red, fontSize: 10),
+              style: const TextStyle(color: AppColors.danger, fontSize: 10),
             ),
           ),
         ],
@@ -1580,8 +1570,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     Widget table = Container(
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        color: backgroundColor,
+        border: Border.all(color: AppColors.border),
+        color: AppColors.background,
       ),
       clipBehavior: Clip.hardEdge,
       child: Column(
@@ -1589,7 +1579,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           _buildTableHeader(showTax),
           Expanded(
             child: _items.isEmpty
-                ? ColoredBox(color: backgroundColor)
+                ? ColoredBox(color: AppColors.background)
                 : ListView.builder(
                     padding: EdgeInsets.zero,
                     itemCount: _items.length,
@@ -1625,7 +1615,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildTableHeader(bool showTax) {
     return Container(
       height: 32,
-      color: headerColor,
+      color: AppColors.tableHeader,
       child: Row(
         children: [
           _tableHeaderCell('S.no', 55),
@@ -1653,7 +1643,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           border: Border(
             right: last
                 ? BorderSide.none
-                : BorderSide(color: borderColor, width: 0.6),
+                : BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
         alignment: Alignment.center,
@@ -1678,7 +1668,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         height: 32,
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: borderColor, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
       ),
@@ -1706,7 +1696,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       },
       child: Container(
         height: 34,
-        color: selected ? const Color(0xFFFFE5A0) : backgroundColor,
+        color: selected ? const Color(0xFFFFE5A0) : AppColors.background,
         child: Row(
           children: [
             _tableDataCell('${index + 1}', 55),
@@ -1733,13 +1723,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         height: 34,
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: borderColor, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
         child: IconButton(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          icon: const Icon(Icons.close, color: Colors.red, size: 16),
+          icon: const Icon(Icons.close, color: AppColors.danger, size: 16),
           tooltip: 'Remove item',
           onPressed: () => _removeItem(index),
         ),
@@ -1760,8 +1750,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           border: Border(
             right: last
                 ? BorderSide.none
-                : BorderSide(color: borderColor, width: 0.6),
-            bottom: BorderSide(color: borderColor, width: 0.6),
+                : BorderSide(color: AppColors.border, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
         alignment: Alignment.center,

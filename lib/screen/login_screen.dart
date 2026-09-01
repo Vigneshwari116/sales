@@ -1,22 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/local_credentials.dart';
-import 'package:sales/screen/admin_login_screen.dart';
+import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/staff_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
+import 'package:sales/theme/app_theme.dart';
 
-/// Local login gate — username determines location (win1–win4).
+/// Single login for staff (win1–win4) and admin — no role toggle on screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// Test seam: replace dashboard destinations without mounting heavy screens.
+  @visibleForTesting
+  static WidgetBuilder? adminHomeBuilder;
+
+  @visibleForTesting
+  static WidgetBuilder? staffHomeBuilder;
+
+  @visibleForTesting
+  static void resetTestHooks() {
+    adminHomeBuilder = null;
+    staffHomeBuilder = null;
+  }
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const Color _btn = Color(0xFF9C1C1C);
-
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _userCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
@@ -36,37 +48,53 @@ class _LoginScreenState extends State<LoginScreen> {
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text.trim();
 
-    if (!verifyStaffLogin(username, password)) {
+    final isAdmin = verifyAdminLogin(username, password);
+    final isStaff = verifyStaffLogin(username, password);
+
+    if (!isAdmin && !isStaff) {
       setState(() => _error = 'Incorrect username or password.');
       return;
     }
 
     setState(() => _error = null);
 
-    final locationCode = staffLocationCodeForUsername(username);
-
     await SessionService.clearBillSession();
+
+    if (isAdmin) {
+      await AppConfig.setLocation('win1');
+      await SessionService.saveLogin(username, role: SessionRole.admin);
+      await AppSessionService.onLoginComplete();
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: LoginScreen.adminHomeBuilder ??
+              (_) => const AdminDashboardScreen(),
+        ),
+      );
+      return;
+    }
+
+    final locationCode = staffLocationCodeForUsername(username);
     await AppConfig.setLocation(locationCode);
-    await AppSessionService.onLoginComplete();
     await SessionService.saveLogin(username, role: SessionRole.staff);
+    await AppSessionService.onLoginComplete();
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const StaffDashboardScreen()),
-    );
-  }
-
-  void _openAdminLogin() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+      MaterialPageRoute(
+        builder: LoginScreen.staffHomeBuilder ??
+            (_) => const StaffDashboardScreen(),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFC6F5C6),
+      backgroundColor: AppColors.background,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -75,12 +103,12 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.cardWhite,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF808080)),
+                border: Border.all(color: AppColors.border),
                 boxShadow: const [
                   BoxShadow(
-                    color: Colors.black26,
+                    color: Colors.black12,
                     blurRadius: 10,
                     offset: Offset(0, 4),
                   ),
@@ -92,7 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.storefront, size: 48, color: _btn),
+                    const Icon(
+                      Icons.storefront,
+                      size: 48,
+                      color: AppColors.navy,
+                    ),
                     const SizedBox(height: 8),
                     const Text(
                       'Sales Bill Login',
@@ -100,6 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: AppColors.navy,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -110,7 +143,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       textCapitalization: TextCapitalization.none,
                       decoration: const InputDecoration(
                         labelText: 'Username',
-                        border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_outline),
                       ),
                       validator: (v) =>
@@ -126,7 +158,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: _obscure,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -144,21 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                        style: const TextStyle(color: AppColors.danger, fontSize: 12),
                       ),
                     ],
                     const SizedBox(height: 20),
                     SizedBox(
-                      height: 46,
+                      height: 44,
                       child: ElevatedButton(
                         onPressed: _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _btn,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
                         child: const Text(
                           'LOGIN',
                           style: TextStyle(
@@ -166,15 +190,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             letterSpacing: 1,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton(
-                        tooltip: 'Switch login',
-                        onPressed: _openAdminLogin,
-                        icon: const Icon(Icons.swap_horiz, size: 20),
                       ),
                     ),
                   ],

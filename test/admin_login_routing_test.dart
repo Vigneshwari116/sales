@@ -10,7 +10,6 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
-import 'package:sales/screen/admin_login_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -36,6 +35,14 @@ Future<void> _deleteTestDb() async {
   }
 }
 
+Future<void> _awaitLoginWork(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+  });
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+}
+
 void main() {
   late Directory tempDir;
 
@@ -56,14 +63,17 @@ void main() {
   });
 
   setUp(() async {
+    LoginScreen.resetTestHooks();
     await SessionService.clearLogin();
     await AppConfig.clearLocation();
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
     await _deleteTestDb();
+    SyncService.instance.isOnlineOverride = () async => false;
   });
 
   tearDown(() async {
+    LoginScreen.resetTestHooks();
     await SyncService.resetForTesting();
     await LocalDb.resetForTesting();
     await _deleteTestDb();
@@ -71,21 +81,23 @@ void main() {
     await AppConfig.clearLocation();
   });
 
-  testWidgets('login screens hide staff/admin path labels', (tester) async {
+  testWidgets('single login screen hides staff/admin path labels', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('Admin login'), findsNothing);
     expect(find.text('Staff login'), findsNothing);
     expect(find.text('LEDGER'), findsNothing);
+    expect(find.byIcon(Icons.swap_horiz), findsNothing);
+    expect(find.byIcon(Icons.admin_panel_settings), findsNothing);
   });
 
-  testWidgets('staff login rejects admin credentials', (tester) async {
+  testWidgets('wrong credentials show generic error', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
-    await tester.enterText(find.byType(TextFormField).at(1), 'admin123');
+    await tester.enterText(find.byType(TextFormField).at(0), 'nobody');
+    await tester.enterText(find.byType(TextFormField).at(1), 'wrong');
     await tester.tap(find.text('LOGIN'));
     await tester.pump();
 
@@ -93,17 +105,41 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('admin login rejects staff credentials', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AdminLoginScreen()));
+  testWidgets('admin credentials route to admin home', (tester) async {
+    LoginScreen.adminHomeBuilder = (_) => const Scaffold(
+          key: Key('routed_admin_home'),
+          body: Text('admin-home'),
+        );
+
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
+    await tester.enterText(find.byType(TextFormField).at(1), 'admin123');
+    await tester.tap(find.text('LOGIN'));
+    await _awaitLoginWork(tester);
+
+    expect(find.byKey(const Key('routed_admin_home')), findsOneWidget);
+    expect(await SessionService.getRole(), SessionRole.admin);
+  });
+
+  testWidgets('staff credentials route to staff home', (tester) async {
+    LoginScreen.staffHomeBuilder = (_) => const Scaffold(
+          key: Key('routed_staff_home'),
+          body: Text('staff-home'),
+        );
+
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField).at(0), 'win1');
     await tester.enterText(find.byType(TextFormField).at(1), 'staff123');
     await tester.tap(find.text('LOGIN'));
-    await tester.pump();
+    await _awaitLoginWork(tester);
 
-    expect(find.text('Incorrect username or password.'), findsOneWidget);
-    expect(find.byType(AdminLoginScreen), findsOneWidget);
+    expect(find.byKey(const Key('routed_staff_home')), findsOneWidget);
+    expect(await SessionService.getRole(), SessionRole.staff);
+    expect(AppConfig.locationCode, 'win1');
   });
 
   test('admin session role is persisted separately from staff', () async {

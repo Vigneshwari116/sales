@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Cross-location abstract totals for admin (all four locations combined).
 class AdminCrossAbstractScreen extends StatefulWidget {
@@ -12,11 +14,8 @@ class AdminCrossAbstractScreen extends StatefulWidget {
 }
 
 class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _border = Color(0xFF888888);
-
-  DateTime? _fromDate;
-  DateTime? _toDate;
+  DateTime _fromDate = DateTime.now();
+  DateTime _toDate = DateTime.now();
   bool _loading = true;
   String? _dateRangeError;
   AbstractSummary? _summary;
@@ -28,9 +27,8 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
   }
 
   bool get _isDateRangeValid {
-    if (_fromDate == null || _toDate == null) return true;
-    final from = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-    final to = DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
+    final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+    final to = DateTime(_toDate.year, _toDate.month, _toDate.day);
     return !to.isBefore(from);
   }
 
@@ -49,12 +47,9 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
       _dateRangeError = null;
     });
 
-    final from = _fromDate ?? DateTime.now();
-    final to = _toDate ?? DateTime.now();
-
     final summary = await AbstractRepository.getCrossLocationSummary(
-      fromDate: from,
-      toDate: to,
+      fromDate: _fromDate,
+      toDate: _toDate,
     );
 
     if (!mounted) return;
@@ -65,92 +60,46 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
     });
   }
 
-  Future<void> _pickFromDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _fromDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked == null) return;
-
-    setState(() => _fromDate = picked);
-    await _loadSummary();
-  }
-
-  Future<void> _pickToDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _toDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked == null) return;
-
-    setState(() => _toDate = picked);
-    await _loadSummary();
-  }
-
-  void _clearRange() {
+  void _setToday() {
+    final now = DateTime.now();
     setState(() {
-      _fromDate = null;
-      _toDate = null;
+      _fromDate = now;
+      _toDate = now;
+    });
+    _loadSummary();
+  }
+
+  void _showAllHistory() {
+    final now = DateTime.now();
+    setState(() {
+      _fromDate = DateTime(2020, 1, 1);
+      _toDate = now;
     });
     _loadSummary();
   }
 
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
 
-  String _formatDate(DateTime date) => DateFormat('dd-MMM-yyyy').format(date);
-
-  Widget _compactDateChip({
-    required String label,
-    required DateTime? date,
-    required VoidCallback onTap,
-  }) {
-    final text = date == null ? '—' : _formatDate(date);
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('$label ', style: const TextStyle(fontSize: 12)),
-            Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 4),
-            const Icon(Icons.calendar_today, size: 14),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final usingToday = _fromDate == null && _toDate == null;
-
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'ABSTRACT (ALL LOCATIONS)',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 1100,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -159,36 +108,35 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _compactDateChip(
-                        label: 'From',
-                        date: _fromDate,
-                        onTap: _pickFromDate,
+                      DateRangeButton(
+                        fromDate: _fromDate,
+                        toDate: _toDate,
+                        onChanged: (range) {
+                          setState(() {
+                            _fromDate = range.start;
+                            _toDate = range.end;
+                          });
+                          _loadSummary();
+                        },
                       ),
-                      _compactDateChip(
-                        label: 'To',
-                        date: _toDate,
-                        onTap: _pickToDate,
+                      OutlinedButton(
+                        onPressed: _setToday,
+                        child: const Text('TODAY'),
                       ),
-                      if (!usingToday)
-                        TextButton(
-                          onPressed: _clearRange,
-                          child: const Text('Today'),
-                        ),
+                      OutlinedButton(
+                        onPressed: _showAllHistory,
+                        child: const Text('SHOW ALL HISTORY'),
+                      ),
                     ],
                   ),
-                  if (usingToday)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Text(
-                        'No range selected — showing today across all locations.',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
                   if (_dateRangeError != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       _dateRangeError!,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                      style: const TextStyle(
+                        color: AppColors.danger,
+                        fontSize: AppTextSizes.listTitle,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 20),
@@ -211,13 +159,28 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _border),
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: AppTextSizes.fieldText,
+                color: AppColors.navy,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: AppTextSizes.statNumber,
+              fontWeight: FontWeight.w600,
+              color: AppColors.navy,
+            ),
+          ),
         ],
       ),
     );

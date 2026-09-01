@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sales/theme/app_theme.dart';
 
 class SidebarNavItem {
   final Key? key;
@@ -16,18 +17,16 @@ class SidebarNavItem {
   });
 }
 
-/// Icon-only when collapsed; icon + label on one row when expanded.
+/// Compact navy rail: icon-only when collapsed; icon + label when expanded.
 class CollapsibleSidebar extends StatelessWidget {
-  static const Color defaultBackground = Color(0xFFC5F6C5);
-  static const double expandedWidth = 200;
-  static const double collapsedWidth = 56;
+  static const double expandedWidth = 168;
+  static const double collapsedWidth = 52;
 
   final bool expanded;
   final VoidCallback onToggle;
   final List<SidebarNavItem> items;
   final Widget? header;
   final Widget? footer;
-  final Color backgroundColor;
 
   const CollapsibleSidebar({
     super.key,
@@ -36,67 +35,85 @@ class CollapsibleSidebar extends StatelessWidget {
     required this.items,
     this.header,
     this.footer,
-    this.backgroundColor = defaultBackground,
+    @Deprecated('Sidebar always uses drawerNavy') Color? backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
       width: expanded ? expandedWidth : collapsedWidth,
-      color: backgroundColor,
-      child: Column(
-        children: [
-          _buildToggleRow(),
-          if (header != null) header!,
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
+      color: AppColors.drawerNavy,
+      clipBehavior: Clip.hardEdge,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Only show labels once the rail is wide enough — avoids overflow
+            // mid-animation when expanded flips before width finishes tweening.
+            final showLabels = constraints.maxWidth >= expandedWidth - 4;
+            return Column(
               children: [
-                for (final item in items) _buildNavItem(item),
+                _buildToggleRow(),
+                if (header != null && showLabels) header!,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    children: [
+                      for (final item in items) _buildNavItem(item, showLabels),
+                    ],
+                  ),
+                ),
+                if (footer != null) footer!,
               ],
-            ),
-          ),
-          if (footer != null) footer!,
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildToggleRow() {
     return SizedBox(
-      height: 48,
+      height: 40,
       child: IconButton(
         key: const Key('sidebar_hamburger_toggle'),
         tooltip: expanded ? 'Collapse menu' : 'Expand menu',
         onPressed: onToggle,
+        color: Colors.white,
+        iconSize: 20,
         icon: Icon(expanded ? Icons.menu_open : Icons.menu),
       ),
     );
   }
 
-  Widget _buildNavItem(SidebarNavItem item) {
+  Widget _buildNavItem(SidebarNavItem item, bool showLabels) {
     final content = Material(
-      color: item.selected ? const Color(0xFFB8E8B8) : Colors.transparent,
+      color: item.selected ? AppColors.drawerActive : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: item.onTap,
+        borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: expanded ? 12 : 8,
-            vertical: 10,
+            horizontal: showLabels ? 10 : 0,
+            vertical: 8,
           ),
           child: Row(
+            mainAxisAlignment:
+                showLabels ? MainAxisAlignment.start : MainAxisAlignment.center,
             children: [
-              Icon(item.icon, size: 22),
-              if (expanded) ...[
-                const SizedBox(width: 12),
+              Icon(item.icon, size: 18, color: Colors.white),
+              if (showLabels) ...[
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     item.label,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -107,8 +124,13 @@ class CollapsibleSidebar extends StatelessWidget {
       ),
     );
 
-    if (expanded) {
-      return KeyedSubtree(key: item.key, child: content);
+    final padded = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: content,
+    );
+
+    if (showLabels) {
+      return KeyedSubtree(key: item.key, child: padded);
     }
 
     return KeyedSubtree(
@@ -116,7 +138,7 @@ class CollapsibleSidebar extends StatelessWidget {
       child: Tooltip(
         message: item.label,
         waitDuration: const Duration(milliseconds: 400),
-        child: content,
+        child: padded,
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class SalesAbstractScreen extends StatefulWidget {
   final String location;
@@ -17,9 +19,6 @@ class SalesAbstractScreen extends StatefulWidget {
 }
 
 class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _border = Color(0xFF888888);
-
   DateTime _fromDate = DateTime.now();
   DateTime _toDate = DateTime.now();
   bool _loading = true;
@@ -76,109 +75,84 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     });
   }
 
-  Future<void> _pickFromDate() async {
-    var picked = await showDatePicker(
-      context: context,
-      initialDate: _fromDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked == null) return;
-
-    setState(() => _fromDate = picked);
-    await _loadSummary();
+  void _setToday() {
+    final now = DateTime.now();
+    setState(() {
+      _fromDate = now;
+      _toDate = now;
+    });
+    _loadSummary();
   }
 
-  Future<void> _pickToDate() async {
-    var picked = await showDatePicker(
-      context: context,
-      initialDate: _toDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked == null) return;
-
-    setState(() => _toDate = picked);
-    await _loadSummary();
+  void _showAllHistory() {
+    final now = DateTime.now();
+    setState(() {
+      _fromDate = DateTime(2020, 1, 1);
+      _toDate = now;
+    });
+    _loadSummary();
   }
 
   String _formatMoney(double value) {
     return NumberFormat('#,##0.00').format(value);
   }
 
-  String _formatDate(DateTime date) {
-    return DateFormat('dd-MMM-yyyy').format(date);
-  }
-
-  Widget _datePickerRow({
-    required String label,
-    required DateTime date,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_today, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              '$label: ${_formatDate(date)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'SALES ABSTRACT',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
+        automaticallyImplyLeading: false,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 1100,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _datePickerRow(
-                    label: 'From Date',
-                    date: _fromDate,
-                    onTap: _pickFromDate,
-                  ),
-                  const SizedBox(height: 10),
-                  _datePickerRow(
-                    label: 'To Date',
-                    date: _toDate,
-                    onTap: _pickToDate,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DateRangeButton(
+                        fromDate: _fromDate,
+                        toDate: _toDate,
+                        onChanged: (range) {
+                          setState(() {
+                            _fromDate = range.start;
+                            _toDate = range.end;
+                          });
+                          _loadSummary();
+                        },
+                      ),
+                      OutlinedButton(
+                        onPressed: _setToday,
+                        child: const Text('TODAY'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _showAllHistory,
+                        child: const Text('SHOW ALL HISTORY'),
+                      ),
+                    ],
                   ),
                   if (_dateRangeError != null) ...[
                     const SizedBox(height: 10),
                     Text(
                       _dateRangeError!,
                       style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 13,
+                        color: AppColors.danger,
+                        fontSize: AppTextSizes.listTitle,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -203,8 +177,8 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _border),
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -212,16 +186,18 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: AppTextSizes.fieldText,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                color: AppColors.navy,
               ),
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              fontSize: bold ? 18 : 14,
+              fontSize: bold ? AppTextSizes.statNumber : AppTextSizes.fieldText,
               fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              color: AppColors.navy,
             ),
           ),
         ],

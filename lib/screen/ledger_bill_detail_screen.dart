@@ -7,6 +7,7 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
+import 'package:sales/theme/app_theme.dart';
 
 /// Drill-down for a saved bill — password-gated edit for staff.
 class LedgerBillDetailScreen extends StatefulWidget {
@@ -25,9 +26,6 @@ class LedgerBillDetailScreen extends StatefulWidget {
     this.adminFullEdit = false,
   });
 
-  static const Color background = Color(0xFFC5F6C5);
-  static const Color header = Color(0xFFFFF5C5);
-  static const Color border = Color(0xFF888888);
   static const Color billNoColor = Color(0xFFFFE5A0);
 
   @override
@@ -197,14 +195,17 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LedgerBillDetailScreen.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
           'BILL ${_bill.billNo}',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         actions: [
           if (_editUnlocked)
             TextButton(
@@ -234,7 +235,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   Widget _buildBillHeader() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: LedgerBillDetailScreen.border),
+        border: Border.all(color: AppColors.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
@@ -295,15 +296,15 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isPending ? const Color(0xFFFFF3CD) : const Color(0xFFD4EDDA),
-        border: Border.all(color: LedgerBillDetailScreen.border),
+        color: isPending ? AppColors.warningBg : AppColors.successBg,
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         isPending ? 'Pending sync' : 'Synced',
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.bold,
-          color: isPending ? const Color(0xFF856404) : const Color(0xFF155724),
+          color: isPending ? AppColors.warningFg : AppColors.success,
         ),
       ),
     );
@@ -312,7 +313,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   Widget _buildCustomerSection() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: LedgerBillDetailScreen.border),
+        border: Border.all(color: AppColors.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
@@ -367,7 +368,10 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     _passwordError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 10),
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontSize: AppTextSizes.listSubtitle,
+                    ),
                   ),
                 ),
             ],
@@ -379,7 +383,10 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
                 widget.adminFullEdit
                     ? 'Admin edit — update customer, line items, then SAVE.'
                     : 'Edit mode — tap a line item to correct rate/qty, then SAVE.',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF155724)),
+                style: const TextStyle(
+                  fontSize: AppTextSizes.listSubtitle,
+                  color: AppColors.success,
+                ),
               ),
             ),
         ],
@@ -433,7 +440,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   Widget _buildItemTable() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: LedgerBillDetailScreen.border),
+        border: Border.all(color: AppColors.border),
         color: Colors.white,
       ),
       child: Column(
@@ -509,7 +516,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
 
   Widget _tableHeader() {
     return Container(
-      color: LedgerBillDetailScreen.header,
+      color: AppColors.tableHeader,
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: const Row(
         children: [
@@ -547,7 +554,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   Widget _buildTotals() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: LedgerBillDetailScreen.border),
+        border: Border.all(color: AppColors.border),
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
@@ -640,7 +647,7 @@ class _DataCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: const BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: LedgerBillDetailScreen.border, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
         child: Text(

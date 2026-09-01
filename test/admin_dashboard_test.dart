@@ -132,19 +132,25 @@ void main() {
 
     expect(find.byKey(const Key('admin_nav_dashboard')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('sidebar_hamburger_toggle')));
-    await tester.pumpAndSettle();
-
-    final sidebar = tester.widget<CollapsibleSidebar>(
+    final before = tester.widget<CollapsibleSidebar>(
       find.byKey(const Key('admin_collapsible_sidebar')),
     );
-    expect(sidebar.expanded, isFalse);
+    expect(before.expanded, isFalse);
+
+    await tester.tap(find.byKey(const Key('sidebar_hamburger_toggle')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final after = tester.widget<CollapsibleSidebar>(
+      find.byKey(const Key('admin_collapsible_sidebar')),
+    );
+    expect(after.expanded, isTrue);
   });
 
   testWidgets('sidebar switches to ledger section', (tester) async {
     await pumpAdminDashboard(tester);
 
-    await tester.tap(find.text('LEDGER'));
+    await tester.tap(find.byKey(const Key('admin_nav_ledger')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -154,7 +160,7 @@ void main() {
   testWidgets('sidebar switches to sync section', (tester) async {
     await pumpAdminDashboard(tester);
 
-    await tester.tap(find.text('SYNC'));
+    await tester.tap(find.byKey(const Key('admin_nav_sync')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

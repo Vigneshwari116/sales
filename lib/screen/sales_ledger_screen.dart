@@ -4,8 +4,9 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
-import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
@@ -42,15 +43,10 @@ class SalesLedgerScreen extends StatefulWidget {
 }
 
 class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _header = Color(0xFFFFF5C5);
-  static const Color _border = Color(0xFF888888);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-  static const double _tableMinWidth = 980;
+  static const double _tableMinWidth = 920;
 
   bool _loading = true;
   bool _pulling = false;
-  bool _pushing = false;
   List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
 
@@ -73,9 +69,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   Future<void> _loadLedger() async {
-    setState(() {
-      _loading = true;
-    });
+    setState(() => _loading = true);
 
     final ({
       List<LocalLedgerEntry> entries,
@@ -85,9 +79,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     if (widget.loadLedgerOverride != null) {
       result = await widget.loadLedgerOverride!()!;
     } else {
-      result = await LedgerRepository.getLedger(
-        location: widget.location,
-      );
+      result = await LedgerRepository.getLedger(location: widget.location);
     }
 
     if (!mounted) return;
@@ -122,30 +114,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
-  Future<void> _syncNow() async {
-    final allowed = await SyncGateService.confirmSync(context);
-    if (!allowed || !mounted) return;
-
-    setState(() => _pushing = true);
-
-    final result = await SyncService.instance.manualSync(widget.location);
-
-    if (!mounted) return;
-
-    setState(() => _pushing = false);
-    await _loadLedger();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.summaryMessage)),
-    );
-  }
-
-  Future<void> _refreshLedger() async {
-    await _pullInBackground(showFeedback: true);
-  }
-
   Future<void> _viewBill(LocalLedgerEntry entry) async {
     final bill = widget.loadBillOverride != null
         ? await widget.loadBillOverride!(entry.localId)
@@ -177,14 +145,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     }
   }
 
-  String _formatMoney(double value) {
-    return NumberFormat('#,##0.00').format(value);
-  }
+  String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
 
   String _formatDate(String value) {
     try {
-      final date = DateTime.parse(value);
-      return DateFormat('dd-MMM-yy').format(date);
+      return DateFormat('dd-MMM-yy').format(DateTime.parse(value));
     } catch (_) {
       return value;
     }
@@ -193,58 +158,57 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
-      appBar: widget.embeddedInDashboard
-          ? AppBar(
-              title: const Text(
-                'SALES LEDGER',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('SALES LEDGER'),
+        automaticallyImplyLeading: !widget.embeddedInDashboard,
+        actions: [
+          if (_pulling)
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-              backgroundColor: _navSurface,
-              foregroundColor: Colors.black,
-              automaticallyImplyLeading: false,
-              actions: _buildAppBarActions(),
-            )
-          : AppBar(
-              title: const Text(
-                'SALES LEDGER',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              backgroundColor: const Color(0xFFD5D8D5),
-              foregroundColor: Colors.black,
-              actions: _buildAppBarActions(),
             ),
+          IconButton(
+            onPressed: () => _pullInBackground(showFeedback: true),
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
               ? _buildEmptyState()
-              : Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final tableWidth = constraints.maxWidth > _tableMinWidth
-                            ? constraints.maxWidth
-                            : _tableMinWidth;
+              : CenteredContent(
+                  maxWidth: 1100,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final available = constraints.maxWidth;
+                      final tableWidth = available >= _tableMinWidth
+                          ? available
+                          : _tableMinWidth;
 
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: SizedBox(
-                              width: tableWidth,
-                              child: _buildTable(),
-                            ),
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          child: SizedBox(
+                            width: tableWidth,
+                            child: _buildTable(),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 
@@ -255,19 +219,24 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade600),
+            const Icon(Icons.receipt_long_outlined,
+                size: 48, color: AppColors.mutedBlue),
             const SizedBox(height: 16),
             Text(
               'No bills for ${widget.location}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: AppTextSizes.sectionHeader,
+                fontWeight: FontWeight.bold,
+                color: AppColors.navy,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               widget.readOnly
                   ? 'Use Sync → Sync Location to pull bills from the server, or tap Refresh above.'
-                  : 'Save bills on this device or tap Sync Now to push pending bills.',
-              style: const TextStyle(fontSize: 13),
+                  : 'Save bills on this device or open Sync to push pending bills.',
+              style: const TextStyle(fontSize: AppTextSizes.listSubtitle),
               textAlign: TextAlign.center,
             ),
           ],
@@ -276,44 +245,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
-  List<Widget> _buildAppBarActions() {
-    return [
-      if (_pulling)
-        const Padding(
-          padding: EdgeInsets.only(right: 4),
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      if (!widget.readOnly)
-        TextButton.icon(
-          onPressed: _pushing ? null : _syncNow,
-          icon: _pushing
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.cloud_upload_outlined, size: 18),
-          label: const Text('Sync Now'),
-        ),
-      IconButton(
-        onPressed: _refreshLedger,
-        icon: const Icon(Icons.refresh),
-        tooltip: 'Refresh',
-      ),
-    ];
-  }
-
   Widget _buildTable() {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        border: Border.all(color: _border),
-        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(6),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -327,7 +267,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   Widget _headerRow() {
     return Container(
-      color: _header,
+      color: AppColors.tableHeader,
       child: Row(
         children: [
           _cell('BILLNO', 70, bold: true),
@@ -369,7 +309,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Widget _summaryRow() {
     final summary = _summary!;
     return Container(
-      color: const Color(0xFFE8F4E8),
+      color: AppColors.headerBand,
       child: Row(
         children: [
           _cell('', 70, bold: true),
@@ -381,12 +321,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell(_formatMoney(summary.cgst), 70, bold: true, alignRight: true),
           _cell(_formatMoney(summary.sgst), 70, bold: true, alignRight: true),
           _cell(_formatMoney(summary.igst), 70, bold: true, alignRight: true),
-          _cell(
-            _formatMoney(summary.grandTotal),
-            90,
-            bold: true,
-            alignRight: true,
-          ),
+          _cell(_formatMoney(summary.grandTotal), 90,
+              bold: true, alignRight: true),
         ],
       ),
     );
@@ -402,10 +338,10 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           border: Border(
-            right: BorderSide(color: _border, width: 0.6),
-            bottom: BorderSide(color: _border, width: 0.6),
+            right: BorderSide(color: AppColors.border, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
         ),
         child: Text(
@@ -413,8 +349,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           textAlign: alignRight ? TextAlign.right : TextAlign.left,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: AppTextSizes.tableRowText,
             fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            color: AppColors.navy,
           ),
         ),
       ),
