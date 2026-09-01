@@ -82,17 +82,20 @@ class ManualSyncResult {
       return 'Sync failed: $error';
     }
 
+    final pushText = pushFailedCount > 0
+        ? '$pushedCount bills pushed, $pushFailedCount failed'
+        : '$pushedCount bills pushed';
+
     if (pullError != null) {
+      if (pushedCount > 0 || pushFailedCount > 0) {
+        return 'Partial sync: $pushText; pull failed: $pullError';
+      }
       return 'Sync failed: $pullError';
     }
 
     if (gstError != null && pushedCount == 0 && pulledCount == 0) {
       return 'Sync failed: $gstError';
     }
-
-    final pushText = pushFailedCount > 0
-        ? '$pushedCount bills pushed, $pushFailedCount failed'
-        : '$pushedCount bills pushed';
 
     if (!ok) {
       return 'Sync failed: $pushText — ${error ?? "unknown error"}';
