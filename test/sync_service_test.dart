@@ -246,4 +246,55 @@ void main() {
       expect(stillPending, isEmpty);
     });
   });
+
+  group('manualSync integration', () {
+    test('manualSync pushes pending bills without deadlock', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      await db.insertBill(_pendingBill(1));
+      await db.insertBill(_pendingBill(2));
+
+      final sync = SyncService.instance;
+      sync.isOnlineOverride = () async => true;
+      sync.saveBillOverride = (bill) async => SalesApiResult.success(bill.billNo);
+      sync.getBillUpdatesSinceOverride =
+          ({required location, required since}) async {
+        return SalesApiResult.success((
+          bills: <SaleBill>[],
+          serverTime: DateTime.now().toUtc(),
+        ));
+      };
+
+      final result = await sync.manualSync(_testLocationName);
+
+      expect(result.ok, isTrue);
+      expect(result.pushedCount, 2);
+      expect(result.pushFailedCount, 0);
+      expect(result.summaryMessage, contains('2 bills pushed'));
+
+      final stillPending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(stillPending, isEmpty);
+    });
+
+    test('manualSync surfaces pull errors', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      final sync = SyncService.instance;
+      sync.isOnlineOverride = () async => true;
+      sync.getBillUpdatesSinceOverride = ({required location, required since}) async {
+        return SalesApiResult.failure('Server error 503');
+      };
+
+      final result = await sync.manualSync(_testLocationName);
+
+      expect(result.ok, isFalse);
+      expect(result.pullError, contains('503'));
+      expect(result.summaryMessage, contains('Sync failed'));
+    });
+  });
 }
