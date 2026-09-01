@@ -133,6 +133,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     location: _ledgerLocation,
                     embeddedInDashboard: true,
                     readOnly: true,
+                    adminFullEdit: true,
                     refreshGeneration: _refreshGeneration,
                   ),
             ),
@@ -227,8 +228,10 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   );
 
   String _selectedLocationCode = 'win1';
-  bool _saving = false;
+  bool _savingGst = false;
+  bool _syncing = false;
   String? _message;
+  bool? _lastSyncOk;
 
   @override
   void dispose() {
@@ -247,8 +250,9 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
     }
 
     setState(() {
-      _saving = true;
+      _savingGst = true;
       _message = null;
+      _lastSyncOk = null;
     });
 
     final result = await SalesApi.updateGstConfig(
@@ -260,10 +264,11 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
     if (!mounted) return;
 
     setState(() {
-      _saving = false;
+      _savingGst = false;
       _message = result.ok
           ? 'GST config saved — staff will receive on next sync'
           : (result.error ?? 'Could not save GST config');
+      _lastSyncOk = result.ok;
     });
   }
 
@@ -272,8 +277,9 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
     if (!allowed || !mounted) return;
 
     setState(() {
-      _saving = true;
+      _syncing = true;
       _message = null;
+      _lastSyncOk = null;
     });
 
     final location = displayNameForLocationCode(_selectedLocationCode);
@@ -282,8 +288,9 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
     if (!mounted) return;
 
     setState(() {
-      _saving = false;
+      _syncing = false;
       _message = result.summaryMessage;
+      _lastSyncOk = result.ok;
     });
   }
 
@@ -324,7 +331,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                           ),
                         )
                         .toList(),
-                    onChanged: _saving
+                    onChanged: (_savingGst || _syncing)
                         ? null
                         : (value) {
                             if (value == null) return;
@@ -334,6 +341,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _cgstCtrl,
+                    enabled: !_savingGst && !_syncing,
                     decoration: const InputDecoration(
                       labelText: 'CGST %',
                       border: OutlineInputBorder(),
@@ -344,6 +352,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _sgstCtrl,
+                    enabled: !_savingGst && !_syncing,
                     decoration: const InputDecoration(
                       labelText: 'SGST %',
                       border: OutlineInputBorder(),
@@ -353,26 +362,38 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _saving ? null : _saveGstConfig,
+                    onPressed: (_savingGst || _syncing) ? null : _saveGstConfig,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF9C1C1C),
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(_saving ? 'SAVING...' : 'SAVE GST CONFIG'),
+                    child: Text(_savingGst ? 'SAVING...' : 'SAVE GST CONFIG'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     key: const Key('admin_sync_now_button'),
-                    onPressed: _saving ? null : _syncLocation,
-                    icon: const Icon(Icons.cloud_upload_outlined),
-                    label: const Text('SYNC LOCATION'),
+                    onPressed: (_savingGst || _syncing) ? null : _syncLocation,
+                    icon: _syncing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.cloud_upload_outlined),
+                    label: Text(_syncing ? 'SYNCING...' : 'SYNC LOCATION'),
                   ),
                   if (_message != null) ...[
                     const SizedBox(height: 16),
                     Text(
                       _message!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _lastSyncOk == false
+                            ? const Color(0xFF9C1C1C)
+                            : const Color(0xFF155724),
+                      ),
                     ),
                   ],
                 ],

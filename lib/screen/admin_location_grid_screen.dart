@@ -72,12 +72,12 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: GridView.count(
           crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.35,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.6,
           children: [
             for (final code in allLocationCodes)
               _locationCard(displayNameForLocationCode(code)),
@@ -96,25 +96,38 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         color: Colors.white,
         border: Border.all(color: _border),
       ),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             locationName,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 12),
-          const Text('Today — Total sales', style: TextStyle(fontSize: 12)),
-          Text(
-            _formatMoney(summary?.totalSaleAmount ?? 0),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Sales', style: TextStyle(fontSize: 11)),
+              ),
+              Text(
+                _formatMoney(summary?.totalSaleAmount ?? 0),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          const Text('Today — Total GST', style: TextStyle(fontSize: 12)),
-          Text(
-            _formatMoney(summary?.totalGst ?? 0),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('GST', style: TextStyle(fontSize: 11)),
+              ),
+              Text(
+                _formatMoney(summary?.totalGst ?? 0),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
         ],
       ),

@@ -12,6 +12,7 @@ class SalesLedgerScreen extends StatefulWidget {
   final bool autoRefreshOnOpen;
   final bool embeddedInDashboard;
   final bool readOnly;
+  final bool adminFullEdit;
   final int refreshGeneration;
 
   @visibleForTesting
@@ -30,6 +31,7 @@ class SalesLedgerScreen extends StatefulWidget {
     this.autoRefreshOnOpen = true,
     this.embeddedInDashboard = false,
     this.readOnly = false,
+    this.adminFullEdit = false,
     this.refreshGeneration = 0,
     this.loadLedgerOverride,
     this.loadBillOverride,
@@ -97,15 +99,27 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     });
   }
 
-  Future<void> _pullInBackground() async {
+  Future<void> _pullInBackground({bool showFeedback = false}) async {
     setState(() => _pulling = true);
 
-    await SyncService.instance.pullAdminUpdates(widget.location);
+    final result = await SyncService.instance.pullAdminUpdates(widget.location);
 
     if (!mounted) return;
 
     setState(() => _pulling = false);
     await _loadLedger();
+
+    if (!mounted || !showFeedback) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.ok
+              ? 'Pulled ${result.pulledCount} bill update(s) for ${widget.location}'
+              : 'Pull failed: ${result.error ?? "unknown error"}',
+        ),
+      ),
+    );
   }
 
   Future<void> _syncNow() async {
@@ -129,7 +143,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   Future<void> _refreshLedger() async {
-    await _pullInBackground();
+    await _pullInBackground(showFeedback: true);
   }
 
   Future<void> _viewBill(LocalLedgerEntry entry) async {
@@ -152,7 +166,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           bill: bill,
           localId: entry.localId,
           syncStatus: entry.syncStatus,
-          readOnly: widget.readOnly,
+          readOnly: widget.readOnly && !widget.adminFullEdit,
+          adminFullEdit: widget.adminFullEdit,
         ),
       ),
     );
@@ -201,7 +216,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
             ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : _entries.isEmpty
+              ? _buildEmptyState()
+              : Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -228,6 +245,34 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade600),
+            const SizedBox(height: 16),
+            Text(
+              'No bills for ${widget.location}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.readOnly
+                  ? 'Use Sync → Sync Location to pull bills from the server, or tap Refresh above.'
+                  : 'Save bills on this device or tap Sync Now to push pending bills.',
+              style: const TextStyle(fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

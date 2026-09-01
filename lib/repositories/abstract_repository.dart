@@ -4,7 +4,6 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
-import 'package:sales/config/app_config.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
 
@@ -92,23 +91,22 @@ class AbstractRepository {
   ) async {
     final locationName = displayNameForLocationCode(locationCode);
 
-    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
-      try {
-        final entries = await LocalDb.instance.getLedgerEntries(locationName);
-        return entries
-            .map(
-              (entry) => {
-                'bill_date': entry.billDate,
-                'total_amount': entry.totalAmount,
-                'total_cgst': entry.totalCgst,
-                'total_sgst': entry.totalSgst,
-                'total_igst': entry.totalIgst,
-              },
-            )
-            .toList(growable: false);
-      } catch (_) {
-        return const [];
-      }
+    try {
+      await LocalDb.instance.initialize();
+      final entries = await LocalDb.instance.getLedgerEntries(locationName);
+      return entries
+          .map(
+            (entry) => {
+              'bill_date': entry.billDate,
+              'total_amount': entry.totalAmount,
+              'total_cgst': entry.totalCgst,
+              'total_sgst': entry.totalSgst,
+              'total_igst': entry.totalIgst,
+            },
+          )
+          .toList(growable: false);
+    } catch (_) {
+      // Fall back to per-location DB file on staff tablets (legacy path).
     }
 
     final supportDir = await getApplicationSupportDirectory();

@@ -446,7 +446,11 @@ class LocalDb {
     );
   }
 
-  Future<void> updateSavedBill(String localId, SaleBill bill) async {
+  Future<void> updateSavedBill(
+    String localId,
+    SaleBill bill, {
+    String syncStatus = 'pending',
+  }) async {
     final db = await database;
     await db.update(
       'bills',
@@ -464,7 +468,7 @@ class LocalDb {
         'total_sgst': bill.totalSgst,
         'total_igst': bill.totalIgst,
         'grand_total': bill.grandTotal,
-        'sync_status': 'pending',
+        'sync_status': syncStatus,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       },
       where: 'local_id = ?',
