@@ -219,32 +219,32 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           : _entries.isEmpty
               ? _buildEmptyState()
               : Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final tableWidth = constraints.maxWidth > _tableMinWidth
-                            ? constraints.maxWidth
-                            : _tableMinWidth;
+                  padding: const EdgeInsets.all(12),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final tableWidth =
+                              constraints.maxWidth > _tableMinWidth
+                                  ? constraints.maxWidth
+                                  : _tableMinWidth;
 
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: SizedBox(
-                              width: tableWidth,
-                              child: _buildTable(),
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              child: SizedBox(
+                                width: tableWidth,
+                                child: _buildTable(),
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 

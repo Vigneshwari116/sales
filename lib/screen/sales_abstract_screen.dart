@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class SalesAbstractScreen extends StatefulWidget {
   final String location;
@@ -112,36 +113,6 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     return DateFormat('dd-MMM-yyyy').format(date);
   }
 
-  Widget _datePickerRow({
-    required String label,
-    required DateTime date,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_today, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              '$label: ${_formatDate(date)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,39 +127,39 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 520,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _datePickerRow(
-                    label: 'From Date',
-                    date: _fromDate,
+                  CompactDateField(
+                    label: 'From',
+                    valueText: _formatDate(_fromDate),
                     onTap: _pickFromDate,
                   ),
-                  const SizedBox(height: 10),
-                  _datePickerRow(
-                    label: 'To Date',
-                    date: _toDate,
+                  const SizedBox(height: 8),
+                  CompactDateField(
+                    label: 'To',
+                    valueText: _formatDate(_toDate),
                     onTap: _pickToDate,
                   ),
                   if (_dateRangeError != null) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
                       _dateRangeError!,
                       style: const TextStyle(
                         color: Colors.red,
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   _summaryRow(
                     'Total sales',
                     _formatMoney(_summary?.totalSaleAmount ?? 0),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _summaryRow(
                     'Total GST',
                     _formatMoney(_summary?.totalGst ?? 0),
@@ -201,7 +172,7 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
 
   Widget _summaryRow(String label, String value, {bool bold = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _border),
@@ -212,7 +183,7 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -220,8 +191,8 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
           Text(
             value,
             style: TextStyle(
-              fontSize: bold ? 18 : 14,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              fontSize: bold ? 16 : 13,
+              fontWeight: bold ? FontWeight.bold : FontWeight.w600,
             ),
           ),
         ],

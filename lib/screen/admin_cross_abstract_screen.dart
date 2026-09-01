@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Cross-location abstract totals for admin (all four locations combined).
 class AdminCrossAbstractScreen extends StatefulWidget {
@@ -105,33 +106,6 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
 
   String _formatDate(DateTime date) => DateFormat('dd-MMM-yyyy').format(date);
 
-  Widget _compactDateChip({
-    required String label,
-    required DateTime? date,
-    required VoidCallback onTap,
-  }) {
-    final text = date == null ? '—' : _formatDate(date);
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('$label ', style: const TextStyle(fontSize: 12)),
-            Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 4),
-            const Icon(Icons.calendar_today, size: 14),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final usingToday = _fromDate == null && _toDate == null;
@@ -149,31 +123,42 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 520,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
                     children: [
-                      _compactDateChip(
-                        label: 'From',
-                        date: _fromDate,
-                        onTap: _pickFromDate,
+                      Expanded(
+                        child: CompactDateField(
+                          label: 'From',
+                          valueText: _fromDate == null
+                              ? 'Today'
+                              : _formatDate(_fromDate!),
+                          onTap: _pickFromDate,
+                        ),
                       ),
-                      _compactDateChip(
-                        label: 'To',
-                        date: _toDate,
-                        onTap: _pickToDate,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: CompactDateField(
+                          label: 'To',
+                          valueText: _toDate == null
+                              ? 'Today'
+                              : _formatDate(_toDate!),
+                          onTap: _pickToDate,
+                        ),
                       ),
-                      if (!usingToday)
+                      if (!usingToday) ...[
+                        const SizedBox(width: 4),
                         TextButton(
                           onPressed: _clearRange,
-                          child: const Text('Today'),
+                          child: const Text(
+                            'Today',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
+                      ],
                     ],
                   ),
                   if (usingToday)
@@ -191,12 +176,12 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                       style: const TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   _summaryRow(
                     'Total sales',
                     _formatMoney(_summary?.totalSaleAmount ?? 0),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _summaryRow(
                     'Total GST',
                     _formatMoney(_summary?.totalGst ?? 0),
@@ -209,15 +194,18 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
 
   Widget _summaryRow(String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _border),
       ),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
