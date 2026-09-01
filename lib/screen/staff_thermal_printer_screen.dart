@@ -4,7 +4,7 @@ import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
-/// Staff-only thermal printer picker — live OS list, thermal devices only.
+/// Staff printer picker — live OS list of all installed printers.
 class StaffThermalPrinterScreen extends StatefulWidget {
   const StaffThermalPrinterScreen({super.key});
 
@@ -16,32 +16,10 @@ class StaffThermalPrinterScreen extends StatefulWidget {
 class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
   bool _loading = true;
   String? _error;
-  List<Printer> _thermalPrinters = [];
+  List<Printer> _printers = [];
   String? _selected;
   String? _saved;
   bool _saving = false;
-
-  static bool _isThermalPrinter(Printer printer) {
-    final name = printer.name.toLowerCase();
-    final url = printer.url.toLowerCase();
-    const thermalHints = [
-      'thermal',
-      'tvs',
-      'epson tm',
-      'star ',
-      'bixolon',
-      'pos-',
-      'receipt',
-      'rp 32',
-      'rp-32',
-    ];
-    for (final hint in thermalHints) {
-      if (name.contains(hint) || url.contains(hint)) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   @override
   void initState() {
@@ -57,16 +35,15 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
 
     try {
       final all = await Printing.listPrinters();
-      final thermal = all.where(_isThermalPrinter).toList();
       final saved =
           await PrinterSettingsService.getDefaultPrinter(PrinterType.thermal);
 
       if (!mounted) return;
 
       setState(() {
-        _thermalPrinters = thermal;
+        _printers = all;
         _saved = saved;
-        _selected = _matchSaved(saved, thermal);
+        _selected = _matchSaved(saved, all);
         _loading = false;
       });
     } catch (e) {
@@ -92,7 +69,7 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
   Future<void> _save() async {
     if (_selected == null || _selected!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a thermal printer first')),
+        const SnackBar(content: Text('Select a printer first')),
       );
       return;
     }
@@ -108,7 +85,7 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
       _saved = _selected;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Thermal printer saved: $_selected')),
+      SnackBar(content: Text('Printer saved: $_selected')),
     );
   }
 
@@ -117,7 +94,7 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: sectionHeaderAppBar(
-        'THERMAL PRINTER',
+        'PRINTER',
         actions: [
           IconButton(
             tooltip: 'Refresh printer list',
@@ -134,8 +111,8 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Installed thermal printers on this computer (live OS list). '
-                    'A4 and fast printers are not shown here.',
+                    'All printers installed on this computer (live OS list). '
+                    'Select the printer you want to use for bills and receipts.',
                     style: TextStyle(fontSize: AppTextSizes.listSubtitle),
                   ),
                   if (_error != null) ...[
@@ -147,14 +124,14 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
                   ],
                   const SizedBox(height: 12),
                   Expanded(
-                    child: _thermalPrinters.isEmpty
+                    child: _printers.isEmpty
                         ? const Center(
-                            child: Text('No thermal printers detected.'),
+                            child: Text('No printers detected on this system.'),
                           )
                         : ListView.builder(
-                            itemCount: _thermalPrinters.length,
+                            itemCount: _printers.length,
                             itemBuilder: (context, index) {
-                              final printer = _thermalPrinters[index];
+                              final printer = _printers[index];
                               final key = printer.url.isNotEmpty
                                   ? printer.url
                                   : printer.name;
