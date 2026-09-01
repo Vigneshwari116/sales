@@ -53,14 +53,16 @@ class AppTheme {
         background: AppColors.background,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.navy,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         centerTitle: true,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.navy),
+        actionsIconTheme: IconThemeData(color: AppColors.navy),
         titleTextStyle: TextStyle(
           fontSize: AppTextSizes.appBarTitle,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: AppColors.navy,
         ),
       ),
       textTheme: const TextTheme(

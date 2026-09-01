@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/repositories/abstract_repository.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Admin main view: today's totals per location in a compact grid.
 class AdminLocationGridScreen extends StatefulWidget {
@@ -53,17 +54,8 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'DASHBOARD',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
+      appBar: sectionHeaderAppBar(
+        'DASHBOARD',
         actions: [
           IconButton(
             onPressed: _load,
@@ -78,7 +70,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           crossAxisCount: 2,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: 2.6,
+          childAspectRatio: 4.0,
           children: [
             for (final code in allLocationCodes)
               _locationCard(displayNameForLocationCode(code)),
@@ -97,20 +89,20 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         color: AppColors.cardWhite,
         border: Border.all(color: AppColors.border),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Text(
             locationName,
             style: const TextStyle(
-              fontSize: AppTextSizes.fieldText,
+              fontSize: AppTextSizes.listTitle,
               fontWeight: FontWeight.bold,
               color: AppColors.navy,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             children: [
               const Expanded(

@@ -8,6 +8,7 @@ import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Drill-down for a saved bill — password-gated edit for staff.
 class LedgerBillDetailScreen extends StatefulWidget {
@@ -196,16 +197,8 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(
-          'BILL ${_bill.billNo}',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
+      appBar: sectionHeaderAppBar(
+        'BILL ${_bill.billNo}',
         actions: [
           if (_editUnlocked)
             TextButton(

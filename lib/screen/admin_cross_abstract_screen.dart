@@ -69,15 +69,6 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
     _loadSummary();
   }
 
-  void _showAllHistory() {
-    final now = DateTime.now();
-    setState(() {
-      _fromDate = DateTime(2020, 1, 1);
-      _toDate = now;
-    });
-    _loadSummary();
-  }
-
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
 
   @override
@@ -111,10 +102,6 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                       OutlinedButton(
                         onPressed: _setToday,
                         child: const Text('TODAY'),
-                      ),
-                      OutlinedButton(
-                        onPressed: _showAllHistory,
-                        child: const Text('SHOW ALL HISTORY'),
                       ),
                     ],
                   ),
