@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:sales/services/printer_settings_service.dart';
+import 'package:sales/theme/app_theme.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({super.key});
@@ -10,10 +11,6 @@ class PrinterSettingsScreen extends StatefulWidget {
 }
 
 class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _border = Color(0xFF888888);
-  static const Color _header = Color(0xFFFFF5C5);
-
   bool _loading = true;
   String? _error;
   List<Printer> _printers = [];
@@ -110,14 +107,17 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'PRINTER SETTINGS',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         actions: [
           IconButton(
             onPressed: _loading ? null : _loadPrinters,
@@ -138,7 +138,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: AppColors.danger),
                       ),
                     ),
                   Expanded(
@@ -165,18 +165,21 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _border),
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            color: _header,
+            color: AppColors.tableHeader,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               type.settingsTitle,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: AppTextSizes.listTitle,
+              ),
             ),
           ),
           Padding(
@@ -189,7 +192,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       ? 'Current: $saved'
                       : 'No ${type.label.toLowerCase()} printer selected',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: AppTextSizes.listTitle,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -197,7 +200,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 if (_printers.isEmpty)
                   const Text(
                     'No printers found on this system.',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: AppTextSizes.listTitle),
                   )
                 else
                   ..._printers.map((printer) {
@@ -213,12 +216,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       },
                       title: Text(
                         _printerLabel(printer),
-                        style: const TextStyle(fontSize: 13),
+                        style: const TextStyle(fontSize: AppTextSizes.fieldText),
                       ),
                       subtitle: printer.url.isNotEmpty
                           ? Text(
                               printer.url,
-                              style: const TextStyle(fontSize: 10),
+                              style: const TextStyle(
+                                fontSize: AppTextSizes.listSubtitle,
+                              ),
                             )
                           : null,
                     );
@@ -227,7 +232,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 ElevatedButton(
                   onPressed: saving ? null : () => _saveSelection(type),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9D1717),
+                    backgroundColor: AppColors.navy,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),

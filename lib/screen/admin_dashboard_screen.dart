@@ -11,6 +11,7 @@ import 'package:sales/services/sync_service.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/services/gst_config_service.dart';
+import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 
 enum _AdminSection {
@@ -20,7 +21,7 @@ enum _AdminSection {
   sync,
 }
 
-/// Admin shell with collapsible green sidebar (icon-only or icon + label row).
+/// Admin shell with collapsible navy sidebar (icon-only or icon + label row).
 class AdminDashboardScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
@@ -35,11 +36,9 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-
   _AdminSection _selectedSection = _AdminSection.dashboard;
   String _ledgerLocation = displayNameForLocationCode('win1');
-  bool _sidebarExpanded = true;
+  bool _sidebarExpanded = false;
   int _refreshGeneration = 0;
 
   int get _selectedIndex => _selectedSection.index;
@@ -161,14 +160,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('admin_dashboard_shell'),
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       body: Row(
         children: [
           CollapsibleSidebar(
             key: const Key('admin_collapsible_sidebar'),
             expanded: _sidebarExpanded,
             onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
-            backgroundColor: _background,
             header: _sidebarExpanded
                 ? const Padding(
                     padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -178,13 +176,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Text(
                           'Admin',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: AppTextSizes.appBarTitle,
                             fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                         Text(
                           'All locations',
-                          style: TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: AppTextSizes.listSubtitle,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -196,6 +198,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 key: const Key('admin_nav_logout'),
                 tooltip: _sidebarExpanded ? null : 'LOGOUT',
                 onPressed: _logout,
+                color: Colors.white,
                 icon: const Icon(Icons.logout),
               ),
             ),
@@ -217,9 +220,6 @@ class _AdminSyncPanel extends StatefulWidget {
 }
 
 class _AdminSyncPanelState extends State<_AdminSyncPanel> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-
   final _cgstCtrl = TextEditingController(
     text: GstConfigService.defaultCgstPct.toString(),
   );
@@ -297,14 +297,14 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'SYNC & GST CONFIG',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppTextSizes.appBarTitle),
         ),
-        backgroundColor: _navSurface,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
       ),
       body: Center(
@@ -364,7 +364,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                   ElevatedButton(
                     onPressed: (_savingGst || _syncing) ? null : _saveGstConfig,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF9C1C1C),
+                      backgroundColor: AppColors.navy,
                       foregroundColor: Colors.white,
                     ),
                     child: Text(_savingGst ? 'SAVING...' : 'SAVE GST CONFIG'),
@@ -388,11 +388,11 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                       _message!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: AppTextSizes.sectionHeader,
                         fontWeight: FontWeight.w600,
                         color: _lastSyncOk == false
-                            ? const Color(0xFF9C1C1C)
-                            : const Color(0xFF155724),
+                            ? AppColors.danger
+                            : AppColors.success,
                       ),
                     ),
                   ],

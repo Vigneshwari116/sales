@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/theme/app_theme.dart';
 
 /// Admin main view: today's totals per location in a compact grid.
 class AdminLocationGridScreen extends StatefulWidget {
@@ -13,9 +14,6 @@ class AdminLocationGridScreen extends StatefulWidget {
 }
 
 class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _border = Color(0xFF888888);
-
   Map<String, AbstractSummary> _todayByLocation = {
     for (final code in allLocationCodes)
       displayNameForLocationCode(code): AbstractSummary.zero(),
@@ -54,14 +52,17 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'DASHBOARD',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -93,8 +94,8 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _border),
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Column(
@@ -103,17 +104,28 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         children: [
           Text(
             locationName,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: AppTextSizes.fieldText,
+              fontWeight: FontWeight.bold,
+              color: AppColors.navy,
+            ),
           ),
           const SizedBox(height: 6),
           Row(
             children: [
               const Expanded(
-                child: Text('Sales', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  'Sales',
+                  style: TextStyle(fontSize: AppTextSizes.listSubtitle),
+                ),
               ),
               Text(
                 _formatMoney(summary?.totalSaleAmount ?? 0),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: AppTextSizes.fieldText,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.navy,
+                ),
               ),
             ],
           ),
@@ -121,11 +133,18 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           Row(
             children: [
               const Expanded(
-                child: Text('GST', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  'GST',
+                  style: TextStyle(fontSize: AppTextSizes.listSubtitle),
+                ),
               ),
               Text(
                 _formatMoney(summary?.totalGst ?? 0),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: AppTextSizes.listTitle,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.navy,
+                ),
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/theme/app_theme.dart';
 
 /// Staff view: today's sales totals for the logged-in location (LocalDb).
 class StaffSalesDashboardScreen extends StatefulWidget {
@@ -19,10 +20,6 @@ class StaffSalesDashboardScreen extends StatefulWidget {
 }
 
 class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _border = Color(0xFF888888);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-
   bool _loading = true;
   AbstractSummary? _todaySummary;
 
@@ -64,14 +61,17 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'TODAY\'S SALES',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: _navSurface,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -91,14 +91,15 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
                   Text(
                     widget.location,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: AppTextSizes.statNumber,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.navy,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     DateFormat('EEEE, dd MMM yyyy').format(DateTime.now()),
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(fontSize: AppTextSizes.listTitle),
                   ),
                   const SizedBox(height: 20),
                   _summaryCard(
@@ -120,19 +121,23 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _border),
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 14)),
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: AppTextSizes.fieldText),
+            ),
           ),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: AppTextSizes.statNumber,
               fontWeight: FontWeight.bold,
+              color: AppColors.navy,
             ),
           ),
         ],

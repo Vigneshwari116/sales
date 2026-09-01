@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:sales/services/printer_settings_service.dart';
+import 'package:sales/theme/app_theme.dart';
 
 /// Staff-only thermal printer picker — live OS list, thermal devices only.
 class StaffThermalPrinterScreen extends StatefulWidget {
@@ -12,8 +13,6 @@ class StaffThermalPrinterScreen extends StatefulWidget {
 }
 
 class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-
   bool _loading = true;
   String? _error;
   List<Printer> _thermalPrinters = [];
@@ -115,14 +114,17 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'THERMAL PRINTER',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppTextSizes.appBarTitle,
+          ),
         ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -142,11 +144,14 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
                   const Text(
                     'Installed thermal printers on this computer (live OS list). '
                     'A4 and fast printers are not shown here.',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: AppTextSizes.listSubtitle),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
-                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
                   ],
                   const SizedBox(height: 12),
                   Expanded(
@@ -164,8 +169,12 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
                               return RadioListTile<String>(
                                 title: Text(printer.name),
                                 subtitle: printer.url.isNotEmpty
-                                    ? Text(printer.url,
-                                        style: const TextStyle(fontSize: 11))
+                                    ? Text(
+                                        printer.url,
+                                        style: const TextStyle(
+                                          fontSize: AppTextSizes.listSubtitle,
+                                        ),
+                                      )
                                     : null,
                                 value: key,
                                 groupValue: _selected,
@@ -178,14 +187,17 @@ class _StaffThermalPrinterScreenState extends State<StaffThermalPrinterScreen> {
                   ),
                   if (_saved != null) ...[
                     const SizedBox(height: 8),
-                    Text('Current: $_saved', style: const TextStyle(fontSize: 12)),
+                    Text(
+                      'Current: $_saved',
+                      style: const TextStyle(fontSize: AppTextSizes.listSubtitle),
+                    ),
                   ],
                   const SizedBox(height: 8),
                   ElevatedButton(
                     key: const Key('staff_save_thermal_printer'),
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF9C1C1C),
+                      backgroundColor: AppColors.navy,
                       foregroundColor: Colors.white,
                     ),
                     child: Text(_saving ? 'SAVING...' : 'SAVE PRINTER'),

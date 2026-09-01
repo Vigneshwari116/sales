@@ -10,6 +10,7 @@ import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 
 enum _StaffSection {
@@ -21,7 +22,7 @@ enum _StaffSection {
   sync,
 }
 
-/// Staff shell with collapsible green sidebar (icon-only or icon + label row).
+/// Staff shell with collapsible navy sidebar (icon-only or icon + label row).
 class StaffDashboardScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
@@ -36,10 +37,8 @@ class StaffDashboardScreen extends StatefulWidget {
 }
 
 class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
-  static const Color _background = Color(0xFFC5F6C5);
-
   _StaffSection _selectedSection = _StaffSection.bill;
-  bool _sidebarExpanded = true;
+  bool _sidebarExpanded = false;
   int _refreshGeneration = 0;
 
   String get _location => AppConfig.displayLocationName;
@@ -153,14 +152,13 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('staff_dashboard_shell'),
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       body: Row(
         children: [
           CollapsibleSidebar(
             key: const Key('staff_collapsible_sidebar'),
             expanded: _sidebarExpanded,
             onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
-            backgroundColor: _background,
             header: _sidebarExpanded
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -170,13 +168,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                         const Text(
                           'Sales',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: AppTextSizes.appBarTitle,
                             fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                         Text(
                           _location,
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(
+                            fontSize: AppTextSizes.listSubtitle,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -188,6 +190,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                 key: const Key('staff_nav_logout'),
                 tooltip: _sidebarExpanded ? null : 'LOGOUT',
                 onPressed: _logout,
+                color: Colors.white,
                 icon: const Icon(Icons.logout),
               ),
             ),
@@ -209,9 +212,6 @@ class _StaffSyncPanel extends StatefulWidget {
 }
 
 class _StaffSyncPanelState extends State<_StaffSyncPanel> {
-  static const Color _background = Color(0xFFC5F6C5);
-  static const Color _navSurface = Color(0xFFE8F5E8);
-
   bool _syncing = false;
   String? _message;
   bool? _lastSyncOk;
@@ -242,14 +242,14 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'SYNC',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppTextSizes.appBarTitle),
         ),
-        backgroundColor: _navSurface,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.headerBand,
+        foregroundColor: AppColors.navy,
         automaticallyImplyLeading: false,
       ),
       body: Center(
@@ -265,7 +265,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                   const Text(
                     'Push pending bills and pull admin updates.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: AppTextSizes.fieldText),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
@@ -282,7 +282,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                           : const Icon(Icons.cloud_upload_outlined),
                       label: Text(_syncing ? 'SYNCING...' : 'SYNC NOW'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9C1C1C),
+                        backgroundColor: AppColors.navy,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -293,11 +293,11 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                       _message!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: AppTextSizes.sectionHeader,
                         fontWeight: FontWeight.w600,
                         color: _lastSyncOk == false
-                            ? const Color(0xFF9C1C1C)
-                            : const Color(0xFF155724),
+                            ? AppColors.danger
+                            : AppColors.success,
                       ),
                     ),
                   ],

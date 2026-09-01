@@ -9,6 +9,7 @@ import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/staff_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
+import 'package:sales/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +31,7 @@ class SalesBillApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sales Bill',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
+      theme: AppTheme.theme,
       home: const AppRoot(),
     );
   }
@@ -81,7 +82,7 @@ class _AppRootState extends State<AppRoot> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
-            backgroundColor: Color(0xFFC6F5C6),
+            backgroundColor: AppColors.background,
             body: Center(child: CircularProgressIndicator()),
           );
         }
