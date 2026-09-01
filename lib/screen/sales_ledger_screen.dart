@@ -6,6 +6,7 @@ import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
@@ -219,32 +220,32 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           : _entries.isEmpty
               ? _buildEmptyState()
               : Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final tableWidth = constraints.maxWidth > _tableMinWidth
-                            ? constraints.maxWidth
-                            : _tableMinWidth;
+                  padding: const EdgeInsets.all(12),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final tableWidth =
+                              constraints.maxWidth > _tableMinWidth
+                                  ? constraints.maxWidth
+                                  : _tableMinWidth;
 
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: SizedBox(
-                              width: tableWidth,
-                              child: _buildTable(),
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              child: SizedBox(
+                                width: tableWidth,
+                                child: _buildTable(),
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 

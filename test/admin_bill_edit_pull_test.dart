@@ -14,6 +14,8 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/sync_service.dart';
 
+import 'test_guards.dart';
+
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
@@ -64,6 +66,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    enableProductionNetworkGuard();
     tempDir = await Directory.systemTemp.createTemp('admin_edit_pull_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     SharedPreferences.setMockInitialValues({});
@@ -72,6 +75,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    disableProductionNetworkGuard();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }

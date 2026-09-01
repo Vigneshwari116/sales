@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Staff view: today's sales totals for the logged-in location (LocalDb).
 class StaffSalesDashboardScreen extends StatefulWidget {
@@ -83,29 +84,29 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 520,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     widget.location,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     DateFormat('EEEE, dd MMM yyyy').format(DateTime.now()),
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(fontSize: 12),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   _summaryCard(
                     'Total sales today',
                     _formatMoney(_todaySummary?.totalSaleAmount ?? 0),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _summaryCard(
                     'Total GST today',
                     _formatMoney(_todaySummary?.totalGst ?? 0),
@@ -118,7 +119,7 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
 
   Widget _summaryCard(String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _border),
@@ -126,12 +127,12 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 14)),
+            child: Text(label, style: const TextStyle(fontSize: 13)),
           ),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
           ),

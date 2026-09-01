@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/widgets/compact_layout.dart';
 
 /// Admin main view: today's totals per location in a compact grid.
 class AdminLocationGridScreen extends StatefulWidget {
@@ -71,13 +72,16 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           ),
         ],
       ),
-      body: Padding(
+      body: CenteredContent(
+        maxWidth: 640,
         padding: const EdgeInsets.all(12),
         child: GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: 2.6,
+          childAspectRatio: 2.8,
           children: [
             for (final code in allLocationCodes)
               _locationCard(displayNameForLocationCode(code)),
@@ -103,9 +107,9 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         children: [
           Text(
             locationName,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             children: [
               const Expanded(
@@ -113,11 +117,11 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
               ),
               Text(
                 _formatMoney(summary?.totalSaleAmount ?? 0),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Row(
             children: [
               const Expanded(
@@ -125,7 +129,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
               ),
               Text(
                 _formatMoney(summary?.totalGst ?? 0),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ],
           ),

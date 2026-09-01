@@ -17,6 +17,15 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/sync_service.dart';
 
+import 'test_guards.dart';
+
+/// Sync pull-fallback coverage using [MockClient] only.
+///
+/// IMPORTANT: This file must never call the live VPS. Production rows such as
+/// "E2E Sync Customer" / "SyncProbe" were created by ad-hoc curl probes during
+/// debugging — not by this test. The production-network guard below will throw
+/// if a request ever escapes to the real host.
+
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
@@ -181,6 +190,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    enableProductionNetworkGuard();
     tempDir =
         await Directory.systemTemp.createTemp('sync_e2e_invalid_billno_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
@@ -190,6 +200,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    disableProductionNetworkGuard();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }

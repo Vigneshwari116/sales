@@ -85,7 +85,21 @@ class SalesApi {
   @visibleForTesting
   static http.Client? clientOverride;
 
-  static http.Client get _client => clientOverride ?? http.Client();
+  /// When true, any request to the baked-in production host is refused unless
+  /// [clientOverride] is set. Enable in Flutter tests so a missing mock can
+  /// never hit the live VPS.
+  @visibleForTesting
+  static bool forbidProductionHost = false;
+
+  static http.Client get _client {
+    if (clientOverride != null) {
+      return clientOverride!;
+    }
+    if (forbidProductionHost) {
+      return _ProductionBlockedClient();
+    }
+    return http.Client();
+  }
 
   @visibleForTesting
   static void resetClientOverride() {
@@ -442,5 +456,21 @@ class SalesApi {
   /// Returns true when [serverDbName] matches this build's expected GST DB.
   static bool isGstDbNameValid(String serverDbName) {
     return serverDbName == AppConfig.expectedGstDbName;
+  }
+}
+
+/// Blocks accidental live VPS calls from Flutter tests.
+class _ProductionBlockedClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    final host = request.url.host;
+    final productionHost = Uri.parse(salesBillApiBaseUrl).host;
+    if (host == productionHost || host == '187.127.180.135') {
+      throw StateError(
+        'Refusing live API call to $host during tests. '
+        'Set SalesApi.clientOverride to a MockClient instead.',
+      );
+    }
+    return http.Client().send(request);
   }
 }
