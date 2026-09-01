@@ -6,7 +6,6 @@ import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
-import 'package:sales/widgets/compact_layout.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
