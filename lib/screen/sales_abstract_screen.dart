@@ -84,15 +84,6 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
     _loadSummary();
   }
 
-  void _showAllHistory() {
-    final now = DateTime.now();
-    setState(() {
-      _fromDate = DateTime(2020, 1, 1);
-      _toDate = now;
-    });
-    _loadSummary();
-  }
-
   String _formatMoney(double value) {
     return NumberFormat('#,##0.00').format(value);
   }
@@ -101,24 +92,13 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'SALES ABSTRACT',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
-      ),
+      appBar: sectionHeaderAppBar('SALES ABSTRACT'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : CenteredContent(
               maxWidth: 1100,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Wrap(
                     spacing: 8,
@@ -140,10 +120,6 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                         onPressed: _setToday,
                         child: const Text('TODAY'),
                       ),
-                      OutlinedButton(
-                        onPressed: _showAllHistory,
-                        child: const Text('SHOW ALL HISTORY'),
-                      ),
                     ],
                   ),
                   if (_dateRangeError != null) ...[
@@ -157,51 +133,15 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  _summaryRow(
-                    'Total sales',
-                    _formatMoney(_summary?.totalSaleAmount ?? 0),
-                  ),
-                  const SizedBox(height: 10),
-                  _summaryRow(
-                    'Total GST',
-                    _formatMoney(_summary?.totalGst ?? 0),
+                  const SizedBox(height: 16),
+                  CompactAbstractSummary(
+                    totalSalesValue:
+                        _formatMoney(_summary?.totalSaleAmount ?? 0),
+                    totalGstValue: _formatMoney(_summary?.totalGst ?? 0),
                   ),
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {bool bold = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: AppTextSizes.fieldText,
-                fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                color: AppColors.navy,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: bold ? AppTextSizes.statNumber : AppTextSizes.fieldText,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: AppColors.navy,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

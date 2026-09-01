@@ -843,38 +843,103 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   Widget _buildDesktopBody() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-      child: Column(
-        children: [
-          _buildTopArea(),
-          const SizedBox(height: 6),
-          Expanded(child: _buildMainArea()),
-        ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTopArea(),
+                const SizedBox(height: 6),
+                Center(child: _buildRateQtyAmount()),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildItemTable(),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 300),
+                            child: _buildTotals(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _buildSaveSaleBar(),
+      ],
+    );
+  }
+
+  Widget _buildSaveSaleBar() {
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: ElevatedButton(
+          key: const Key('save_sale_bar_button'),
+          onPressed: _saveBill,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.navy,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: const RoundedRectangleBorder(),
+            textStyle: const TextStyle(
+              fontSize: AppTextSizes.buttonText,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          child: const Text('SAVE SALE'),
+        ),
       ),
     );
   }
 
   Widget _buildMobileBody(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildBillDetails(mobile: true),
-          const SizedBox(height: 8),
-          _buildCustomerDetails(),
-          const SizedBox(height: 10),
-          _buildRateQtyAmount(mobile: true),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.28,
-            child: _buildItemTable(mobile: true),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildBillDetails(mobile: true),
+                const SizedBox(height: 8),
+                _buildCustomerDetails(),
+                const SizedBox(height: 10),
+                _buildRateQtyAmount(mobile: true),
+                const SizedBox(height: 10),
+                _buildItemTable(mobile: true),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    child: _buildTotals(),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          _buildTotals(pinToBottom: false),
-        ],
-      ),
+        ),
+        _buildSaveSaleBar(),
+      ],
     );
   }
 
@@ -1119,77 +1184,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           ),
 
           const SizedBox(height: 4),
-
-          _buildButtons(mobile: mobile),
         ],
       ),
-    );
-  }
-
-  // ============================================================
-  // BUTTONS
-  // ============================================================
-
-  Widget _buildButtons({bool mobile = false}) {
-    final buttonHeight = mobile ? 32.0 : 25.0;
-    final fontSize = mobile ? 10.0 : 8.5;
-    final horizontalPadding = mobile ? 10.0 : 7.0;
-
-    Widget button(
-        String text,
-        VoidCallback onPressed,
-        ) {
-      return SizedBox(
-        height: buttonHeight,
-
-        child: ElevatedButton(
-          onPressed: onPressed,
-
-          style:
-          ElevatedButton.styleFrom(
-            backgroundColor: AppColors.navy,
-
-            foregroundColor:
-            Colors.white,
-
-            padding:
-            EdgeInsets
-                .symmetric(
-              horizontal: horizontalPadding,
-            ),
-
-            minimumSize:
-            Size(0, buttonHeight),
-
-            shape:
-            RoundedRectangleBorder(
-              borderRadius:
-              BorderRadius.circular(
-                mobile ? 4 : 2,
-              ),
-            ),
-          ),
-
-          child: Text(
-            text,
-            style:
-            TextStyle(
-              fontSize: fontSize,
-              fontWeight:
-              FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Wrap(
-      spacing: mobile ? 4 : 2,
-      runSpacing: mobile ? 4 : 2,
-      alignment: mobile ? WrapAlignment.center : WrapAlignment.start,
-      children: [
-        button('SAVE', _saveBill),
-      ],
     );
   }
 
@@ -1520,39 +1516,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // MAIN AREA
-  // ============================================================
-
-  Widget _buildMainArea() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 6,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Center(
-                  child: _buildRateQtyAmount(),
-                ),
-              ),
-              Expanded(
-                child: _buildItemTable(),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: SizedBox(
-            width: 185,
-            child: _buildTotals(),
-          ),
-        ),
-      ],
-    );
-  }  // ============================================================
   // ITEM TABLE
   //
   // BEFORE ITEM:
@@ -1566,47 +1529,40 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
   Widget _buildItemTable({bool mobile = false}) {
     final bool showTax = _items.isNotEmpty;
-    const double mobileTableWidth = 624;
+    const double tableWidth = 624;
 
-    Widget table = Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        color: AppColors.background,
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        children: [
-          _buildTableHeader(showTax),
-          Expanded(
-            child: _items.isEmpty
-                ? ColoredBox(color: AppColors.background)
-                : ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      return _buildTableRow(index, showTax);
-                    },
-                  ),
-          ),
-        ],
+    Widget table = SizedBox(
+      width: tableWidth,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          color: AppColors.background,
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTableHeader(showTax),
+            if (_items.isNotEmpty)
+              ...List.generate(
+                _items.length,
+                (index) => _buildTableRow(index, showTax),
+              ),
+          ],
+        ),
       ),
     );
 
     if (!mobile) {
-      return table;
+      return Align(
+        alignment: Alignment.topLeft,
+        child: table,
+      );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: mobileTableWidth,
-            height: constraints.maxHeight,
-            child: table,
-          ),
-        );
-      },
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: table,
     );
   }  // ============================================================
   // TABLE HEADER
@@ -1769,63 +1725,64 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // TOTALS
   // ============================================================
 
-  Widget _buildTotals({bool pinToBottom = true}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (pinToBottom) const Spacer(),
-        _totalField('', _format(_totalQty)),
-        const SizedBox(height: 3),
-        _totalField('Total Amt', _format(_totalAmount)),
-        const SizedBox(height: 3),
-        _totalField('CGST', _format(_totalCgst)),
-        const SizedBox(height: 3),
-        _totalField('SGST', _format(_totalSgst)),
-        const SizedBox(height: 3),
-        _totalField('IGST', _format(_totalIgst)),
-        const SizedBox(height: 8),
-        const Text(
-          'Grand Total',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 2),
-        SizedBox(
-          height: 60,
-          child: Container(
-            color: Colors.white,
+  Widget _buildTotals() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _totalField('', _format(_totalQty)),
+          const SizedBox(height: 2),
+          _totalField('Total Amt', _format(_totalAmount)),
+          const SizedBox(height: 2),
+          _totalField('CGST', _format(_totalCgst)),
+          const SizedBox(height: 2),
+          _totalField('SGST', _format(_totalSgst)),
+          const SizedBox(height: 2),
+          _totalField('IGST', _format(_totalIgst)),
+          const SizedBox(height: 6),
+          const Text(
+            'Grand Total',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Container(
+            color: AppColors.headerBand,
             alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Text(
               _format(_grandTotal),
               style: const TextStyle(
-                fontSize: 26,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
+                color: AppColors.navy,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 3),
-        SizedBox(
-          height: 28,
-          child: Container(
-            color: Colors.white,
+          const SizedBox(height: 4),
+          Container(
             alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Text(
-                amountInWords(_grandTotal),
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              amountInWords(_grandTotal),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: AppColors.mutedBlue,
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1838,7 +1795,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       String value,
       ) {
     return SizedBox(
-      height: 36,
+      height: 28,
 
       child: Row(
         children: [

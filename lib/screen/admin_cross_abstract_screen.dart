@@ -84,24 +84,13 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'ABSTRACT (ALL LOCATIONS)',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppTextSizes.appBarTitle,
-          ),
-        ),
-        backgroundColor: AppColors.headerBand,
-        foregroundColor: AppColors.navy,
-        automaticallyImplyLeading: false,
-      ),
+      appBar: sectionHeaderAppBar('ABSTRACT (ALL LOCATIONS)'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : CenteredContent(
               maxWidth: 1100,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Wrap(
                     spacing: 8,
@@ -139,50 +128,15 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  _summaryRow(
-                    'Total sales',
-                    _formatMoney(_summary?.totalSaleAmount ?? 0),
-                  ),
-                  const SizedBox(height: 10),
-                  _summaryRow(
-                    'Total GST',
-                    _formatMoney(_summary?.totalGst ?? 0),
+                  const SizedBox(height: 16),
+                  CompactAbstractSummary(
+                    totalSalesValue:
+                        _formatMoney(_summary?.totalSaleAmount ?? 0),
+                    totalGstValue: _formatMoney(_summary?.totalGst ?? 0),
                   ),
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: AppTextSizes.fieldText,
-                color: AppColors.navy,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: AppTextSizes.statNumber,
-              fontWeight: FontWeight.w600,
-              color: AppColors.navy,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

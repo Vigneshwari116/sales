@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_date_range_picker.dart';
 
-/// Compact date-range trigger — opens a from/to picker popup.
+/// Compact date-range trigger — opens a small from/to calendar popup.
 class DateRangeButton extends StatelessWidget {
   final DateTime fromDate;
   final DateTime toDate;
@@ -17,21 +18,10 @@ class DateRangeButton extends StatelessWidget {
   });
 
   Future<void> _pick(BuildContext context) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      initialDateRange: DateTimeRange(start: fromDate, end: toDate),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppColors.navy,
-                ),
-          ),
-          child: child!,
-        );
-      },
+    final picked = await showCompactDateRangePicker(
+      context,
+      fromDate: fromDate,
+      toDate: toDate,
     );
 
     if (picked == null) return;
@@ -61,8 +51,6 @@ class DateRangeButton extends StatelessWidget {
 }
 
 /// Centers [child] at an explicit width capped by [maxWidth].
-/// Using a fixed [SizedBox] width (not only maxWidth) is required so the
-/// panel does not shrink/left-align and leave dead space on wide screens.
 class CenteredContent extends StatelessWidget {
   final Widget child;
   final double maxWidth;
@@ -90,6 +78,92 @@ class CenteredContent extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Light header band app bar used inside staff/admin dashboard sections.
+PreferredSizeWidget sectionHeaderAppBar(String title) {
+  return AppBar(
+    title: Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: AppTextSizes.appBarTitle,
+        color: AppColors.navy,
+      ),
+    ),
+    backgroundColor: AppColors.headerBand,
+    foregroundColor: AppColors.navy,
+    iconTheme: const IconThemeData(color: AppColors.navy),
+    automaticallyImplyLeading: false,
+  );
+}
+
+/// Small dashboard-style stat cards for abstract totals.
+class CompactAbstractSummary extends StatelessWidget {
+  final String totalSalesLabel;
+  final String totalSalesValue;
+  final String totalGstLabel;
+  final String totalGstValue;
+
+  const CompactAbstractSummary({
+    super.key,
+    this.totalSalesLabel = 'Total sales',
+    this.totalGstLabel = 'Total GST',
+    required this.totalSalesValue,
+    required this.totalGstValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          _statCard(totalSalesLabel, totalSalesValue),
+          _statCard(totalGstLabel, totalGstValue),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value) {
+    return Container(
+      width: 190,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: AppTextSizes.listSubtitle,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedBlue,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: AppTextSizes.statNumber,
+              fontWeight: FontWeight.w700,
+              color: AppColors.navy,
+              height: 1.1,
+            ),
+          ),
+        ],
       ),
     );
   }
