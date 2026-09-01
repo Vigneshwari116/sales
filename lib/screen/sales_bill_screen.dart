@@ -560,7 +560,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         _busy = false;
       });
       _showMessage(
-        'No thermal printer selected. Please choose one in Printer Settings.',
+        'No printer selected. Please choose one in Printer Settings.',
       );
     } else {
       try {
