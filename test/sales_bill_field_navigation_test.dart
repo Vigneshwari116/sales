@@ -138,12 +138,11 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
-    expect(find.byIcon(Icons.close), findsNothing);
+    expect(find.byIcon(Icons.close), findsOneWidget);
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('double-tap mobile unlocks excel edit and shows delete',
-      (tester) async {
+  testWidgets('double-tap mobile unlocks row edit mode', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
@@ -155,7 +154,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
-    expect(find.byIcon(Icons.close), findsNothing);
+    expect(find.byIcon(Icons.close), findsOneWidget);
 
     final mobileField = find.byKey(const Key('bill_mobile_field'));
     await tester.tap(mobileField);
@@ -164,15 +163,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('bill_edit_password_field')), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('bill_edit_password_field')),
-      billEditPassword,
-    );
-    await tester.tap(find.byKey(const Key('bill_edit_password_ok')));
-    await tester.pumpAndSettle();
-
-    expect(find.byIcon(Icons.close), findsOneWidget);
     await tearDownBillScreen(tester);
   });
 

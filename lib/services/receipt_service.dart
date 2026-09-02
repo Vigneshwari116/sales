@@ -3,7 +3,7 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 
 class ReceiptService {
-  static const String businessName = 'R K S ENTERPRIISES';
+  static const String businessName = 'R K S ENTERPRISES';
   static const String businessAddress =
       '47/3/4, 2nd Cross KUDULU MAIN ROAD, Bangalore-68';
   static const String gstin = '29FNIPS8082N1ZS';
