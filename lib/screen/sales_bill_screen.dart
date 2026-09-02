@@ -943,26 +943,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   Widget _buildSaveSaleBar() {
-    return SizedBox(
-      width: double.infinity,
-      height: 38,
-      child: ElevatedButton(
-        key: const Key('save_sale_bar_button'),
-        onPressed: _saveBill,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.navy,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: const RoundedRectangleBorder(),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          textStyle: const TextStyle(
-            fontSize: AppTextSizes.buttonText,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-          ),
-        ),
-        child: const Text('SAVE SALE'),
-      ),
+    return CompactSaveButton(
+      buttonKey: const Key('save_sale_bar_button'),
+      label: 'SAVE SALE',
+      onPressed: _saveBill,
     );
   }
 

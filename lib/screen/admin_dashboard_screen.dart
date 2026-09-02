@@ -8,9 +8,7 @@ import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
-import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
-import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -221,57 +219,10 @@ class _AdminSyncPanel extends StatefulWidget {
 }
 
 class _AdminSyncPanelState extends State<_AdminSyncPanel> {
-  final _cgstCtrl = TextEditingController(
-    text: GstConfigService.defaultCgstPct.toString(),
-  );
-  final _sgstCtrl = TextEditingController(
-    text: GstConfigService.defaultSgstPct.toString(),
-  );
-
   String _selectedLocationCode = 'win1';
-  bool _savingGst = false;
   bool _syncing = false;
   String? _message;
   bool? _lastSyncOk;
-
-  @override
-  void dispose() {
-    _cgstCtrl.dispose();
-    _sgstCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveGstConfig() async {
-    final cgst = double.tryParse(_cgstCtrl.text.trim());
-    final sgst = double.tryParse(_sgstCtrl.text.trim());
-
-    if (cgst == null || sgst == null) {
-      setState(() => _message = 'Enter valid GST percentages');
-      return;
-    }
-
-    setState(() {
-      _savingGst = true;
-      _message = null;
-      _lastSyncOk = null;
-    });
-
-    final result = await SalesApi.updateGstConfig(
-      locationCode: _selectedLocationCode,
-      cgstPct: cgst,
-      sgstPct: sgst,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _savingGst = false;
-      _message = result.ok
-          ? 'GST config saved — staff will receive on next sync'
-          : (result.error ?? 'Could not save GST config');
-      _lastSyncOk = result.ok;
-    });
-  }
 
   Future<void> _syncLocation() async {
     final allowed = await SyncGateService.confirmSync(context);
@@ -299,24 +250,24 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: sectionHeaderAppBar(
-        'SYNC & GST CONFIG',
-      ),
+      appBar: sectionHeaderAppBar('SYNC'),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
+          constraints: const BoxConstraints(maxWidth: 320),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
                     value: _selectedLocationCode,
+                    isDense: true,
                     decoration: const InputDecoration(
                       labelText: 'Location',
                       border: OutlineInputBorder(),
+                      isDense: true,
                     ),
                     items: allLocationCodes
                         .map(
@@ -326,7 +277,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                           ),
                         )
                         .toList(),
-                    onChanged: (_savingGst || _syncing)
+                    onChanged: _syncing
                         ? null
                         : (value) {
                             if (value == null) return;
@@ -334,47 +285,24 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                           },
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _cgstCtrl,
-                    enabled: !_savingGst && !_syncing,
-                    decoration: const InputDecoration(
-                      labelText: 'CGST %',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _sgstCtrl,
-                    enabled: !_savingGst && !_syncing,
-                    decoration: const InputDecoration(
-                      labelText: 'SGST %',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: (_savingGst || _syncing) ? null : _saveGstConfig,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.navy,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(_savingGst ? 'SAVING...' : 'SAVE GST CONFIG'),
-                  ),
-                  const SizedBox(height: 12),
                   OutlinedButton.icon(
                     key: const Key('admin_sync_now_button'),
-                    onPressed: (_savingGst || _syncing) ? null : _syncLocation,
+                    onPressed: _syncing ? null : _syncLocation,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      minimumSize: const Size(0, 34),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     icon: _syncing
                         ? const SizedBox(
-                            width: 18,
-                            height: 18,
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.cloud_upload_outlined),
+                        : const Icon(Icons.cloud_upload_outlined, size: 18),
                     label: Text(_syncing ? 'SYNCING...' : 'SYNC LOCATION'),
                   ),
                   if (_message != null) ...[
