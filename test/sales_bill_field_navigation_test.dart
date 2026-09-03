@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -123,36 +124,75 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate advances to qty; enter on qty adds item',
-      (tester) async {
+  testWidgets('enter on rate saves single-item bill with qty 1', (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '777');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    final stored = await LocalDb.instance.getBillByNumber(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+    );
+    expect(stored, isNotNull);
+    expect(stored!.bill.items.single.rate, 777);
+    expect(stored.bill.items.single.qty, 1);
+
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('enter on qty saves bill with custom qty', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
     await tester.enterText(rateField, '100');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
-    await tester.pump();
-
-    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
-
+    await tester.tap(qtyField);
     await tester.enterText(qtyField, '2');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    final stored = await LocalDb.instance.getBillByNumber(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+    );
+    expect(stored, isNotNull);
+    expect(stored!.bill.items.single.qty, 2);
+
     await tearDownBillScreen(tester);
   });
 
   testWidgets('double-tap mobile unlocks row edit mode', (tester) async {
-    await pumpBillScreen(tester);
+    await SessionService.saveBillSession(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+      billDate: DateTime.now(),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 2, rate: 100)],
+      billSaved: false,
+    );
 
-    await tester.tap(rateField);
-    await tester.enterText(rateField, '100');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
-    await tester.pump();
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SalesBillScreen(),
+      ),
+    );
 
-    await tester.enterText(qtyField, '2');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pump();
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
     expect(find.byIcon(Icons.close), findsOneWidget);
 
@@ -166,11 +206,56 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
+  testWidgets('enter on rate prints existing bill in table without replacing lines',
+      (tester) async {
+    await SessionService.saveBillSession(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+      billDate: DateTime.now(),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 4, rate: 23)],
+      billSaved: false,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SalesBillScreen(initialBillNo: 1),
+      ),
+    );
+
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '777');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    final stored = await LocalDb.instance.getBillByNumber(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+    );
+    expect(stored, isNotNull);
+    expect(stored!.bill.items.single.rate, 23);
+    expect(stored.bill.items.single.qty, 4);
+
+    await tearDownBillScreen(tester);
+  });
+
   testWidgets('invalid rate shows inline error below field', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.enterText(rateField, '0');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
     expect(find.text('Rate must be greater than 0'), findsOneWidget);

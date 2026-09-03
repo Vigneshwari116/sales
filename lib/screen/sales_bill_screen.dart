@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -417,15 +419,20 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // RATE ENTER
+  // RATE / QTY ENTER — save & print
   // ============================================================
 
   void _rateSubmitted() {
+    if (_items.isNotEmpty) {
+      unawaited(_saveBill());
+      return;
+    }
+
     if (!_validateRate()) {
       return;
     }
 
-    _focusQty();
+    unawaited(_quickSaveAndPrintFromRate());
   }
 
   void _qtySubmitted() {
@@ -433,7 +440,45 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    _addItem();
+    if (_items.isNotEmpty) {
+      _addItem();
+      return;
+    }
+
+    unawaited(_quickSaveAndPrintFromRate(
+      qty: double.parse(_qtyController.text.trim()),
+    ));
+  }
+
+  Future<void> _quickSaveAndPrintFromRate({double qty = 1}) async {
+    if (_busy) return;
+
+    if (!_validateRate(focusOnError: false)) {
+      return;
+    }
+
+    final rate = double.parse(_rateController.text.trim());
+
+    setState(() {
+      _clearEntryErrors();
+      _items
+        ..clear()
+        ..add(
+          BillItem(
+            qty: qty,
+            rate: rate,
+            cgstPct: _cgstPct,
+            sgstPct: _sgstPct,
+            igstPct: 0,
+          ),
+        );
+      _qtyController.text = qty == qty.roundToDouble()
+          ? qty.toInt().toString()
+          : qty.toString();
+      _updateAmountDisplay();
+    });
+
+    await _saveBill();
   }
 
   void _addItem() {
@@ -1578,7 +1623,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 onChanged: _rateChanged,
                 onSubmitted: _rateSubmitted,
                 blockTabTraversal: true,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
                 fieldKey: const Key('bill_rate_field'),
               ),
               _buildInlineEntryField(
@@ -1609,7 +1654,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 onChanged: _rateChanged,
                 onSubmitted: _rateSubmitted,
                 blockTabTraversal: true,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
                 fieldKey: const Key('bill_rate_field'),
               ),
               const SizedBox(width: 14),
