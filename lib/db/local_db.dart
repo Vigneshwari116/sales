@@ -403,6 +403,30 @@ class LocalDb {
     return insertBill(bill, syncStatus: 'pending');
   }
 
+  /// Inserts a new bill or updates an existing row for the same bill number.
+  Future<String> persistBill(
+    SaleBill bill, {
+    String? updateLocalId,
+    required String syncStatus,
+  }) async {
+    if (updateLocalId != null) {
+      await updateSavedBill(updateLocalId, bill, syncStatus: syncStatus);
+      return updateLocalId;
+    }
+
+    final existingId = await findLocalIdByBillNo(
+      location: bill.location,
+      billNo: bill.billNo,
+    );
+
+    if (existingId != null) {
+      await updateSavedBill(existingId, bill, syncStatus: syncStatus);
+      return existingId;
+    }
+
+    return insertBill(bill, syncStatus: syncStatus);
+  }
+
   Future<String> insertSavedBill(
     SaleBill bill, {
     required String syncStatus,

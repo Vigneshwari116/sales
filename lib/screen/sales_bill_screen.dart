@@ -518,87 +518,84 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     setState(() => _busy = true);
 
-    final bill = _buildCurrentBill();
-    final result = await BillRepository.saveBill(
-      bill,
-      updateLocalId: _currentBillLocalId,
-    );
-
-    if (!mounted) return;
-
-    if (!result.ok) {
-      setState(() => _busy = false);
-      _showMessage(result.error ?? 'Failed to save bill');
-      return;
-    }
-
-    _currentBillLocalId = await LocalDb.instance.findLocalIdByBillNo(
-          location: _selectedLocation,
-          billNo: _billNo,
-        ) ??
-        _currentBillLocalId;
-
-    final int savedBillNo = _billNo;
-
     try {
-      await BillPrintService.saveReceiptToDesktop(bill);
-    } catch (_) {
-      // Desktop save is best-effort; bill is already persisted locally.
-    }
+      final bill = _buildCurrentBill();
+      final result = await BillRepository.saveBill(
+        bill,
+        updateLocalId: _currentBillLocalId,
+      );
 
-    final defaultPrinter = await PrinterSettingsService.getDefaultPrinter(
-      PrinterType.thermal,
-    );
-
-    if (defaultPrinter == null || defaultPrinter.isEmpty) {
       if (!mounted) return;
+
+      if (!result.ok) {
+        _showMessage(result.error ?? 'Failed to save bill');
+        return;
+      }
+
+      try {
+        _currentBillLocalId = await LocalDb.instance.findLocalIdByBillNo(
+              location: _selectedLocation,
+              billNo: _billNo,
+            ) ??
+            _currentBillLocalId;
+      } catch (_) {
+        // Bill is saved; local id lookup is best-effort.
+      }
+
+      final int savedBillNo = _billNo;
+
+      try {
+        await BillPrintService.saveReceiptToDesktop(bill);
+      } catch (_) {
+        // Desktop save is best-effort; bill is already persisted locally.
+      }
+
+      final defaultPrinter = await PrinterSettingsService.getDefaultPrinter(
+        PrinterType.thermal,
+      );
+
+      if (defaultPrinter == null || defaultPrinter.isEmpty) {
+        _showMessage(
+          'No printer selected. Please choose one in Printer Settings.',
+        );
+      } else {
+        try {
+          await BillPrintService.printReceipt(
+            bill,
+            printerName: defaultPrinter,
+            type: PrinterType.thermal,
+          );
+          _showMessage('Bill $savedBillNo saved and printed');
+        } catch (e) {
+          _showMessage('Bill $savedBillNo saved (print failed: $e)');
+        }
+      }
+
+      if (!mounted) return;
+
+      await _loadBillNumber();
+
+      if (!mounted) return;
+
       setState(() {
         _billSaved = true;
-        _busy = false;
+        _clearCurrentBill();
       });
-      _showMessage(
-        'No printer selected. Please choose one in Printer Settings.',
-      );
-    } else {
-      try {
-        await BillPrintService.printReceipt(
-          bill,
-          printerName: defaultPrinter,
-          type: PrinterType.thermal,
-        );
-        if (!mounted) return;
-        setState(() {
-          _billSaved = true;
-          _busy = false;
-        });
-        _showMessage('Bill $savedBillNo saved and printed');
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _billSaved = true;
-          _busy = false;
-        });
-        _showMessage('Bill $savedBillNo saved (print failed: $e)');
+
+      await _persistSession();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusRate();
+      });
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Save failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
       }
     }
-
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    if (!mounted) return;
-
-    await _loadBillNumber();
-
-    if (!mounted) return;
-
-    setState(() {
-      _clearCurrentBill();
-    });
-
-    _persistSession();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusRate();
-    });
   }
 
   void _openLedger() {
