@@ -162,13 +162,13 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                   ],
                   const SizedBox(height: 12),
                   CompactAbstractSummary(
-                    totalValue: _formatMoney(
+                    amountValue:
+                        _formatMoney(_summary?.totalSaleAmount ?? 0),
+                    gstValue: _formatMoney(_summary?.totalGst ?? 0),
+                    grandTotalValue: _formatMoney(
                       (_summary?.totalSaleAmount ?? 0) +
                           (_summary?.totalGst ?? 0),
                     ),
-                    gstValue: _formatMoney(_summary?.totalGst ?? 0),
-                    totalSalesValue:
-                        _formatMoney(_summary?.totalSaleAmount ?? 0),
                   ),
                 ],
               ),
