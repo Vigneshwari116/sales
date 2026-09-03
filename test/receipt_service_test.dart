@@ -37,9 +37,10 @@ void main() {
     );
     expect(lines.any((line) => line.startsWith('SNO')), isTrue);
     expect(lines.any((line) => line.contains('GRAND TOTAL')), isTrue);
+    expect(text, contains('Bangalore-68'));
   });
 
-  test('receipt shows taxable amount and 5% gst split on inclusive bill', () {
+  test('receipt shows value, subtotal, gst and grand total clearly', () {
     final item = BillItem(qty: 12, rate: 12);
     final bill = SaleBill(
       billNo: 8,
@@ -59,14 +60,47 @@ void main() {
 
     final text = ReceiptService.buildReceiptText(bill);
 
+    expect(item.grossAmt, 144);
     expect(item.amount, 137);
     expect(item.cgst, 3.5);
     expect(item.sgst, 3.5);
     expect(item.netAmt, 144);
+    expect(text, contains('144.00'));
+    expect(text, contains('SUBTOTAL'));
     expect(text, contains('137.00'));
     expect(text, contains('CGST'));
     expect(text, contains('3.50'));
     expect(text, contains('GRAND TOTAL'));
-    expect(text, contains('144.00'));
+  });
+
+  test('receipt shows large bill amounts without mixing subtotal and grand total',
+      () {
+    final item = BillItem(qty: 67, rate: 45);
+    final bill = SaleBill(
+      billNo: 1,
+      location: 'Win1',
+      billDate: DateTime(2026, 9, 3),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [item],
+      totalQty: 67,
+      totalAmount: item.amount,
+      totalCgst: item.cgst,
+      totalSgst: item.sgst,
+      totalIgst: 0,
+      grandTotal: item.netAmt,
+    );
+
+    final text = ReceiptService.buildReceiptText(bill);
+
+    expect(item.grossAmt, 3015);
+    expect(item.amount, 2871);
+    expect(item.cgst, 72);
+    expect(item.sgst, 72);
+    expect(text, contains('3015.00'));
+    expect(text, contains('2871.00'));
+    expect(text, contains('SUBTOTAL'));
+    expect(text, contains('GRAND TOTAL'));
   });
 }

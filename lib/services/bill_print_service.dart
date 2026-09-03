@@ -68,19 +68,19 @@ class BillPrintService {
     final doc = pw.Document();
     final style = pw.TextStyle(
       font: pw.Font.courierBold(),
-      fontSize: type == PrinterType.thermal ? 8.5 : 9,
-      lineSpacing: 1.05,
+      fontSize: type == PrinterType.thermal ? 7.2 : 8,
+      lineSpacing: 1.1,
       color: PdfColors.black,
     );
 
     final lines = text.split('\n');
     final lineCount = lines.length;
-    final heightMm = (lineCount * 3.6 + 6).clamp(85.0, 420.0);
+    final heightMm = (lineCount * 3.8 + 8).clamp(90.0, 420.0);
     final pageFormat = PdfPageFormat(
-      80 * PdfPageFormat.mm,
+      88 * PdfPageFormat.mm,
       heightMm * PdfPageFormat.mm,
-      marginLeft: 4 * PdfPageFormat.mm,
-      marginRight: 4 * PdfPageFormat.mm,
+      marginLeft: 3 * PdfPageFormat.mm,
+      marginRight: 3 * PdfPageFormat.mm,
       marginTop: 3 * PdfPageFormat.mm,
       marginBottom: 3 * PdfPageFormat.mm,
     );
@@ -89,14 +89,21 @@ class BillPrintService {
       pw.Page(
         pageFormat: pageFormat,
         build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
             for (final line in lines)
-              pw.Text(
-                line,
-                style: style,
-                maxLines: 1,
-                softWrap: false,
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 0.5),
+                child: pw.FittedBox(
+                  alignment: pw.Alignment.centerLeft,
+                  fit: pw.BoxFit.scaleDown,
+                  child: pw.Text(
+                    line,
+                    style: style,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ),
               ),
           ],
         ),
