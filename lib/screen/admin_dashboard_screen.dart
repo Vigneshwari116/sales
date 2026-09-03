@@ -45,7 +45,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _selectSection(_AdminSection section) {
     setState(() {
       _selectedSection = section;
-      if (section == _AdminSection.ledger) {
+      if (section == _AdminSection.ledger ||
+          section == _AdminSection.dashboard) {
         _refreshGeneration++;
       }
     });
@@ -93,7 +94,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildSectionBody() {
     switch (_selectedSection) {
       case _AdminSection.dashboard:
-        return const AdminLocationGridScreen();
+        return AdminLocationGridScreen(
+          key: ValueKey('admin_grid_$_refreshGeneration'),
+          refreshGeneration: _refreshGeneration,
+        );
       case _AdminSection.abstract:
         return const AdminCrossAbstractScreen();
       case _AdminSection.ledger:
@@ -138,7 +142,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         );
       case _AdminSection.sync:
-        return const _AdminSyncPanel();
+        return _AdminSyncPanel(
+          onSyncComplete: () => setState(() => _refreshGeneration++),
+        );
     }
   }
 
@@ -212,7 +218,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 class _AdminSyncPanel extends StatefulWidget {
-  const _AdminSyncPanel();
+  final VoidCallback? onSyncComplete;
+
+  const _AdminSyncPanel({this.onSyncComplete});
 
   @override
   State<_AdminSyncPanel> createState() => _AdminSyncPanelState();
@@ -244,6 +252,10 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
       _message = result.summaryMessage;
       _lastSyncOk = result.ok;
     });
+
+    if (result.ok) {
+      widget.onSyncComplete?.call();
+    }
   }
 
   @override

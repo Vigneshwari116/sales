@@ -125,6 +125,8 @@ void main() {
 
     expect(find.byKey(const Key('admin_collapsible_sidebar')), findsOneWidget);
     expect(find.byKey(const Key('admin_location_card_win1')), findsOneWidget);
+    expect(find.byKey(const Key('admin_last_synced_win1')), findsOneWidget);
+    expect(find.text('Not synced'), findsWidgets);
   });
 
   testWidgets('sidebar hamburger toggles expanded/collapsed', (tester) async {
