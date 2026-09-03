@@ -100,7 +100,8 @@ class LedgerPdfService {
               'DATE',
               'NAME',
               'MOBILE',
-              'PAY',
+              'CASH',
+              'CARD/UPI',
               'TOTAL',
               'GST',
               'GRAND TOTAL',
@@ -112,7 +113,8 @@ class LedgerPdfService {
                   _formatDate(entry.date),
                   entry.customerName,
                   entry.mobile.isEmpty ? '—' : entry.mobile,
-                  _formatPay(entry.paymentMode),
+                  _cashColumnAmount(entry),
+                  _cardColumnAmount(entry),
                   money.format(entry.total),
                   money.format(entry.cgst + entry.sgst + entry.igst),
                   money.format(entry.grandTotal),
@@ -122,7 +124,8 @@ class LedgerPdfService {
                 '',
                 '',
                 '',
-                'TOTAL',
+                money.format(_cashTotal(entries)),
+                money.format(_cardTotal(entries)),
                 money.format(summary.total),
                 money.format(summary.cgst + summary.sgst + summary.igst),
                 money.format(summary.grandTotal),
@@ -160,7 +163,33 @@ class LedgerPdfService {
     return 'CARD/UPI';
   }
 
-  static String _formatPay(String mode) => formatPayMode(mode);
+  static bool _isCashPayment(String mode) => mode.toUpperCase() == 'CASH';
+
+  static String _cashColumnAmount(LocalLedgerEntry entry) {
+    if (!_isCashPayment(entry.paymentMode)) {
+      return '';
+    }
+    return NumberFormat('#,##0.00').format(entry.grandTotal);
+  }
+
+  static String _cardColumnAmount(LocalLedgerEntry entry) {
+    if (_isCashPayment(entry.paymentMode)) {
+      return '';
+    }
+    return NumberFormat('#,##0.00').format(entry.grandTotal);
+  }
+
+  static double _cashTotal(List<LocalLedgerEntry> entries) {
+    return entries
+        .where((entry) => _isCashPayment(entry.paymentMode))
+        .fold(0.0, (sum, entry) => sum + entry.grandTotal);
+  }
+
+  static double _cardTotal(List<LocalLedgerEntry> entries) {
+    return entries
+        .where((entry) => !_isCashPayment(entry.paymentMode))
+        .fold(0.0, (sum, entry) => sum + entry.grandTotal);
+  }
 
   static Future<String> _saveDirectory() async {
     if (!kIsWeb && Platform.isWindows) {
