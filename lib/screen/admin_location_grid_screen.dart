@@ -66,15 +66,16 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(12),
-        child: GridView.count(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 4.0,
-          children: [
-            for (final code in allLocationCodes)
-              _locationCard(displayNameForLocationCode(code)),
-          ],
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final code in allLocationCodes)
+                _locationCard(displayNameForLocationCode(code)),
+            ],
+          ),
         ),
       ),
     );
@@ -85,14 +86,16 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
 
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
+      width: 148,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
         border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(4),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             locationName,
@@ -107,34 +110,15 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Sales',
-                  style: TextStyle(fontSize: AppTextSizes.listSubtitle),
+                  'Sales today',
+                  style: TextStyle(fontSize: 10),
                 ),
               ),
               Text(
                 _formatMoney(summary?.totalSaleAmount ?? 0),
                 style: const TextStyle(
-                  fontSize: AppTextSizes.fieldText,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.navy,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'GST',
-                  style: TextStyle(fontSize: AppTextSizes.listSubtitle),
-                ),
-              ),
-              Text(
-                _formatMoney(summary?.totalGst ?? 0),
-                style: const TextStyle(
                   fontSize: AppTextSizes.listTitle,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.navy,
                 ),
               ),

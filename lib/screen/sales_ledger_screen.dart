@@ -268,6 +268,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
+  bool get _hideTaxColumns => widget.embeddedInDashboard;
+
   Widget _headerRow() {
     return Container(
       color: AppColors.tableHeader,
@@ -279,9 +281,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('MOBILE', flex: 11, bold: true),
           _cell('PAY', flex: 7, bold: true),
           _cell('TOTAL', flex: 8, bold: true, alignRight: true),
-          _cell('CGST', flex: 7, bold: true, alignRight: true),
-          _cell('SGST', flex: 7, bold: true, alignRight: true),
-          _cell('IGST', flex: 7, bold: true, alignRight: true),
+          if (!_hideTaxColumns) ...[
+            _cell('CGST', flex: 7, bold: true, alignRight: true),
+            _cell('SGST', flex: 7, bold: true, alignRight: true),
+            _cell('IGST', flex: 7, bold: true, alignRight: true),
+          ],
           _cell('GRAND TOTAL', flex: 9, bold: true, alignRight: true),
         ],
       ),
@@ -300,9 +304,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell(entry.mobile.isEmpty ? '—' : entry.mobile, flex: 11),
           _cell(entry.paymentMode, flex: 7),
           _cell(_formatMoney(entry.total), flex: 8, alignRight: true),
-          _cell(_formatMoney(entry.cgst), flex: 7, alignRight: true),
-          _cell(_formatMoney(entry.sgst), flex: 7, alignRight: true),
-          _cell(_formatMoney(entry.igst), flex: 7, alignRight: true),
+          if (!_hideTaxColumns) ...[
+            _cell(_formatMoney(entry.cgst), flex: 7, alignRight: true),
+            _cell(_formatMoney(entry.sgst), flex: 7, alignRight: true),
+            _cell(_formatMoney(entry.igst), flex: 7, alignRight: true),
+          ],
           _cell(_formatMoney(entry.grandTotal), flex: 9, alignRight: true),
         ],
       ),
@@ -322,12 +328,14 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('', flex: 7, bold: true),
           _cell(_formatMoney(summary.total),
               flex: 8, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst),
-              flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst),
-              flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst),
-              flex: 7, bold: true, alignRight: true),
+          if (!_hideTaxColumns) ...[
+            _cell(_formatMoney(summary.cgst),
+                flex: 7, bold: true, alignRight: true),
+            _cell(_formatMoney(summary.sgst),
+                flex: 7, bold: true, alignRight: true),
+            _cell(_formatMoney(summary.igst),
+                flex: 7, bold: true, alignRight: true),
+          ],
           _cell(_formatMoney(summary.grandTotal),
               flex: 9, bold: true, alignRight: true),
         ],

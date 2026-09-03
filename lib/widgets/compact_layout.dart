@@ -109,19 +109,62 @@ PreferredSizeWidget sectionHeaderAppBar(
   );
 }
 
+/// Compact primary action button used on bill and admin screens.
+class CompactSaveButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final Key? buttonKey;
+
+  const CompactSaveButton({
+    super.key,
+    this.buttonKey,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: 148,
+        height: 34,
+        child: ElevatedButton(
+          key: buttonKey,
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.navy,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            minimumSize: const Size(0, 34),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: const TextStyle(
+              fontSize: AppTextSizes.buttonText,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+          child: Text(label),
+        ),
+      ),
+    );
+  }
+}
+
 /// Small dashboard-style stat cards for abstract totals.
 class CompactAbstractSummary extends StatelessWidget {
   final String totalSalesLabel;
   final String totalSalesValue;
-  final String totalGstLabel;
-  final String totalGstValue;
+  final String? totalGstLabel;
+  final String? totalGstValue;
 
   const CompactAbstractSummary({
     super.key,
     this.totalSalesLabel = 'Total sales',
     this.totalGstLabel = 'Total GST',
     required this.totalSalesValue,
-    required this.totalGstValue,
+    this.totalGstValue,
   });
 
   @override
@@ -133,7 +176,8 @@ class CompactAbstractSummary extends StatelessWidget {
         runSpacing: 10,
         children: [
           _statCard(totalSalesLabel, totalSalesValue),
-          _statCard(totalGstLabel, totalGstValue),
+          if (totalGstLabel != null && totalGstValue != null)
+            _statCard(totalGstLabel!, totalGstValue!),
         ],
       ),
     );

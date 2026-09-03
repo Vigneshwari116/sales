@@ -68,32 +68,28 @@ class BillPrintService {
     final doc = pw.Document();
     final style = pw.TextStyle(
       font: pw.Font.courier(),
-      fontSize: type == PrinterType.thermal ? 8 : 10,
-      lineSpacing: 1.2,
+      fontSize: type == PrinterType.thermal ? 8 : 9,
+      lineSpacing: 1.15,
     );
 
-    final PdfPageFormat pageFormat;
-    if (type == PrinterType.thermal) {
-      final lineCount = text.split('\n').length;
-      final heightMm = (lineCount * 4.2 + 12).clamp(100.0, 600.0);
-      pageFormat = PdfPageFormat(
-        80 * PdfPageFormat.mm,
-        heightMm * PdfPageFormat.mm,
-        marginAll: 4 * PdfPageFormat.mm,
-      );
-    } else {
-      pageFormat = PdfPageFormat.a4.copyWith(
-        marginTop: 12 * PdfPageFormat.mm,
-        marginBottom: 12 * PdfPageFormat.mm,
-        marginLeft: 12 * PdfPageFormat.mm,
-        marginRight: 12 * PdfPageFormat.mm,
-      );
-    }
+    final lines = text.split('\n');
+    final lineCount = lines.length;
+    final heightMm = (lineCount * 3.8 + 8).clamp(90.0, 420.0);
+    final pageFormat = PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      heightMm * PdfPageFormat.mm,
+      marginAll: 3 * PdfPageFormat.mm,
+    );
 
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
-        build: (context) => pw.Text(text, style: style),
+        build: (context) => pw.Center(
+          child: pw.SizedBox(
+            width: 72 * PdfPageFormat.mm,
+            child: pw.Text(text, style: style),
+          ),
+        ),
       ),
     );
 

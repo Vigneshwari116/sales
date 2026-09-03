@@ -50,8 +50,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   static const Color billNoColor = Color(0xFF7FE8E8);
-  static const double _entryBoxWidth = 100;
-  static const double _entryBoxHeight = 42;
+  static const double _entryBoxWidth = 92;
+  static const double _entryBoxHeight = 38;
+  static const double _entryLabelSize = 13.0;
   static const double _desktopBreakpoint = 900;
   static const double _sidebarBreakpoint = 700;
   static const double _sidebarWidth = 200;
@@ -459,10 +460,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   void _removeItem(int index) {
-    if (!_editUnlocked) {
-      return;
-    }
-
     setState(() {
       _items.removeAt(index);
 
@@ -929,44 +926,27 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               children: [
                 _buildTopArea(),
                 const SizedBox(height: 6),
-                Center(child: _buildRateQtyAmount()),
+                _buildRateQtyAmount(),
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.topLeft,
                   child: _buildItemTableSection(),
                 ),
+                const SizedBox(height: 8),
+                _buildSaveSaleBar(),
               ],
             ),
           ),
         ),
-        _buildSaveSaleBar(),
       ],
     );
   }
 
   Widget _buildSaveSaleBar() {
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        width: double.infinity,
-        height: 46,
-        child: ElevatedButton(
-          key: const Key('save_sale_bar_button'),
-          onPressed: _saveBill,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.navy,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: const RoundedRectangleBorder(),
-            textStyle: const TextStyle(
-              fontSize: AppTextSizes.buttonText,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-            ),
-          ),
-          child: const Text('SAVE SALE'),
-        ),
-      ),
+    return CompactSaveButton(
+      buttonKey: const Key('save_sale_bar_button'),
+      label: 'SAVE SALE',
+      onPressed: _saveBill,
     );
   }
 
@@ -976,22 +956,24 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildBillDetails(mobile: true),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _buildCustomerDetails(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 _buildRateQtyAmount(mobile: true),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 _buildItemTableSection(mobile: true),
+                const SizedBox(height: 8),
+                _buildSaveSaleBar(),
               ],
             ),
           ),
         ),
-        _buildSaveSaleBar(),
       ],
     );
   }
@@ -1043,15 +1025,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 4,
+        SizedBox(
+          width: 300,
           child: _buildBillDetails(),
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          flex: 6,
-          child: _buildCustomerDetails(),
-        ),
+        const SizedBox(width: 8),
+        _buildCustomerDetails(),
       ],
     );
   }
@@ -1202,33 +1181,24 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               ),
 
               InkWell(
-                onTap: _selectDate,
-
+                onTap: null,
                 child: Container(
                   width: 108,
                   height: 29,
-
-                  alignment:
-                  Alignment.center,
-
-                  decoration:
-                  BoxDecoration(
-                    color: Colors.white,
-                    border:
-                    Border.all(
-                      color:
-                      AppColors.border,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F3F3),
+                    border: Border.all(
+                      color: AppColors.border,
                     ),
                   ),
-
                   child: Text(
                     '${_billDate.day.toString().padLeft(2, '0')}/'
                         '${_billDate.month.toString().padLeft(2, '0')}/'
                         '${_billDate.year}',
-
-                    style:
-                    const TextStyle(
+                    style: const TextStyle(
                       fontSize: 10,
+                      color: Colors.black87,
                     ),
                   ),
                 ),
@@ -1251,139 +1221,121 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
       ),
-      padding: const EdgeInsets.all(7),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
             'Customer Details',
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(
-                width: 45,
-                child: Text(
-                  'Name',
-                  style: TextStyle(
-                    fontSize: 10,
-                  ),
-                ),
+              const Text(
+                'Name',
+                style: TextStyle(fontSize: 10),
               ),
+              const SizedBox(width: 4),
               SizedBox(
-                width: 150,
+                width: 110,
                 child: _smallTextField(
                   _customerNameController,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(
-                width: 45,
-                child: Text(
-                  'MOBILE',
-                  style: TextStyle(
-                    fontSize: 10,
+              const SizedBox(width: 10),
+              const Text(
+                'MOBILE',
+                style: TextStyle(fontSize: 10),
+              ),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 110,
+                child: GestureDetector(
+                  onDoubleTap: _onMobileDoubleTap,
+                  child: _smallTextField(
+                    _mobileController,
+                    number: true,
+                    fieldKey: const Key('bill_mobile_field'),
                   ),
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onDoubleTap: _onMobileDoubleTap,
-                      child: SizedBox(
-                        width: 150,
-                        child: _smallTextField(
-                          _mobileController,
-                          number: true,
-                          fieldKey: const Key('bill_mobile_field'),
-                        ),
-                      ),
-                    ),
-                    if (_showPasswordField && !_editUnlocked) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 52,
-                            child: Text(
-                              'Password',
-                              style: TextStyle(fontSize: 10),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 110,
-                            child: TextField(
-                              key: const Key('bill_edit_password_field'),
-                              controller: _passwordController,
-                              obscureText: true,
-                              autofocus: true,
-                              onSubmitted: (_) => _tryUnlockEdit(),
-                              style: const TextStyle(fontSize: 10),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 6,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          SizedBox(
-                            height: 30,
-                            child: ElevatedButton(
-                              key: const Key('bill_edit_password_ok'),
-                              onPressed: _tryUnlockEdit,
-                              style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 10),
-                                minimumSize: const Size(0, 30),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: const Text('OK', style: TextStyle(fontSize: 10)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_passwordError != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            _passwordError!,
-                            style: const TextStyle(
-                              color: AppColors.danger,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                    ],
-                    if (_editUnlocked)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Edit mode — tap a line to correct rate/qty.',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
             ],
           ),
+          if (_showPasswordField && !_editUnlocked) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 52,
+                  child: Text(
+                    'Password',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                ),
+                SizedBox(
+                  width: 110,
+                  child: TextField(
+                    key: const Key('bill_edit_password_field'),
+                    controller: _passwordController,
+                    obscureText: true,
+                    autofocus: true,
+                    onSubmitted: (_) => _tryUnlockEdit(),
+                    style: const TextStyle(fontSize: 10),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                SizedBox(
+                  height: 30,
+                  child: ElevatedButton(
+                    key: const Key('bill_edit_password_ok'),
+                    onPressed: _tryUnlockEdit,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('OK', style: TextStyle(fontSize: 10)),
+                  ),
+                ),
+              ],
+            ),
+            if (_passwordError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _passwordError!,
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontSize: 9,
+                  ),
+                ),
+              ),
+          ],
+          if (_editUnlocked)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Edit mode — tap a line to correct rate/qty.',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: AppColors.success,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1454,14 +1406,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  Widget _buildEntryField({
+  Widget _buildInlineEntryField({
     required String label,
     required TextEditingController controller,
     FocusNode? focusNode,
     ValueChanged<String>? onChanged,
     VoidCallback? onSubmitted,
     bool readOnly = false,
-    bool fullWidth = false,
     bool blockTabTraversal = false,
     TextInputAction? textInputAction,
     Key? fieldKey,
@@ -1484,7 +1435,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       onChanged: onChanged,
       onSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
       decoration: _entryDecoration(),
-      style: const TextStyle(fontSize: 15, height: 1),
+      style: const TextStyle(fontSize: 14, height: 1),
     );
 
     if (blockTabTraversal) {
@@ -1500,62 +1451,37 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       );
     }
 
-    return _buildEntryBox(
-      label: label,
-      fullWidth: fullWidth,
-      child: field,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: _entryLabelSize,
+            fontWeight: FontWeight.w700,
+            color: AppColors.navy,
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: _entryBoxWidth,
+          height: _entryBoxHeight,
+          child: ClipRect(child: field),
+        ),
+      ],
     );
   }
 
   Widget _buildRateQtyAmount({bool mobile = false}) {
     final fields = mobile
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        ? Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: _buildEntryField(
-                  label: 'RATE',
-                  controller: _rateController,
-                  focusNode: _rateFocus,
-                  onChanged: _rateChanged,
-                  onSubmitted: _rateSubmitted,
-                  blockTabTraversal: true,
-                  textInputAction: TextInputAction.next,
-                  fieldKey: const Key('bill_rate_field'),
-                  fullWidth: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildEntryField(
-                  label: 'QTY',
-                  controller: _qtyController,
-                  focusNode: _qtyFocus,
-                  onChanged: _qtyChanged,
-                  onSubmitted: _qtySubmitted,
-                  blockTabTraversal: true,
-                  textInputAction: TextInputAction.done,
-                  fieldKey: const Key('bill_qty_field'),
-                  fullWidth: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildEntryField(
-                  label: 'AMOUNT',
-                  controller: _amountController,
-                  readOnly: true,
-                  fullWidth: true,
-                ),
-              ),
-            ],
-          )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildEntryField(
-                label: 'RATE',
+              _buildInlineEntryField(
+                label: 'rate',
                 controller: _rateController,
                 focusNode: _rateFocus,
                 onChanged: _rateChanged,
@@ -1564,9 +1490,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 textInputAction: TextInputAction.next,
                 fieldKey: const Key('bill_rate_field'),
               ),
-              const SizedBox(width: 12),
-              _buildEntryField(
-                label: 'QTY',
+              _buildInlineEntryField(
+                label: 'qty',
                 controller: _qtyController,
                 focusNode: _qtyFocus,
                 onChanged: _qtyChanged,
@@ -1575,9 +1500,41 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 textInputAction: TextInputAction.done,
                 fieldKey: const Key('bill_qty_field'),
               ),
-              const SizedBox(width: 12),
-              _buildEntryField(
-                label: 'AMOUNT',
+              _buildInlineEntryField(
+                label: 'amount',
+                controller: _amountController,
+                readOnly: true,
+              ),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildInlineEntryField(
+                label: 'rate',
+                controller: _rateController,
+                focusNode: _rateFocus,
+                onChanged: _rateChanged,
+                onSubmitted: _rateSubmitted,
+                blockTabTraversal: true,
+                textInputAction: TextInputAction.next,
+                fieldKey: const Key('bill_rate_field'),
+              ),
+              const SizedBox(width: 14),
+              _buildInlineEntryField(
+                label: 'qty',
+                controller: _qtyController,
+                focusNode: _qtyFocus,
+                onChanged: _qtyChanged,
+                onSubmitted: _qtySubmitted,
+                blockTabTraversal: true,
+                textInputAction: TextInputAction.done,
+                fieldKey: const Key('bill_qty_field'),
+              ),
+              const SizedBox(width: 14),
+              _buildInlineEntryField(
+                label: 'amount',
                 controller: _amountController,
                 readOnly: true,
               ),
@@ -1587,7 +1544,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment:
-          mobile ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+          mobile ? CrossAxisAlignment.start : CrossAxisAlignment.start,
       children: [
         fields,
         if (_rateError != null) ...[
@@ -1614,58 +1571,15 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     );
   }
 
-  Widget _buildEntryBox({
-    required String label,
-    required Widget child,
-    bool fullWidth = false,
-  }) {
-    return SizedBox(
-      width: fullWidth ? double.infinity : _entryBoxWidth,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 18,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          SizedBox(
-            height: _entryBoxHeight,
-            width: fullWidth ? double.infinity : _entryBoxWidth,
-            child: ClipRect(
-              child: child,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ============================================================
   // ITEM TABLE
   //
   // BEFORE ITEM (Enter on Qty adds first row):
   //
-  // S.NO | QTY | RATE | AMOUNT | Total
-  //
-  // AFTER ITEM:
-  //
-  // S.NO | QTY | RATE | AMOUNT | Total | CGST % | SGST % | IGST
+  // S.NO | RATE | QTY | AMOUNT | Total | CGST % | SGST % | IGST | X
   // ============================================================
 
-  double _tableWidth(bool showTax) => showTax ? 624 : 480;
+  double _tableWidth(bool showTax) => (showTax ? 624 : 480) + 34;
 
   Widget _buildItemTableSection({bool mobile = false}) {
     if (_items.isEmpty) {
@@ -1676,7 +1590,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     final width = _tableWidth(showTax);
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
         border: Border.all(color: AppColors.border),
@@ -1744,8 +1658,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       child: Row(
         children: [
           _tableHeaderCell('S.no', 55),
-          _tableHeaderCell('Qty', 65),
           _tableHeaderCell('RATE', 75),
+          _tableHeaderCell('Qty', 65),
           _tableHeaderCell('AMOUNT', 95),
           _tableHeaderCell('Total', 95, last: !showTax),
           if (showTax) ...[
@@ -1753,7 +1667,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             _tableHeaderCell('SGST %', 70),
             _tableHeaderCell('IGST', 65),
           ],
-          if (_editUnlocked) _tableDeleteHeaderCell(),
+          _tableDeleteHeaderCell(),
         ],
       ),
     );
@@ -1899,16 +1813,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         child: Row(
           children: [
             _tableDataCell('${index + 1}', 55),
-            _tableDataCell(_format(item.qty), 65),
             _tableDataCell(_format(item.rate), 75),
+            _tableDataCell(_format(item.qty), 65),
             _tableDataCell(_format(item.amount), 95),
             _tableDataCell(_format(item.grossAmt), 95, last: !showTax),
             if (showTax) ...[
               _tableDataCell(_format(item.cgstPct), 70),
               _tableDataCell(_format(item.sgstPct), 70),
-              _tableDataCell(_format(item.igst), 65, last: !_editUnlocked),
+              _tableDataCell(_format(item.igst), 65),
             ],
-            if (_editUnlocked) _buildDeleteCell(index),
+            _buildDeleteCell(index),
           ],
         ),
       ),
@@ -1978,7 +1892,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           bottom: BorderSide(color: AppColors.border),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -2022,31 +1936,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         ],
       ),
     );
-  }
-
-  // ============================================================
-  // DATE
-  // ============================================================
-
-  Future<void> _selectDate() async {
-    final DateTime? picked =
-    await showDatePicker(
-      context: context,
-
-      initialDate: _billDate,
-
-      firstDate:
-      DateTime(2020),
-
-      lastDate:
-      DateTime(2100),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _billDate = picked;
-      });
-    }
   }
 
   // ============================================================

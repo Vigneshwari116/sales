@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'package:sales/config/app_config.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
 
@@ -90,25 +91,43 @@ class AbstractRepository {
     String locationCode,
   ) async {
     final locationName = displayNameForLocationCode(locationCode);
-
-    try {
-      await LocalDb.instance.initialize();
-      final entries = await LocalDb.instance.getLedgerEntries(locationName);
-      return entries
-          .map(
-            (entry) => {
-              'bill_date': entry.billDate,
-              'total_amount': entry.totalAmount,
-              'total_cgst': entry.totalCgst,
-              'total_sgst': entry.totalSgst,
-              'total_igst': entry.totalIgst,
-            },
-          )
-          .toList(growable: false);
-    } catch (_) {
-      // Fall back to per-location DB file on staff tablets (legacy path).
+    final supportDir = await getApplicationSupportDirectory();
+    final dbPath = join(supportDir.path, '${locationCode}_sales.db');
+    if (await File(dbPath).exists()) {
+      return _readBillsFromLocationFile(
+        locationCode: locationCode,
+        locationName: locationName,
+      );
     }
 
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        await LocalDb.instance.initialize();
+        final entries = await LocalDb.instance.getLedgerEntries(locationName);
+        return entries
+            .map(
+              (entry) => {
+                'bill_date': entry.billDate,
+                'total_amount': entry.totalAmount,
+                'grand_total': entry.grandTotal,
+                'total_cgst': entry.totalCgst,
+                'total_sgst': entry.totalSgst,
+                'total_igst': entry.totalIgst,
+              },
+            )
+            .toList(growable: false);
+      } catch (_) {
+        return const [];
+      }
+    }
+
+    return const [];
+  }
+
+  static Future<List<Map<String, dynamic>>> _readBillsFromLocationFile({
+    required String locationCode,
+    required String locationName,
+  }) async {
     final supportDir = await getApplicationSupportDirectory();
     final path = join(supportDir.path, '${locationCode}_sales.db');
     final file = File(path);
@@ -126,6 +145,7 @@ class AbstractRepository {
         columns: [
           'bill_date',
           'total_amount',
+          'grand_total',
           'total_cgst',
           'total_sgst',
           'total_igst',
@@ -162,7 +182,9 @@ class AbstractRepository {
       return null;
     }
 
-    final saleAmount = (row['total_amount'] as num?)?.toDouble() ?? 0;
+    final saleAmount = (row['total_amount'] as num?)?.toDouble() ??
+        (row['grand_total'] as num?)?.toDouble() ??
+        0;
     final cgst = (row['total_cgst'] as num?)?.toDouble() ?? 0;
     final sgst = (row['total_sgst'] as num?)?.toDouble() ?? 0;
     final igst = (row['total_igst'] as num?)?.toDouble() ?? 0;

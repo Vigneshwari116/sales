@@ -157,8 +157,9 @@ void main() {
     await _pumpThemed(tester, const AdminCrossAbstractScreen());
     await _waitForLoadingToFinish(tester);
 
-    expect(find.text('ABSTRACT (ALL LOCATIONS)'), findsOneWidget);
+    expect(find.text('SALES ABSTRACT'), findsOneWidget);
     expect(find.text('SHOW ALL HISTORY'), findsNothing);
+    expect(find.byKey(const Key('admin_abstract_location')), findsOneWidget);
 
     await _savePng(
       tester,
@@ -216,7 +217,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('screenshot admin sync and gst config header', (tester) async {
+  testWidgets('screenshot admin sync header', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -225,16 +226,17 @@ void main() {
     await _pumpThemed(
       tester,
       Scaffold(
-        appBar: sectionHeaderAppBar('SYNC & GST CONFIG'),
-        body: const Center(child: Text('Sync & GST config body')),
+        appBar: sectionHeaderAppBar('SYNC'),
+        body: const Center(child: Text('Sync panel body')),
       ),
     );
 
-    expect(find.text('SYNC & GST CONFIG'), findsOneWidget);
+    expect(find.text('SYNC'), findsOneWidget);
+    expect(find.text('SAVE GST CONFIG'), findsNothing);
 
     await _savePng(
       tester,
-      '/opt/cursor/artifacts/screenshots/pr20_admin_sync_gst_header.png',
+      '/opt/cursor/artifacts/screenshots/pr20_admin_sync_header.png',
     );
     await tester.pumpWidget(const SizedBox.shrink());
   });
