@@ -160,13 +160,10 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            locationName,
-            style: const TextStyle(
-              fontSize: AppTextSizes.listTitle,
-              fontWeight: FontWeight.bold,
-              color: AppColors.navy,
-            ),
+          LocationBrandingHeader(
+            locationDisplayName: locationName,
+            align: TextAlign.left,
+            compact: true,
           ),
           const SizedBox(height: 8),
           CompactAbstractSummary(

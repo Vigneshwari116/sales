@@ -305,6 +305,27 @@ class LocalDb {
     );
   }
 
+  /// Deletes all bills for [location] and resets the next bill number to 1.
+  Future<void> resetLocationSalesData(String location) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'bills',
+        where: 'location = ?',
+        whereArgs: [location],
+      );
+      await txn.delete(
+        'location_meta',
+        where: 'location = ?',
+        whereArgs: [location],
+      );
+      await txn.insert('location_meta', {
+        'location': location,
+        'next_bill_no': 1,
+      });
+    });
+  }
+
   /// Overwrites local rows with admin-edited server versions (auto-pull).
   /// Skips local rows still marked `pending` (not yet manually pushed).
   /// Returns the number of bills written.

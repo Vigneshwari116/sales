@@ -1,9 +1,10 @@
 import 'package:intl/intl.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 
 class ReceiptService {
-  static const String businessName = 'R K S ENTERPRISES';
+  static const String businessName = businessDisplayName;
   static const String businessAddressLine1 =
       '47/3/4, 2nd Cross KUDULU MAIN ROAD';
   static const String businessAddressLine2 = 'Bangalore-68';
@@ -21,8 +22,10 @@ class ReceiptService {
     final buffer = StringBuffer();
     final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
     final line = '-' * _width;
+    final branch = branchLabelForDisplayName(bill.location);
 
     buffer.writeln(_center(businessName));
+    buffer.writeln(_center(branch));
     buffer.writeln(_center(businessAddressLine1));
     buffer.writeln(_center(businessAddressLine2));
     buffer.writeln(_center('GSTIN:$gstin'));
@@ -80,7 +83,7 @@ class ReceiptService {
   }
 
   static String _fieldLine(String label, String value) {
-    final text = value.trim().isEmpty ? '—' : value.trim();
+    final text = value.trim().isEmpty ? '-' : value.trim();
     return '$label: $text';
   }
 

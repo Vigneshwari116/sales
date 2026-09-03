@@ -116,7 +116,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     .map(
                       (code) => DropdownMenuItem(
                         value: displayNameForLocationCode(code),
-                        child: Text(displayNameForLocationCode(code)),
+                        child: Text(branchLabelForLocationCode(code)),
                       ),
                     )
                     .toList(),
@@ -265,7 +265,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
       appBar: sectionHeaderAppBar('SYNC'),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
+          constraints: const BoxConstraints(maxWidth: 380),
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -275,6 +275,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                 children: [
                   DropdownButtonFormField<String>(
                     value: _selectedLocationCode,
+                    isExpanded: true,
                     isDense: true,
                     decoration: const InputDecoration(
                       labelText: 'Location',
@@ -285,7 +286,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                         .map(
                           (code) => DropdownMenuItem(
                             value: code,
-                            child: Text(displayNameForLocationCode(code)),
+                            child: Text(branchLabelForLocationCode(code)),
                           ),
                         )
                         .toList(),

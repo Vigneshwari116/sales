@@ -9,6 +9,7 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/location_reset_service.dart';
 
 class ManualPushResult {
   final bool ok;
@@ -257,6 +258,7 @@ class SyncService with WidgetsBindingObserver {
     manualPushInProgress.value = true;
 
     try {
+      await LocationResetService.flushPendingServerResets();
       final pushResult = await _executePush(location);
       final pullResult = await pullAdminUpdates(location);
 
@@ -371,11 +373,13 @@ class SyncService with WidgetsBindingObserver {
         return 'win2';
       case 'Win3':
         return 'win3';
-      case 'Win4':
-        return 'win4';
       default:
         return AppConfig.locationCode;
     }
+  }
+
+  Future<bool> isDeviceOnline() async {
+    return isOnlineOverride?.call() ?? _isOnline();
   }
 
   Future<bool> _isOnline() async {

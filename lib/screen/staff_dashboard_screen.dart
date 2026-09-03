@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/local_credentials.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_abstract_screen.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
@@ -7,6 +9,7 @@ import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/screen/staff_sales_dashboard_screen.dart';
 import 'package:sales/screen/staff_thermal_printer_screen.dart';
 import 'package:sales/services/app_session_service.dart';
+import 'package:sales/services/location_reset_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -176,7 +179,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           ),
                         ),
                         Text(
-                          _location,
+                          branchLabelForDisplayName(_location),
                           style: const TextStyle(
                             fontSize: AppTextSizes.listSubtitle,
                             color: Colors.white,
@@ -215,6 +218,7 @@ class _StaffSyncPanel extends StatefulWidget {
 
 class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   bool _syncing = false;
+  bool _resetting = false;
   String? _message;
   bool? _lastSyncOk;
 
@@ -238,6 +242,43 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
       _syncing = false;
       _message = result.summaryMessage;
       _lastSyncOk = result.ok;
+    });
+  }
+
+  Future<void> _resetLocation() async {
+    final allowed = await SyncGateService.confirmReset(context);
+    if (!allowed || !mounted) return;
+
+    setState(() {
+      _resetting = true;
+      _message = null;
+      _lastSyncOk = null;
+    });
+
+    final result = await LocationResetService.resetCurrentLocation(
+      locationDisplayName: AppConfig.displayLocationName,
+      password: resetPassword,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _resetting = false;
+      _lastSyncOk = result.ok;
+      if (!result.ok) {
+        _message = result.error ?? 'Reset failed';
+        return;
+      }
+
+      if (result.serverResetQueued) {
+        _message =
+            'Local sales data cleared. Server reset queued for next sync.';
+      } else if (result.serverCleared) {
+        _message = 'All sales data cleared locally and on the server. '
+            'Next bill will be #1.';
+      } else {
+        _message = 'All local sales data cleared. Next bill will be #1.';
+      }
     });
   }
 
@@ -268,7 +309,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                     height: 46,
                     child: ElevatedButton.icon(
                       key: const Key('staff_sync_now_button'),
-                      onPressed: _syncing ? null : _syncNow,
+                      onPressed: (_syncing || _resetting) ? null : _syncNow,
                       icon: _syncing
                           ? const SizedBox(
                               width: 18,
@@ -280,6 +321,26 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.navy,
                         foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      key: const Key('staff_reset_button'),
+                      onPressed: (_syncing || _resetting) ? null : _resetLocation,
+                      icon: _resetting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_forever_outlined),
+                      label: Text(_resetting ? 'RESETTING...' : 'RESET'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: const BorderSide(color: AppColors.danger),
                       ),
                     ),
                   ),

@@ -123,7 +123,7 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
                             for (final code in allLocationCodes)
                               DropdownMenuItem(
                                 value: displayNameForLocationCode(code),
-                                child: Text(displayNameForLocationCode(code)),
+                                child: Text(branchLabelForLocationCode(code)),
                               ),
                           ],
                           onChanged: (value) {

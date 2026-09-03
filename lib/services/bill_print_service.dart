@@ -21,6 +21,16 @@ class BillPrintService {
     return file.path;
   }
 
+  static Future<String> saveReceiptPdfToDesktop(SaleBill bill) async {
+    final bytes = await _buildPdfBytes(bill, type: PrinterType.thermal);
+    final saveDir = await _receiptSaveDirectory();
+    final datePart = DateFormat('dd-MM-yyyy').format(bill.billDate);
+    final fileName = 'Bill_${bill.billNo}_$datePart.pdf';
+    final file = File('$saveDir${Platform.pathSeparator}$fileName');
+    await file.writeAsBytes(bytes);
+    return file.path;
+  }
+
   static Future<bool> printReceipt(
     SaleBill bill, {
     required String printerName,
@@ -68,41 +78,38 @@ class BillPrintService {
     final doc = pw.Document();
     final style = pw.TextStyle(
       font: pw.Font.courierBold(),
-      fontSize: type == PrinterType.thermal ? 7.2 : 8,
-      lineSpacing: 1.1,
+      fontSize: type == PrinterType.thermal ? 7.0 : 7.5,
+      lineSpacing: 1.15,
       color: PdfColors.black,
     );
 
     final lines = text.split('\n');
-    final lineCount = lines.length;
-    final heightMm = (lineCount * 3.8 + 8).clamp(90.0, 420.0);
+    const lineHeightMm = 4.8;
+    final contentHeightMm = lines.length * lineHeightMm + 12;
     final pageFormat = PdfPageFormat(
-      88 * PdfPageFormat.mm,
-      heightMm * PdfPageFormat.mm,
-      marginLeft: 3 * PdfPageFormat.mm,
-      marginRight: 3 * PdfPageFormat.mm,
-      marginTop: 3 * PdfPageFormat.mm,
-      marginBottom: 3 * PdfPageFormat.mm,
+      90 * PdfPageFormat.mm,
+      contentHeightMm * PdfPageFormat.mm,
+      marginLeft: 2 * PdfPageFormat.mm,
+      marginRight: 2 * PdfPageFormat.mm,
+      marginTop: 2 * PdfPageFormat.mm,
+      marginBottom: 2 * PdfPageFormat.mm,
     );
 
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
         build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
           children: [
             for (final line in lines)
               pw.Padding(
                 padding: const pw.EdgeInsets.only(bottom: 0.5),
-                child: pw.FittedBox(
-                  alignment: pw.Alignment.centerLeft,
-                  fit: pw.BoxFit.scaleDown,
-                  child: pw.Text(
-                    line,
-                    style: style,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
+                child: pw.Text(
+                  line.isEmpty ? ' ' : line,
+                  style: style,
+                  maxLines: 1,
+                  softWrap: false,
                 ),
               ),
           ],
