@@ -44,7 +44,7 @@ class SalesLedgerScreen extends StatefulWidget {
 }
 
 class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
-  static const double _tableMinWidth = 760;
+  static const double _tableMinWidth = 860;
 
   bool _loading = true;
   bool _pulling = false;
@@ -224,6 +224,28 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   double _summaryGst(LedgerSummary summary) =>
       summary.cgst + summary.sgst + summary.igst;
+
+  bool _isCashPayment(String mode) => mode.toUpperCase() == 'CASH';
+
+  String _paymentColumnAmount(LocalLedgerEntry entry, {required bool cash}) {
+    if (_isCashPayment(entry.paymentMode) != cash) {
+      return '';
+    }
+    return _formatMoney(entry.grandTotal);
+  }
+
+  ({double cash, double card}) _paymentTotals() {
+    var cash = 0.0;
+    var card = 0.0;
+    for (final entry in _entries) {
+      if (_isCashPayment(entry.paymentMode)) {
+        cash += entry.grandTotal;
+      } else {
+        card += entry.grandTotal;
+      }
+    }
+    return (cash: cash, card: card);
+  }
 
   String get _periodLabel {
     if (!_customRange) {
@@ -417,7 +439,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('DATE', flex: 7, bold: true),
           _cell('NAME', flex: 10, bold: true),
           _cell('MOBILE', flex: 8, bold: true),
-          _cell('PAY', flex: 6, bold: true),
+          _cell('CASH', flex: 7, bold: true, alignRight: true),
+          _cell('CARD/UPI', flex: 7, bold: true, alignRight: true),
           _cell('TOTAL', flex: 7, bold: true, alignRight: true),
           _cell('GST', flex: 6, bold: true, alignRight: true),
           _cell('GRAND TOTAL', flex: 8, bold: true, alignRight: true),
@@ -436,7 +459,10 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell(_formatDate(entry.date), flex: 7),
           _cell(entry.customerName, flex: 10),
           _cell(entry.mobile.isEmpty ? '—' : entry.mobile, flex: 8),
-          _cell(LedgerPdfService.formatPayMode(entry.paymentMode), flex: 6),
+          _cell(_paymentColumnAmount(entry, cash: true),
+              flex: 7, alignRight: true),
+          _cell(_paymentColumnAmount(entry, cash: false),
+              flex: 7, alignRight: true),
           _cell(_formatMoney(entry.total), flex: 7, alignRight: true),
           _cell(_formatMoney(_entryGst(entry)), flex: 6, alignRight: true),
           _cell(_formatMoney(entry.grandTotal), flex: 8, alignRight: true),
@@ -447,6 +473,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   Widget _summaryRow() {
     final summary = _summary!;
+    final payTotals = _paymentTotals();
     return Container(
       color: AppColors.headerBand,
       child: Row(
@@ -455,7 +482,10 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           _cell('', flex: 7, bold: true),
           _cell('', flex: 10, bold: true),
           _cell('', flex: 8, bold: true),
-          _cell('', flex: 6, bold: true),
+          _cell(_formatMoney(payTotals.cash),
+              flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(payTotals.card),
+              flex: 7, bold: true, alignRight: true),
           _cell(_formatMoney(summary.total),
               flex: 7, bold: true, alignRight: true),
           _cell(_formatMoney(_summaryGst(summary)),
