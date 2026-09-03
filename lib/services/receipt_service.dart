@@ -38,9 +38,7 @@ class ReceiptService {
     }
 
     buffer.writeln(line);
-    final totalGross =
-        bill.items.fold(0.0, (sum, item) => sum + item.grossAmt);
-    buffer.writeln(_totalLine(bill.totalQty, totalGross));
+    buffer.writeln(_totalLine(bill.totalQty, bill.totalAmount));
     buffer.writeln(_taxTotalLine('CGST', bill.totalCgst));
     buffer.writeln(_taxTotalLine('SGST', bill.totalSgst));
     buffer.writeln(_grandTotalLine(bill.grandTotal));
@@ -64,7 +62,7 @@ class ReceiptService {
     return '${_padRight('$sno', _snoWidth)}'
         '${_padRight(_money(item.rate), _rateWidth)}'
         '${_padRight(_money(item.qty), _qtyWidth)}'
-        '${_padLeft(_money(item.grossAmt), _amountWidth)}';
+        '${_padLeft(_money(item.amount), _amountWidth)}';
   }
 
   static String _totalLine(double totalQty, double totalAmount) {

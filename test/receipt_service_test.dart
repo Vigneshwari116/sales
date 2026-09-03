@@ -38,4 +38,35 @@ void main() {
     expect(lines.any((line) => line.startsWith('SNO')), isTrue);
     expect(lines.any((line) => line.contains('GRAND TOTAL')), isTrue);
   });
+
+  test('receipt shows taxable amount and 5% gst split on inclusive bill', () {
+    final item = BillItem(qty: 12, rate: 12);
+    final bill = SaleBill(
+      billNo: 8,
+      location: 'Win1',
+      billDate: DateTime(2026, 9, 3),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [item],
+      totalQty: 12,
+      totalAmount: item.amount,
+      totalCgst: item.cgst,
+      totalSgst: item.sgst,
+      totalIgst: 0,
+      grandTotal: item.netAmt,
+    );
+
+    final text = ReceiptService.buildReceiptText(bill);
+
+    expect(item.amount, 137);
+    expect(item.cgst, 3.5);
+    expect(item.sgst, 3.5);
+    expect(item.netAmt, 144);
+    expect(text, contains('137.00'));
+    expect(text, contains('CGST'));
+    expect(text, contains('3.50'));
+    expect(text, contains('GRAND TOTAL'));
+    expect(text, contains('144.00'));
+  });
 }
