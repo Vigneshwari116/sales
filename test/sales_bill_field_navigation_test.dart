@@ -8,9 +8,11 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/session_service.dart';
@@ -65,9 +67,12 @@ void main() {
     await LocalDb.instance.initialize();
     await LocalDb.instance.getNextBillNumber(AppConfig.displayLocationName);
     SyncService.instance.start(location: AppConfig.displayLocationName);
+    BillRepository.saveBillApiOverride =
+        (bill) async => SalesApiResult.success(bill.billNo);
   });
 
   tearDown(() async {
+    BillRepository.saveBillApiOverride = null;
     await SyncService.resetForTesting();
     await LocalDb.resetForTesting();
     await _deleteTestDb();
@@ -124,29 +129,39 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate saves single-item bill with qty 1', (tester) async {
+  testWidgets('enter on rate with normal value focuses qty without saving',
+      (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '100');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
+    expect(find.byIcon(Icons.close), findsNothing);
+
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('enter on rate with 777 and empty table does not save',
+      (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
     await tester.enterText(rateField, '777');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
-    for (var i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    await tester.pump(const Duration(milliseconds: 100));
 
-    final stored = await LocalDb.instance.getBillByNumber(
-      location: AppConfig.displayLocationName,
-      billNo: 1,
-    );
-    expect(stored, isNotNull);
-    expect(stored!.bill.items.single.rate, 777);
-    expect(stored.bill.items.single.qty, 1);
+    expect(find.text('Add items before printing'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsNothing);
 
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on qty saves bill with custom qty', (tester) async {
+  testWidgets('enter on qty adds line item without saving', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
@@ -155,16 +170,9 @@ void main() {
     await tester.enterText(qtyField, '2');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
-    for (var i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    await tester.pump(const Duration(milliseconds: 100));
 
-    final stored = await LocalDb.instance.getBillByNumber(
-      location: AppConfig.displayLocationName,
-      billNo: 1,
-    );
-    expect(stored, isNotNull);
-    expect(stored!.bill.items.single.qty, 2);
+    expect(find.byIcon(Icons.close), findsOneWidget);
 
     await tearDownBillScreen(tester);
   });
@@ -206,8 +214,10 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate prints existing bill in table without replacing lines',
+  testWidgets('enter on rate with 777 triggers print without changing table lines',
       (tester) async {
+    var printTriggered = false;
+
     await SessionService.saveBillSession(
       location: AppConfig.displayLocationName,
       billNo: 1,
@@ -220,8 +230,12 @@ void main() {
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: SalesBillScreen(initialBillNo: 1),
+      MaterialApp(
+        home: SalesBillScreen(
+          saveBillOverride: () async {
+            printTriggered = true;
+          },
+        ),
       ),
     );
 
@@ -236,17 +250,10 @@ void main() {
     await tester.enterText(rateField, '777');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
-    for (var i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
 
-    final stored = await LocalDb.instance.getBillByNumber(
-      location: AppConfig.displayLocationName,
-      billNo: 1,
-    );
-    expect(stored, isNotNull);
-    expect(stored!.bill.items.single.rate, 23);
-    expect(stored.bill.items.single.qty, 4);
+    expect(printTriggered, isTrue);
+    expect(tester.widget<TextField>(rateField).controller?.text, '0');
+    expect(find.byIcon(Icons.close), findsOneWidget);
 
     await tearDownBillScreen(tester);
   });

@@ -35,6 +35,10 @@ class SalesBillScreen extends StatefulWidget {
   @visibleForTesting
   final int? initialBillNo;
 
+  /// When set (tests only), replaces the default save/print handler for 777.
+  @visibleForTesting
+  final Future<void> Function()? saveBillOverride;
+
   /// When false, bill tab is hidden inside [IndexedStack] — restore focus on return.
   final bool isSectionActive;
 
@@ -44,6 +48,7 @@ class SalesBillScreen extends StatefulWidget {
     this.isSectionActive = true,
     this.initialBillNo,
     this.ledgerScreenBuilder,
+    this.saveBillOverride,
   });
 
   @override
@@ -419,12 +424,22 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   // ============================================================
-  // RATE / QTY ENTER — save & print
+  // RATE / QTY ENTER — 777 prints table bill; other rates go to qty
   // ============================================================
 
+  static const String _printCode = '777';
+
   void _rateSubmitted() {
-    if (_items.isNotEmpty) {
-      unawaited(_saveBill());
+    final rateText = _rateController.text.trim();
+
+    if (rateText == _printCode) {
+      _rateController.text = '0';
+      if (_items.isEmpty) {
+        _showMessage('Add items before printing');
+        return;
+      }
+      final save = widget.saveBillOverride ?? _saveBill;
+      unawaited(save());
       return;
     }
 
@@ -432,7 +447,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    unawaited(_quickSaveAndPrintFromRate());
+    _focusQty();
   }
 
   void _qtySubmitted() {
@@ -440,45 +455,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    if (_items.isNotEmpty) {
-      _addItem();
-      return;
-    }
-
-    unawaited(_quickSaveAndPrintFromRate(
-      qty: double.parse(_qtyController.text.trim()),
-    ));
-  }
-
-  Future<void> _quickSaveAndPrintFromRate({double qty = 1}) async {
-    if (_busy) return;
-
-    if (!_validateRate(focusOnError: false)) {
-      return;
-    }
-
-    final rate = double.parse(_rateController.text.trim());
-
-    setState(() {
-      _clearEntryErrors();
-      _items
-        ..clear()
-        ..add(
-          BillItem(
-            qty: qty,
-            rate: rate,
-            cgstPct: _cgstPct,
-            sgstPct: _sgstPct,
-            igstPct: 0,
-          ),
-        );
-      _qtyController.text = qty == qty.roundToDouble()
-          ? qty.toInt().toString()
-          : qty.toString();
-      _updateAmountDisplay();
-    });
-
-    await _saveBill();
+    _addItem();
   }
 
   void _addItem() {
