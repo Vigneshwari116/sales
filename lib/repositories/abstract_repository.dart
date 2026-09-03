@@ -91,14 +91,6 @@ class AbstractRepository {
     String locationCode,
   ) async {
     final locationName = displayNameForLocationCode(locationCode);
-    final supportDir = await getApplicationSupportDirectory();
-    final dbPath = join(supportDir.path, '${locationCode}_sales.db');
-    if (await File(dbPath).exists()) {
-      return _readBillsFromLocationFile(
-        locationCode: locationCode,
-        locationName: locationName,
-      );
-    }
 
     if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
       try {
@@ -121,6 +113,15 @@ class AbstractRepository {
       }
     }
 
+    final supportDir = await getApplicationSupportDirectory();
+    final dbPath = join(supportDir.path, '${locationCode}_sales.db');
+    if (await File(dbPath).exists()) {
+      return _readBillsFromLocationFile(
+        locationCode: locationCode,
+        locationName: locationName,
+      );
+    }
+
     return const [];
   }
 
@@ -135,7 +136,12 @@ class AbstractRepository {
       return const [];
     }
 
-    final db = await openDatabase(path, readOnly: true);
+    // Use a separate connection so closing it does not shut down LocalDb.
+    final db = await openDatabase(
+      path,
+      readOnly: true,
+      singleInstance: false,
+    );
 
     try {
       return await db.query(
