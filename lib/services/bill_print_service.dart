@@ -67,28 +67,38 @@ class BillPrintService {
     final text = ReceiptService.buildReceiptText(bill);
     final doc = pw.Document();
     final style = pw.TextStyle(
-      font: pw.Font.courier(),
-      fontSize: type == PrinterType.thermal ? 8 : 9,
-      lineSpacing: 1.15,
+      font: pw.Font.courierBold(),
+      fontSize: type == PrinterType.thermal ? 8.5 : 9,
+      lineSpacing: 1.05,
+      color: PdfColors.black,
     );
 
     final lines = text.split('\n');
     final lineCount = lines.length;
-    final heightMm = (lineCount * 3.8 + 8).clamp(90.0, 420.0);
+    final heightMm = (lineCount * 3.6 + 6).clamp(85.0, 420.0);
     final pageFormat = PdfPageFormat(
       80 * PdfPageFormat.mm,
       heightMm * PdfPageFormat.mm,
-      marginAll: 3 * PdfPageFormat.mm,
+      marginLeft: 4 * PdfPageFormat.mm,
+      marginRight: 4 * PdfPageFormat.mm,
+      marginTop: 3 * PdfPageFormat.mm,
+      marginBottom: 3 * PdfPageFormat.mm,
     );
 
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
-        build: (context) => pw.Center(
-          child: pw.SizedBox(
-            width: 72 * PdfPageFormat.mm,
-            child: pw.Text(text, style: style),
-          ),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            for (final line in lines)
+              pw.Text(
+                line,
+                style: style,
+                maxLines: 1,
+                softWrap: false,
+              ),
+          ],
         ),
       ),
     );

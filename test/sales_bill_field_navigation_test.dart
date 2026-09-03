@@ -8,9 +8,12 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/local_credentials.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/repositories/bill_repository.dart';
+import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/sales_bill_screen.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -64,9 +67,12 @@ void main() {
     await LocalDb.instance.initialize();
     await LocalDb.instance.getNextBillNumber(AppConfig.displayLocationName);
     SyncService.instance.start(location: AppConfig.displayLocationName);
+    BillRepository.saveBillApiOverride =
+        (bill) async => SalesApiResult.success(bill.billNo);
   });
 
   tearDown(() async {
+    BillRepository.saveBillApiOverride = null;
     await SyncService.resetForTesting();
     await LocalDb.resetForTesting();
     await _deleteTestDb();
@@ -123,36 +129,78 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate advances to qty; enter on qty adds item',
+  testWidgets('enter on rate with normal value focuses qty without saving',
       (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
     await tester.enterText(rateField, '100');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
-    await tester.pump();
-
-    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
-
-    await tester.enterText(qtyField, '2');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
+    expect(find.byIcon(Icons.close), findsNothing);
+
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('double-tap mobile unlocks row edit mode', (tester) async {
+  testWidgets('enter on rate with 777 and empty table does not save',
+      (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '777');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Add items before printing'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsNothing);
+
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('enter on qty adds line item without saving', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
     await tester.enterText(rateField, '100');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
-    await tester.pump();
-
+    await tester.tap(qtyField);
     await tester.enterText(qtyField, '2');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byIcon(Icons.close), findsOneWidget);
+
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('double-tap mobile unlocks row edit mode', (tester) async {
+    await SessionService.saveBillSession(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+      billDate: DateTime.now(),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 2, rate: 100)],
+      billSaved: false,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SalesBillScreen(),
+      ),
+    );
+
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
     expect(find.byIcon(Icons.close), findsOneWidget);
 
@@ -166,11 +214,55 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
+  testWidgets('enter on rate with 777 triggers print without changing table lines',
+      (tester) async {
+    var printTriggered = false;
+
+    await SessionService.saveBillSession(
+      location: AppConfig.displayLocationName,
+      billNo: 1,
+      billDate: DateTime.now(),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 4, rate: 23)],
+      billSaved: false,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SalesBillScreen(
+          saveBillOverride: () async {
+            printTriggered = true;
+          },
+        ),
+      ),
+    );
+
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    await tester.tap(rateField);
+    await tester.enterText(rateField, '777');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(printTriggered, isTrue);
+    expect(tester.widget<TextField>(rateField).controller?.text, '0');
+    expect(find.byIcon(Icons.close), findsOneWidget);
+
+    await tearDownBillScreen(tester);
+  });
+
   testWidgets('invalid rate shows inline error below field', (tester) async {
     await pumpBillScreen(tester);
 
     await tester.enterText(rateField, '0');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
     expect(find.text('Rate must be greater than 0'), findsOneWidget);

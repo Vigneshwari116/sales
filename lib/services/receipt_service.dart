@@ -8,10 +8,10 @@ class ReceiptService {
       '47/3/4, 2nd Cross KUDULU MAIN ROAD, Bangalore-68';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  static const int _width = 44;
-  static const int _snoWidth = 5;
-  static const int _rateWidth = 10;
-  static const int _qtyWidth = 11;
+  static const int _width = 42;
+  static const int _snoWidth = 4;
+  static const int _rateWidth = 9;
+  static const int _qtyWidth = 9;
   static const int _amountWidth =
       _width - _snoWidth - _rateWidth - _qtyWidth;
 
@@ -22,12 +22,10 @@ class ReceiptService {
 
     buffer.writeln(_center(businessName));
     buffer.writeln(_center(businessAddress));
-    buffer.writeln(_center('GSTIN: $gstin'));
-    buffer.writeln();
+    buffer.writeln(_center('GSTIN:$gstin'));
     buffer.writeln(_billDateLine(bill.billNo, dateText));
     buffer.writeln('NAME: ${bill.customerName}');
     buffer.writeln('MOBILE: ${bill.mobile}');
-    buffer.writeln();
     buffer.writeln(_itemHeader());
     buffer.writeln(line);
 
@@ -35,7 +33,7 @@ class ReceiptService {
       final BillItem item = bill.items[i];
       buffer.writeln(_itemLine(i + 1, item));
       buffer.writeln(
-        '      CGST% ${_formatPct(item.cgstPct)}SGST% ${_formatPct(item.sgstPct)}',
+        '     CGST% ${_formatPct(item.cgstPct)} SGST% ${_formatPct(item.sgstPct)}',
       );
     }
 
@@ -45,13 +43,11 @@ class ReceiptService {
     buffer.writeln(_totalLine(bill.totalQty, totalGross));
     buffer.writeln(_taxTotalLine('CGST', bill.totalCgst));
     buffer.writeln(_taxTotalLine('SGST', bill.totalSgst));
-    buffer.writeln();
     buffer.writeln(_grandTotalLine(bill.grandTotal));
-    buffer.writeln();
+    buffer.writeln(line);
     buffer.writeln('TERMS AND CONDITION');
     buffer.writeln('EXCHANGE ONLY 3 DAYS');
     buffer.writeln('AMOUNT NOT REFUND');
-    buffer.writeln();
     buffer.writeln(_center('THANK YOU VISIT AGAIN'));
 
     return buffer.toString();
@@ -76,8 +72,6 @@ class ReceiptService {
     final qtyText = _money(totalQty);
     final amountText = _money(totalAmount);
     final qtyStart = _snoWidth + _rateWidth;
-    final amountStart = qtyStart + _qtyWidth;
-
     final buffer = StringBuffer(_padRight(label, qtyStart));
     while (buffer.length < qtyStart + _qtyWidth - qtyText.length) {
       buffer.write(' ');
@@ -89,7 +83,7 @@ class ReceiptService {
 
   static String _taxTotalLine(String label, double amount) {
     final amountText = _money(amount);
-    final labelPart = '               $label';
+    final labelPart = '              $label';
     final spaces = _width - labelPart.length - amountText.length;
     return '$labelPart${' ' * spaces.clamp(1, _width)}$amountText';
   }
@@ -97,9 +91,9 @@ class ReceiptService {
   static String _grandTotalLine(double grandTotal) {
     const label = 'GRAND TOTAL';
     final amountText = _money(grandTotal);
-    final labelPart = '               $label';
-    final spaces = _width - labelPart.length - amountText.length - 1;
-    return '$labelPart${' ' * spaces.clamp(1, _width)} $amountText';
+    final labelPart = '              $label';
+    final spaces = _width - labelPart.length - amountText.length;
+    return '$labelPart${' ' * spaces.clamp(1, _width)}$amountText';
   }
 
   static String _billDateLine(int billNo, String dateText) {

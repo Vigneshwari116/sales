@@ -20,6 +20,7 @@ class SessionService {
   static const String _mobileKey = 'session_mobile';
   static const String _itemsKey = 'session_items_json';
   static const String _billSavedKey = 'session_bill_saved';
+  static const String _focusFieldKey = 'session_focus_field';
 
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
@@ -134,6 +135,17 @@ class SessionService {
     await prefs.remove(_mobileKey);
     await prefs.remove(_itemsKey);
     await prefs.remove(_billSavedKey);
+    await prefs.remove(_focusFieldKey);
+  }
+
+  static Future<void> saveFocusField(String field) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_focusFieldKey, field);
+  }
+
+  static Future<String?> loadFocusField() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_focusFieldKey);
   }
 }
 
