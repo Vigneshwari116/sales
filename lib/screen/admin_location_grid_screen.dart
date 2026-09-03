@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/repositories/location_sync_repository.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
 /// Admin main view: today's totals per location in a compact grid.
 class AdminLocationGridScreen extends StatefulWidget {
-  const AdminLocationGridScreen({super.key});
+  final int refreshGeneration;
+
+  const AdminLocationGridScreen({
+    super.key,
+    this.refreshGeneration = 0,
+  });
 
   @override
   State<AdminLocationGridScreen> createState() =>
@@ -19,6 +25,10 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
     for (final code in allLocationCodes)
       displayNameForLocationCode(code): AbstractSummary.zero(),
   };
+  Map<String, DateTime?> _lastSyncedByLocation = {
+    for (final code in allLocationCodes)
+      displayNameForLocationCode(code): null,
+  };
 
   @override
   void initState() {
@@ -26,10 +36,19 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(AdminLocationGridScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshGeneration != widget.refreshGeneration) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     try {
       final today = DateTime.now();
       final summaries = <String, AbstractSummary>{};
+      final lastSynced = <String, DateTime?>{};
 
       for (final code in allLocationCodes) {
         final name = displayNameForLocationCode(code);
@@ -38,17 +57,57 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           fromDate: today,
           toDate: today,
         );
+        lastSynced[name] =
+            await LocationSyncRepository.getLastSyncedAtForLocationCode(code);
       }
 
       if (!mounted) return;
 
-      setState(() => _todayByLocation = summaries);
+      setState(() {
+        _todayByLocation = summaries;
+        _lastSyncedByLocation = lastSynced;
+      });
     } catch (_) {
       // Keep zeroed placeholders on error.
     }
   }
 
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
+
+  String _formatLastSynced(DateTime? syncedAt) {
+    if (syncedAt == null) {
+      return 'Not synced';
+    }
+
+    final local = syncedAt.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final syncedDay = DateTime(local.year, local.month, local.day);
+
+    if (syncedDay == today) {
+      return 'Synced ${DateFormat('h:mm a').format(local)}';
+    }
+
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (syncedDay == yesterday) {
+      return 'Synced yesterday';
+    }
+
+    return 'Synced ${DateFormat('dd-MMM').format(local)}';
+  }
+
+  Color _lastSyncedColor(DateTime? syncedAt) {
+    if (syncedAt == null) {
+      return AppColors.danger;
+    }
+
+    final age = DateTime.now().difference(syncedAt.toLocal());
+    if (age > const Duration(hours: 24)) {
+      return const Color(0xFFB45309);
+    }
+
+    return AppColors.mutedBlue;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +142,8 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
 
   Widget _locationCard(String locationName) {
     final summary = _todayByLocation[locationName];
+    final lastSynced = _lastSyncedByLocation[locationName];
+    final syncLabel = _formatLastSynced(lastSynced);
 
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
@@ -123,6 +184,18 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            syncLabel,
+            key: Key('admin_last_synced_${locationName.toLowerCase()}'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: _lastSyncedColor(lastSynced),
+            ),
           ),
         ],
       ),
