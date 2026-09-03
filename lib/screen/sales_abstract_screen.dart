@@ -135,11 +135,13 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                   ],
                   const SizedBox(height: 16),
                   CompactAbstractSummary(
-                    totalSalesLabel: 'Total sales',
-                    totalGstLabel: 'Total GST',
+                    totalValue: _formatMoney(
+                      (_summary?.totalSaleAmount ?? 0) +
+                          (_summary?.totalGst ?? 0),
+                    ),
+                    gstValue: _formatMoney(_summary?.totalGst ?? 0),
                     totalSalesValue:
                         _formatMoney(_summary?.totalSaleAmount ?? 0),
-                    totalGstValue: _formatMoney(_summary?.totalGst ?? 0),
                   ),
                 ],
               ),

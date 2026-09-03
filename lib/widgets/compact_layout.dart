@@ -153,18 +153,17 @@ class CompactSaveButton extends StatelessWidget {
 }
 
 /// Small dashboard-style stat cards for abstract totals.
+/// Order: Total (grand), GST, Total sales (subtotal).
 class CompactAbstractSummary extends StatelessWidget {
-  final String totalSalesLabel;
+  final String totalValue;
+  final String gstValue;
   final String totalSalesValue;
-  final String? totalGstLabel;
-  final String? totalGstValue;
 
   const CompactAbstractSummary({
     super.key,
-    this.totalSalesLabel = 'Total sales',
-    this.totalGstLabel = 'Total GST',
+    required this.totalValue,
+    required this.gstValue,
     required this.totalSalesValue,
-    this.totalGstValue,
   });
 
   @override
@@ -175,9 +174,9 @@ class CompactAbstractSummary extends StatelessWidget {
         spacing: 10,
         runSpacing: 10,
         children: [
-          _statCard(totalSalesLabel, totalSalesValue),
-          if (totalGstLabel != null && totalGstValue != null)
-            _statCard(totalGstLabel!, totalGstValue!),
+          _statCard('Total', totalValue),
+          _statCard('GST', gstValue),
+          _statCard('Total sales', totalSalesValue),
         ],
       ),
     );
