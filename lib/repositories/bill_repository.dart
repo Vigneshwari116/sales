@@ -11,33 +11,20 @@ class BillRepository {
     SaleBill bill, {
     String? updateLocalId,
   }) async {
-    var result = await SalesApi.saveBill(bill);
-
-    if (result.ok) {
-      try {
-        if (updateLocalId != null) {
-          await LocalDb.instance.updateSavedBill(
-            updateLocalId,
-            bill,
-            syncStatus: 'synced',
-          );
-        } else {
-          await LocalDb.instance.insertSavedBill(bill, syncStatus: 'synced');
-        }
-      } catch (_) {
-        // Bill saved on server; local record is best-effort for numbering.
-      }
-      return result;
-    }
+    final apiResult = await SalesApi.saveBill(bill);
+    final syncStatus = apiResult.ok ? 'synced' : 'pending';
 
     try {
-      if (updateLocalId != null) {
-        await LocalDb.instance.updateSavedBill(updateLocalId, bill);
-      } else {
-        await LocalDb.instance.insertPendingBill(bill);
-      }
+      await LocalDb.instance.persistBill(
+        bill,
+        updateLocalId: updateLocalId,
+        syncStatus: syncStatus,
+      );
       return SalesApiResult.success(bill.billNo);
     } catch (_) {
+      if (apiResult.ok) {
+        return apiResult;
+      }
       return SalesApiResult.failure('Could not save bill locally.');
     }
   }
