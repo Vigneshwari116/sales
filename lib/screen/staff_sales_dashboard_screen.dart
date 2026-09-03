@@ -61,6 +61,9 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final amount = _todaySummary?.totalSaleAmount ?? 0;
+    final gst = _todaySummary?.totalGst ?? 0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: sectionHeaderAppBar(
@@ -75,10 +78,10 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : CenteredContent(
+              maxWidth: 520,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.location,
@@ -93,47 +96,16 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
                     DateFormat('EEEE, dd MMM yyyy').format(DateTime.now()),
                     style: const TextStyle(fontSize: AppTextSizes.listTitle),
                   ),
-                  const SizedBox(height: 20),
-                  _summaryCard(
-                    'Total sales today',
-                    _formatMoney(_todaySummary?.totalSaleAmount ?? 0),
-                  ),
-                  const SizedBox(height: 12),
-                  _summaryCard(
-                    'Total GST today',
-                    _formatMoney(_todaySummary?.totalGst ?? 0),
+                  const SizedBox(height: 16),
+                  CompactAbstractSummary(
+                    amountValue: _formatMoney(amount),
+                    gstValue: _formatMoney(gst),
+                    grandTotalValue: _formatMoney(amount + gst),
+                    grandTotalLabel: 'Total sales',
                   ),
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _summaryCard(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: AppTextSizes.fieldText),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: AppTextSizes.statNumber,
-              fontWeight: FontWeight.bold,
-              color: AppColors.navy,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

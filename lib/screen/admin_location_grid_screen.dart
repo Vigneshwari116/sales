@@ -144,10 +144,12 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
     final summary = _todayByLocation[locationName];
     final lastSynced = _lastSyncedByLocation[locationName];
     final syncLabel = _formatLastSynced(lastSynced);
+    final amount = summary?.totalSaleAmount ?? 0;
+    final gst = summary?.totalGst ?? 0;
 
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
-      width: 148,
+      width: 470,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
@@ -155,7 +157,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -166,26 +168,15 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
               color: AppColors.navy,
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Sales today',
-                  style: TextStyle(fontSize: 10),
-                ),
-              ),
-              Text(
-                _formatMoney(summary?.totalSaleAmount ?? 0),
-                style: const TextStyle(
-                  fontSize: AppTextSizes.listTitle,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.navy,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          CompactAbstractSummary(
+            amountValue: _formatMoney(amount),
+            gstValue: _formatMoney(gst),
+            grandTotalValue: _formatMoney(amount + gst),
+            grandTotalLabel: 'Total sales',
+            cardWidth: 146,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             syncLabel,
             key: Key('admin_last_synced_${locationName.toLowerCase()}'),
