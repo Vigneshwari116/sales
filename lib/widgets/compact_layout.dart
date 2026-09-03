@@ -225,7 +225,7 @@ class CompactAbstractSummary extends StatelessWidget {
   }
 }
 
-/// Centered business name with branch label (e.g. Win1 - Bommasandra).
+/// Centered business name with branch label (e.g. Bommasandra).
 class LocationBrandingHeader extends StatelessWidget {
   final String locationDisplayName;
   final TextAlign align;

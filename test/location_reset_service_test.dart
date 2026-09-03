@@ -15,9 +15,9 @@ void main() {
   });
 
   test('branch labels map to the three active locations', () {
-    expect(branchLabelForLocationCode('win1'), 'Win1 - Bommasandra');
-    expect(branchLabelForLocationCode('win2'), 'Win2 - Tippasandra');
-    expect(branchLabelForLocationCode('win3'), 'Win3 - Grabhivapalya');
+    expect(branchLabelForLocationCode('win1'), 'Bommasandra');
+    expect(branchLabelForLocationCode('win2'), 'Tippasandra');
+    expect(branchLabelForLocationCode('win3'), 'Grabhivapalya');
   });
 
   test('hasPendingServerReset tracks queued location codes', () async {

@@ -126,7 +126,7 @@ void main() {
     await _waitForLoadingToFinish(tester);
 
     expect(find.text('R K S ENTERPRISES'), findsOneWidget);
-    expect(find.text('Win1 - Bommasandra'), findsOneWidget);
+    expect(find.text('Bommasandra'), findsOneWidget);
 
     await _savePng(tester, '$shotDir/branding_staff_dashboard_win1.png');
     await tester.pumpWidget(const SizedBox.shrink());
@@ -142,7 +142,7 @@ void main() {
     await _waitForLoadingToFinish(tester);
 
     expect(find.text('R K S ENTERPRISES'), findsWidgets);
-    expect(find.text('Win1 - Bommasandra'), findsOneWidget);
+    expect(find.text('Bommasandra'), findsOneWidget);
 
     await _savePng(tester, '$shotDir/branding_admin_location_grid.png');
     await tester.pumpWidget(const SizedBox.shrink());
@@ -307,7 +307,7 @@ void main() {
     await pdfFile.copy('$shotDir/receipt_full_bill_sample.pdf');
 
     expect(text, contains('R K S ENTERPRISES'));
-    expect(text, contains('Win1 - Bommasandra'));
+    expect(text, contains('Bommasandra'));
     expect(text, contains('SUBTOTAL'));
     expect(text, contains('GRAND TOTAL'));
     expect(text, contains('THANK YOU VISIT AGAIN'));

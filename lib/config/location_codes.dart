@@ -22,11 +22,11 @@ String displayNameForLocationCode(String code) {
 String branchLabelForLocationCode(String code) {
   switch (code) {
     case 'win1':
-      return 'Win1 - Bommasandra';
+      return 'Bommasandra';
     case 'win2':
-      return 'Win2 - Tippasandra';
+      return 'Tippasandra';
     case 'win3':
-      return 'Win3 - Grabhivapalya';
+      return 'Grabhivapalya';
     default:
       return displayNameForLocationCode(code);
   }
