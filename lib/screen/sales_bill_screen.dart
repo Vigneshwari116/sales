@@ -33,9 +33,13 @@ class SalesBillScreen extends StatefulWidget {
   @visibleForTesting
   final int? initialBillNo;
 
+  /// When false, bill tab is hidden inside [IndexedStack] — restore focus on return.
+  final bool isSectionActive;
+
   const SalesBillScreen({
     super.key,
     this.embeddedInDashboard = false,
+    this.isSectionActive = true,
     this.initialBillNo,
     this.ledgerScreenBuilder,
   });
@@ -94,7 +98,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final List<String> _paymentModes = const [
     'CASH',
     'CARD',
-    'PHONE PEE',
+    'UPI',
   ];
 
   // ============================================================
@@ -123,6 +127,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   final FocusNode _rateFocus = FocusNode();
 
   final FocusNode _qtyFocus = FocusNode();
+
+  final FocusNode _nameFocus = FocusNode();
+
+  final FocusNode _mobileFocus = FocusNode();
+
+  String _lastFocusField = 'name';
 
   // ============================================================
   // AUTO FOCUS TIMERS — removed; field advance is Enter-only.
@@ -157,6 +167,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateController.text = '0';
     _qtyController.text = '0';
 
+    _rateFocus.addListener(() => _onNumericFocus(_rateFocus, _rateController));
+    _qtyFocus.addListener(() => _onNumericFocus(_qtyFocus, _qtyController));
+    _nameFocus.addListener(() => _onFieldFocused('name'));
+    _mobileFocus.addListener(() => _onFieldFocused('mobile'));
+    _rateFocus.addListener(() {
+      if (_rateFocus.hasFocus) _onFieldFocused('rate');
+    });
+    _qtyFocus.addListener(() {
+      if (_qtyFocus.hasFocus) _onFieldFocused('qty');
+    });
+
     _manualPushInProgress = SyncService.instance.manualPushInProgress.value;
     SyncService.instance.manualPushInProgress.addListener(_onManualPushChanged);
 
@@ -165,15 +186,64 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     if (widget.initialBillNo != null) {
       _billNo = widget.initialBillNo!;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusRate();
+        if (mounted) _restoreSavedFocus();
       });
     } else {
       _restoreSessionOrLoadBill().then((_) {
         if (mounted) {
-          _focusRate();
+          _restoreSavedFocus();
         }
       });
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant SalesBillScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSectionActive && !oldWidget.isSectionActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _restoreSavedFocus();
+      });
+    }
+  }
+
+  void _onNumericFocus(FocusNode node, TextEditingController controller) {
+    if (!node.hasFocus) return;
+    final text = controller.text.trim();
+    if (text == '0' || text == '0.0' || text == '0.00') {
+      controller.clear();
+    }
+  }
+
+  void _onFieldFocused(String field) {
+    _lastFocusField = field;
+    SessionService.saveFocusField(field);
+  }
+
+  Future<void> _restoreSavedFocus() async {
+    final saved = await SessionService.loadFocusField();
+    final field = saved ?? _lastFocusField;
+    switch (field) {
+      case 'mobile':
+        _focusMobile();
+      case 'rate':
+        _focusRate();
+      case 'qty':
+        _focusQty();
+      case 'name':
+      default:
+        _focusName();
+    }
+  }
+
+  void _focusName() {
+    if (!mounted) return;
+    _nameFocus.requestFocus();
+  }
+
+  void _focusMobile() {
+    if (!mounted) return;
+    _mobileFocus.requestFocus();
   }
 
   void _onManualPushChanged() {
@@ -214,7 +284,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       setState(() {
         _billNo = session.billNo;
         _billDate = session.billDate;
-        _paymentMode = session.paymentMode;
+        _paymentMode = session.paymentMode == 'PHONE PEE'
+            ? 'UPI'
+            : session.paymentMode;
         var customerName = session.customerName;
         if (customerName == 'CASH' && session.paymentMode == 'CASH') {
           customerName = '';
@@ -1153,9 +1225,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                       }
 
                       setState(() {
-                        _paymentMode =
-                            value;
+                        _paymentMode = value;
                       });
+                      _onFieldFocused('name');
+                      _focusName();
                     },
                   ),
                 ),
@@ -1230,7 +1303,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           const SizedBox(height: 4),
           _buildLabeledCustomerField(
             label: 'Name',
-            child: _smallTextField(_customerNameController),
+            child: _smallTextField(
+              _customerNameController,
+              focusNode: _nameFocus,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => _focusMobile(),
+            ),
           ),
           const SizedBox(height: 6),
           _buildLabeledCustomerField(
@@ -1241,6 +1319,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 _mobileController,
                 number: true,
                 fieldKey: const Key('bill_mobile_field'),
+                focusNode: _mobileFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _focusRate(),
               ),
             ),
           ),
@@ -1353,10 +1434,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       TextEditingController controller, {
         bool number = false,
         Key? fieldKey,
+        FocusNode? focusNode,
+        TextInputAction? textInputAction,
+        ValueChanged<String>? onSubmitted,
       }) {
     return TextField(
         key: fieldKey,
         controller: controller,
+        focusNode: focusNode,
+        textInputAction: textInputAction,
+        onSubmitted: onSubmitted,
 
         keyboardType: number
             ? TextInputType.phone
@@ -1976,6 +2063,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _rateFocus.dispose();
 
     _qtyFocus.dispose();
+
+    _nameFocus.dispose();
+
+    _mobileFocus.dispose();
 
     super.dispose();
   }

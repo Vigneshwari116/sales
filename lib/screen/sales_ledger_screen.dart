@@ -4,6 +4,7 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
+import 'package:sales/services/ledger_pdf_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -43,12 +44,16 @@ class SalesLedgerScreen extends StatefulWidget {
 }
 
 class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
-  static const double _tableMinWidth = 920;
+  static const double _tableMinWidth = 760;
 
   bool _loading = true;
   bool _pulling = false;
+  bool _exportingPdf = false;
   List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
+  DateTime _fromDate = DateTime.now();
+  DateTime _toDate = DateTime.now();
+  bool _customRange = false;
 
   @override
   void initState() {
@@ -68,6 +73,15 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     }
   }
 
+  String? get _fromKey => _dateKey(_fromDate);
+  String? get _toKey => _dateKey(_toDate);
+
+  String? _dateKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _loadLedger() async {
     setState(() => _loading = true);
 
@@ -79,7 +93,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     if (widget.loadLedgerOverride != null) {
       result = await widget.loadLedgerOverride!()!;
     } else {
-      result = await LedgerRepository.getLedger(location: widget.location);
+      result = await LedgerRepository.getLedger(
+        location: widget.location,
+        from: _fromKey,
+        to: _toKey,
+      );
     }
 
     if (!mounted) return;
@@ -112,6 +130,52 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         ),
       ),
     );
+  }
+
+  void _setToday() {
+    final now = DateTime.now();
+    setState(() {
+      _fromDate = now;
+      _toDate = now;
+      _customRange = false;
+    });
+    _loadLedger();
+  }
+
+  Future<void> _exportPdf() async {
+    if (_entries.isEmpty || _summary == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No ledger rows to export')),
+      );
+      return;
+    }
+
+    setState(() => _exportingPdf = true);
+
+    try {
+      final path = await LedgerPdfService.saveLedgerPdf(
+        location: widget.location,
+        entries: _entries,
+        summary: _summary!,
+        fromDate: _fromDate,
+        toDate: _toDate,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ledger PDF saved: $path')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save ledger PDF: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _exportingPdf = false);
+      }
+    }
   }
 
   Future<void> _viewBill(LocalLedgerEntry entry) async {
@@ -155,6 +219,21 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     }
   }
 
+  double _entryGst(LocalLedgerEntry entry) =>
+      entry.cgst + entry.sgst + entry.igst;
+
+  double _summaryGst(LedgerSummary summary) =>
+      summary.cgst + summary.sgst + summary.igst;
+
+  String get _periodLabel {
+    if (!_customRange) {
+      return 'Today — ${DateFormat('dd MMM yyyy').format(DateTime.now())}';
+    }
+    final from = DateFormat('dd MMM yyyy').format(_fromDate);
+    final to = DateFormat('dd MMM yyyy').format(_toDate);
+    return from == to ? from : '$from — $to';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,6 +242,24 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         'SALES LEDGER',
         automaticallyImplyLeading: !widget.embeddedInDashboard,
         actions: [
+          if (_exportingPdf)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              key: const Key('ledger_save_pdf_button'),
+              onPressed: _entries.isEmpty ? null : _exportPdf,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Save as PDF',
+            ),
           if (_pulling)
             const Padding(
               padding: EdgeInsets.only(right: 12),
@@ -186,32 +283,75 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _entries.isEmpty
-              ? _buildEmptyState()
-              : CenteredContent(
-                  maxWidth: 1100,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final needsHScroll =
-                          constraints.maxWidth < _tableMinWidth;
-                      final table = _buildTable();
-
-                      if (!needsHScroll) {
-                        return SingleChildScrollView(child: table);
-                      }
-
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(
-                          child: SizedBox(
-                            width: _tableMinWidth,
-                            child: table,
-                          ),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        _periodLabel,
+                        style: const TextStyle(
+                          fontSize: AppTextSizes.listTitle,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.navy,
                         ),
-                      );
-                    },
+                      ),
+                      DateRangeButton(
+                        fromDate: _fromDate,
+                        toDate: _toDate,
+                        onChanged: (range) {
+                          setState(() {
+                            _fromDate = range.start;
+                            _toDate = range.end;
+                            _customRange = true;
+                          });
+                          _loadLedger();
+                        },
+                      ),
+                      OutlinedButton(
+                        onPressed: _setToday,
+                        child: const Text('TODAY'),
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _entries.isEmpty
+                      ? _buildEmptyState()
+                      : CenteredContent(
+                          maxWidth: 1100,
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final needsHScroll =
+                                  constraints.maxWidth < _tableMinWidth;
+                              final table = _buildTable();
+
+                              if (!needsHScroll) {
+                                return SingleChildScrollView(child: table);
+                              }
+
+                              return SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SingleChildScrollView(
+                                  child: SizedBox(
+                                    width: _tableMinWidth,
+                                    child: table,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -236,9 +376,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              widget.readOnly
-                  ? 'Use Sync → Sync Location to pull bills from the server, or tap Refresh above.'
-                  : 'Save bills on this device or open Sync to push pending bills.',
+              _customRange
+                  ? 'No bills in the selected date range.'
+                  : 'No bills saved today. Use DATE RANGE to view older bills.',
               style: const TextStyle(fontSize: AppTextSizes.listSubtitle),
               textAlign: TextAlign.center,
             ),
@@ -268,25 +408,19 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
-  bool get _hideTaxColumns => widget.embeddedInDashboard;
-
   Widget _headerRow() {
     return Container(
       color: AppColors.tableHeader,
       child: Row(
         children: [
-          _cell('BILLNO', flex: 7, bold: true),
-          _cell('DATE', flex: 8, bold: true),
-          _cell('NAME', flex: 13, bold: true),
-          _cell('MOBILE', flex: 11, bold: true),
-          _cell('PAY', flex: 7, bold: true),
-          _cell('TOTAL', flex: 8, bold: true, alignRight: true),
-          if (!_hideTaxColumns) ...[
-            _cell('CGST', flex: 7, bold: true, alignRight: true),
-            _cell('SGST', flex: 7, bold: true, alignRight: true),
-            _cell('IGST', flex: 7, bold: true, alignRight: true),
-          ],
-          _cell('GRAND TOTAL', flex: 9, bold: true, alignRight: true),
+          _cell('BILLNO', flex: 6, bold: true),
+          _cell('DATE', flex: 7, bold: true),
+          _cell('NAME', flex: 10, bold: true),
+          _cell('MOBILE', flex: 8, bold: true),
+          _cell('PAY', flex: 6, bold: true),
+          _cell('TOTAL', flex: 7, bold: true, alignRight: true),
+          _cell('GST', flex: 6, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', flex: 8, bold: true, alignRight: true),
         ],
       ),
     );
@@ -298,18 +432,14 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       onTap: () => _viewBill(entry),
       child: Row(
         children: [
-          _cell('${entry.billNo}', flex: 7),
-          _cell(_formatDate(entry.date), flex: 8),
-          _cell(entry.customerName, flex: 13),
-          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, flex: 11),
-          _cell(entry.paymentMode, flex: 7),
-          _cell(_formatMoney(entry.total), flex: 8, alignRight: true),
-          if (!_hideTaxColumns) ...[
-            _cell(_formatMoney(entry.cgst), flex: 7, alignRight: true),
-            _cell(_formatMoney(entry.sgst), flex: 7, alignRight: true),
-            _cell(_formatMoney(entry.igst), flex: 7, alignRight: true),
-          ],
-          _cell(_formatMoney(entry.grandTotal), flex: 9, alignRight: true),
+          _cell('${entry.billNo}', flex: 6),
+          _cell(_formatDate(entry.date), flex: 7),
+          _cell(entry.customerName, flex: 10),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, flex: 8),
+          _cell(LedgerPdfService.formatPayMode(entry.paymentMode), flex: 6),
+          _cell(_formatMoney(entry.total), flex: 7, alignRight: true),
+          _cell(_formatMoney(_entryGst(entry)), flex: 6, alignRight: true),
+          _cell(_formatMoney(entry.grandTotal), flex: 8, alignRight: true),
         ],
       ),
     );
@@ -321,23 +451,17 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       color: AppColors.headerBand,
       child: Row(
         children: [
+          _cell('', flex: 6, bold: true),
           _cell('', flex: 7, bold: true),
+          _cell('', flex: 10, bold: true),
           _cell('', flex: 8, bold: true),
-          _cell('', flex: 13, bold: true),
-          _cell('', flex: 11, bold: true),
-          _cell('', flex: 7, bold: true),
+          _cell('', flex: 6, bold: true),
           _cell(_formatMoney(summary.total),
-              flex: 8, bold: true, alignRight: true),
-          if (!_hideTaxColumns) ...[
-            _cell(_formatMoney(summary.cgst),
-                flex: 7, bold: true, alignRight: true),
-            _cell(_formatMoney(summary.sgst),
-                flex: 7, bold: true, alignRight: true),
-            _cell(_formatMoney(summary.igst),
-                flex: 7, bold: true, alignRight: true),
-          ],
+              flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(_summaryGst(summary)),
+              flex: 6, bold: true, alignRight: true),
           _cell(_formatMoney(summary.grandTotal),
-              flex: 9, bold: true, alignRight: true),
+              flex: 8, bold: true, alignRight: true),
         ],
       ),
     );
@@ -352,7 +476,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     return Expanded(
       flex: flex,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
         decoration: const BoxDecoration(
           border: Border(
             right: BorderSide(color: AppColors.border, width: 0.6),
@@ -364,8 +488,8 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
           textAlign: alignRight ? TextAlign.right : TextAlign.left,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: AppTextSizes.tableRowText,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            fontSize: 9,
+            fontWeight: bold ? FontWeight.bold : FontWeight.w500,
             color: AppColors.navy,
           ),
         ),

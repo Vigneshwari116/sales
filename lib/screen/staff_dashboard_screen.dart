@@ -118,6 +118,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         ),
         SalesBillScreen(
           embeddedInDashboard: true,
+          isSectionActive: _selectedSection == _StaffSection.bill,
           ledgerScreenBuilder: widget.ledgerScreenBuilder,
         ),
         SalesAbstractScreen(
