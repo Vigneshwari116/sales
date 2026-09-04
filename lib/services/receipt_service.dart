@@ -7,8 +7,13 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// Thermal width in characters — keep lines within this to avoid clipping.
-  static const int _width = 48;
+  /// 58mm thermal paper — ~32 monospace chars fit without clipping.
+  static const int _width = 32;
+  static const int _snoW = 4;
+  static const int _rateW = 8;
+  static const int _qtyW = 6;
+  static const int _amountW = _width - _snoW - _rateW - _qtyW;
+  static const int _labelW = _width - _amountW;
 
   static String buildReceiptText(SaleBill bill) {
     final code = locationCodeFromDisplayName(bill.location);
@@ -30,7 +35,7 @@ class ReceiptService {
     final profile = _locationProfile('win3');
 
     buffer.writeln(_center(businessName));
-    buffer.writeln(_center(profile.addressLine));
+    _writeCenteredLines(buffer, profile.addressLine);
     buffer.writeln(_center('GSTIN:$gstin'));
     buffer.writeln(_billDateLine(bill.billNo, dateText));
     buffer.writeln(_fieldLine('NAME', bill.customerName));
@@ -40,8 +45,9 @@ class ReceiptService {
     for (final item in bill.items) {
       buffer.writeln(_grabhivItemLine(item));
       buffer.writeln(
-        '     CGST% ${_formatPct(item.cgstPct)}'
-        '  SGST% ${_formatPct(item.sgstPct)}',
+        '${_padRight('', _snoW)}'
+        'CGST% ${_formatPct(item.cgstPct)}'
+        ' SGST% ${_formatPct(item.sgstPct)}',
       );
     }
 
@@ -70,7 +76,7 @@ class ReceiptService {
     final line = '-' * _width;
 
     buffer.writeln(_center(businessName));
-    buffer.writeln(_center(profile.addressLine));
+    _writeCenteredLines(buffer, profile.addressLine);
     buffer.writeln(_center('GSTIN:$gstin'));
     buffer.writeln(_billDateLine(bill.billNo, dateText));
     buffer.writeln(_fieldLine('NAME', bill.customerName));
@@ -130,55 +136,55 @@ class ReceiptService {
   }
 
   static String _grabhivItemHeader() {
-    return '${_padRight('SNO', 4)}'
-        '${_padRight('RATE', 10)}'
-        '${_padRight('QTY', 6)}'
-        '${_padLeft('AMOUNT', _width - 20)}';
+    return '${_padRight('SNO', _snoW)}'
+        '${_padRight('RATE', _rateW)}'
+        '${_padRight('QTY', _qtyW)}'
+        '${_padLeft('AMOUNT', _amountW)}';
   }
 
   static String _grabhivItemLine(BillItem item) {
-    return '${_padRight('', 4)}'
-        '${_padRight(_money(item.rate), 10)}'
-        '${_padRight(_money(item.qty), 6)}'
-        '${_padLeft(_money(item.grossAmt), _width - 20)}';
+    return '${_padRight('', _snoW)}'
+        '${_padRight(_money(item.rate), _rateW)}'
+        '${_padRight(_money(item.qty), _qtyW)}'
+        '${_padLeft(_money(item.grossAmt), _amountW)}';
   }
 
   static String _grabhivTotalLine(double qty, double grandTotal) {
-    final left = _padRight('TOTAL', 20);
-    final qtyPart = _padRight(_money(qty), 10);
-    final amountPart = _padLeft(_money(grandTotal), _width - 30);
+    final left = _padRight('TOTAL', _snoW + _rateW);
+    final qtyPart = _padRight(_money(qty), _qtyW);
+    final amountPart = _padLeft(_money(grandTotal), _amountW);
     return '$left$qtyPart$amountPart';
   }
 
   static String _grabhivGrandTotalLine(double grandTotal) {
-    final label = _padRight('GRAND TOTAL', 28);
-    return '$label${_padLeft(_money(grandTotal), _width - 28)}';
+    final label = _padRight('GRAND TOTAL', _labelW);
+    return '$label${_padLeft(_money(grandTotal), _amountW)}';
   }
 
   static String _dashedItemHeader() {
-    return '${_padRight('SNO', 5)}'
-        '${_padRight('RATE', 10)}'
-        '${_padRight('QTY', 14)}'
-        '${_padLeft('AMOUNT', _width - 29)}';
+    return '${_padRight('SNO', _snoW)}'
+        '${_padRight('RATE', _rateW)}'
+        '${_padRight('QTY', _qtyW)}'
+        '${_padLeft('AMOUNT', _amountW)}';
   }
 
   static String _dashedItemLine(BillItem item) {
-    return '${_padRight('', 5)}'
-        '${_padRight(_money(item.rate), 10)}'
-        '${_padRight(_money(item.qty), 14)}'
-        '${_padLeft(_money(item.grossAmt), _width - 29)}';
+    return '${_padRight('', _snoW)}'
+        '${_padRight(_money(item.rate), _rateW)}'
+        '${_padRight(_money(item.qty), _qtyW)}'
+        '${_padLeft(_money(item.grossAmt), _amountW)}';
   }
 
   static String _dashedTotalLine(double qty, double grandTotal) {
-    final left = _padRight('TOTAL', 20);
-    final qtyPart = _padRight(_money(qty), 10);
-    final amountPart = _padLeft(_money(grandTotal), _width - 30);
+    final left = _padRight('TOTAL', _snoW + _rateW);
+    final qtyPart = _padRight(_money(qty), _qtyW);
+    final amountPart = _padLeft(_money(grandTotal), _amountW);
     return '$left$qtyPart$amountPart';
   }
 
   static String _rightAmountLine(String label, double amount) {
-    final labelPart = _padRight(label, 28);
-    return '$labelPart${_padLeft(_money(amount), _width - 28)}';
+    final labelPart = _padRight(label, _labelW);
+    return '$labelPart${_padLeft(_money(amount), _amountW)}';
   }
 
   static String _fieldLine(String label, String value) {
@@ -194,6 +200,36 @@ class ReceiptService {
     }
     final gap = _width - left.length - right.length;
     return '$left${' ' * gap}$right';
+  }
+
+  static void _writeCenteredLines(StringBuffer buffer, String text) {
+    for (final line in _wrapToWidth(text)) {
+      buffer.writeln(_center(line));
+    }
+  }
+
+  static List<String> _wrapToWidth(String text) {
+    if (text.length <= _width) {
+      return [text];
+    }
+    final lines = <String>[];
+    var remaining = text;
+    while (remaining.isNotEmpty) {
+      if (remaining.length <= _width) {
+        lines.add(remaining);
+        break;
+      }
+      var breakAt = remaining.lastIndexOf(',', _width);
+      if (breakAt <= 0) {
+        breakAt = _width;
+      }
+      lines.add(remaining.substring(0, breakAt).trim());
+      remaining = remaining.substring(breakAt).trimLeft();
+      if (remaining.startsWith(',')) {
+        remaining = remaining.substring(1).trimLeft();
+      }
+    }
+    return lines;
   }
 
   static String _center(String text) {
