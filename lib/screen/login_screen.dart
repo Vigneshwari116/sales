@@ -7,7 +7,7 @@ import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/theme/app_theme.dart';
 
-/// Single login for staff (win1–win4) and admin — no role toggle on screen.
+/// Single login for staff (win1–win3) and admin — no role toggle on screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 

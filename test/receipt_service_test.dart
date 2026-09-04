@@ -38,6 +38,7 @@ void main() {
     expect(lines.any((line) => line.startsWith('SNO')), isTrue);
     expect(lines.any((line) => line.contains('GRAND TOTAL')), isTrue);
     expect(text, contains('Bangalore-68'));
+    expect(text, contains('Bommasandra'));
   });
 
   test('receipt shows value, subtotal, gst and grand total clearly', () {

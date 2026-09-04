@@ -640,6 +640,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
       try {
         await BillPrintService.saveReceiptToDesktop(bill);
+        await BillPrintService.saveReceiptPdfToDesktop(bill);
       } catch (_) {
         // Desktop save is best-effort; bill is already persisted locally.
       }

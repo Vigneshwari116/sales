@@ -12,6 +12,7 @@ import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
+import 'package:sales/services/location_reset_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class _FakePathProvider extends Fake
@@ -101,6 +102,7 @@ void main() {
     await AppConfig.setLocation(_testLocationCode);
     await LocalDb.resetForTesting();
     await SyncService.resetForTesting();
+    await LocationResetService.clearPendingForTesting();
     await _deleteTestDb();
   });
 
@@ -213,6 +215,42 @@ void main() {
       },
     );
 
+    test('manualPush blocked while server reset is pending', () async {
+      SharedPreferences.setMockInitialValues({
+        'pending_server_reset_locations': ['win1'],
+      });
+
+      final db = LocalDb.instance;
+      await db.initialize();
+      await db.insertBill(_pendingBill(1));
+
+      final sync = SyncService.instance;
+      sync.isOnlineOverride = () async => true;
+      LocationResetService.isDeviceOnlineOverride = () async => true;
+      LocationResetService.resetLocationSalesOverride =
+          ({required location, required password}) async {
+        return SalesApiResult.failure('Server unavailable');
+      };
+
+      final postedBillNos = <int>[];
+      sync.saveBillOverride = (bill) async {
+        postedBillNos.add(bill.billNo);
+        return SalesApiResult.success(bill.billNo);
+      };
+
+      final result = await sync.manualPush(_testLocationName);
+
+      expect(result.ok, isFalse);
+      expect(result.error, LocationResetService.pendingResetFailedMessage);
+      expect(postedBillNos, isEmpty);
+
+      final stillPending = await db.getBillsBySyncStatus(
+        'pending',
+        location: _testLocationName,
+      );
+      expect(stillPending, hasLength(1));
+    });
+
     test('manualPush pushes soft-deleted synced bill with deleted flag', () async {
       final db = LocalDb.instance;
       await db.initialize();
@@ -278,6 +316,51 @@ void main() {
         location: _testLocationName,
       );
       expect(stillPending, isEmpty);
+    });
+
+    test('manualSync wipes server before pushing pending bills', () async {
+      SharedPreferences.setMockInitialValues({
+        'pending_server_reset_locations': ['win1'],
+      });
+
+      final db = LocalDb.instance;
+      await db.initialize();
+      await db.insertBill(_pendingBill(1));
+
+      final sync = SyncService.instance;
+      sync.isOnlineOverride = () async => true;
+      LocationResetService.isDeviceOnlineOverride = () async => true;
+
+      var resetCalls = 0;
+      LocationResetService.resetLocationSalesOverride =
+          ({required location, required password}) async {
+        resetCalls++;
+        return SalesApiResult.success(null);
+      };
+
+      final postedBillNos = <int>[];
+      sync.saveBillOverride = (bill) async {
+        postedBillNos.add(bill.billNo);
+        return SalesApiResult.success(bill.billNo);
+      };
+      sync.getBillUpdatesSinceOverride =
+          ({required location, required since}) async {
+        return SalesApiResult.success((
+          bills: <SaleBill>[],
+          serverTime: DateTime.now().toUtc(),
+        ));
+      };
+
+      final result = await sync.manualSync(_testLocationName);
+
+      expect(resetCalls, greaterThanOrEqualTo(1));
+      expect(result.ok, isTrue);
+      expect(result.pushedCount, 1);
+      expect(postedBillNos, [1]);
+      expect(
+        await LocationResetService.hasPendingServerReset('win1'),
+        isFalse,
+      );
     });
 
     test('manualSync surfaces pull errors', () async {

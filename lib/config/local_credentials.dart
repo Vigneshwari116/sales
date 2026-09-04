@@ -11,8 +11,11 @@ const String billEditPassword = '12345678';
 /// Password required before manual sync runs.
 const String syncPassword = 'RKS';
 
-/// Staff usernames map 1:1 to location codes (never shown as Win1–4 in UI).
-const List<String> staffLocationUsernames = ['win1', 'win2', 'win3', 'win4'];
+/// Password required before staff data reset runs.
+const String resetPassword = 'RKS';
+
+/// Staff usernames map 1:1 to location codes.
+const List<String> staffLocationUsernames = ['win1', 'win2', 'win3'];
 
 bool isStaffUsername(String username) {
   return staffLocationUsernames.contains(username.trim().toLowerCase());

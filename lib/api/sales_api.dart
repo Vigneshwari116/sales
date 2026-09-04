@@ -443,4 +443,36 @@ class SalesApi {
   static bool isGstDbNameValid(String serverDbName) {
     return serverDbName == AppConfig.expectedGstDbName;
   }
+
+  static Future<SalesApiResult<void>> resetLocationSales({
+    required String location,
+    required String password,
+  }) async {
+    final uri = Uri.parse('$salesBillApiBaseUrl/api/locations/reset');
+
+    try {
+      final res = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'location': location,
+              'password': password,
+            }),
+          )
+          .timeout(_timeout);
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode == 200 && body['ok'] == true) {
+        return SalesApiResult.success(null);
+      }
+
+      return SalesApiResult.failure(
+        body['error'] as String? ?? 'Could not reset location data',
+      );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
 }

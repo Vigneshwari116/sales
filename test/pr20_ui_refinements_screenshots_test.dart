@@ -180,7 +180,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
       await tester.pump();
-      if (find.text('Win1').evaluate().isNotEmpty) {
+      if (find.text('Bommasandra').evaluate().isNotEmpty) {
         break;
       }
     }

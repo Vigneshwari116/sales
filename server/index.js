@@ -84,7 +84,7 @@ async function initDatabase() {
     console.log('Default user created: admin / admin');
   }
 
-  for (const loc of ['win1', 'win2', 'win3', 'win4']) {
+  for (const loc of ['win1', 'win2', 'win3']) {
     await pool.query(
       `INSERT INTO gst_config (location, cgst_pct, sgst_pct, version)
        VALUES ($1, 2.5, 2.5, '1')
@@ -499,6 +499,34 @@ app.get('/api/ledger', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Could not load ledger' });
+  }
+});
+
+const RESET_PASSWORD = 'RKS';
+
+app.post('/api/locations/reset', async (req, res) => {
+  const password = String(req.body?.password ?? '');
+  const location = String(req.body?.location ?? '').trim();
+
+  if (password !== RESET_PASSWORD) {
+    return res.status(403).json({ ok: false, error: 'Incorrect password' });
+  }
+
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'location is required' });
+  }
+
+  const activeLocations = ['Win1', 'Win2', 'Win3'];
+  if (!activeLocations.includes(location)) {
+    return res.status(400).json({ ok: false, error: 'Invalid location' });
+  }
+
+  try {
+    await pool.query('DELETE FROM bills WHERE location = $1', [location]);
+    res.json({ ok: true, location, message: 'Location sales data reset' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not reset location data' });
   }
 });
 

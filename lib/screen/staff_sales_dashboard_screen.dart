@@ -83,13 +83,9 @@ class _StaffSalesDashboardScreenState extends State<StaffSalesDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.location,
-                    style: const TextStyle(
-                      fontSize: AppTextSizes.statNumber,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.navy,
-                    ),
+                  LocationBrandingHeader(
+                    locationDisplayName: widget.location,
+                    align: TextAlign.left,
                   ),
                   const SizedBox(height: 4),
                   Text(

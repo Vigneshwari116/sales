@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_date_range_picker.dart';
 
@@ -220,6 +221,55 @@ class CompactAbstractSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Centered business name with branch label (e.g. Bommasandra).
+class LocationBrandingHeader extends StatelessWidget {
+  final String locationDisplayName;
+  final TextAlign align;
+  final bool compact;
+
+  const LocationBrandingHeader({
+    super.key,
+    required this.locationDisplayName,
+    this.align = TextAlign.center,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleSize =
+        compact ? AppTextSizes.sectionHeader : AppTextSizes.statNumber;
+    final branchSize =
+        compact ? AppTextSizes.listTitle : AppTextSizes.sectionHeader;
+
+    return Column(
+      crossAxisAlignment: align == TextAlign.center
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        Text(
+          businessDisplayName,
+          textAlign: align,
+          style: TextStyle(
+            fontSize: titleSize,
+            fontWeight: FontWeight.bold,
+            color: AppColors.navy,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          branchLabelForDisplayName(locationDisplayName),
+          textAlign: align,
+          style: TextStyle(
+            fontSize: branchSize,
+            fontWeight: FontWeight.w600,
+            color: AppColors.navy,
+          ),
+        ),
+      ],
     );
   }
 }
