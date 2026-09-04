@@ -28,7 +28,7 @@ bool isStaffUsername(String username) {
 
 bool verifyAdminLogin(String username, String password) {
   return username.trim().toLowerCase() == adminUsername &&
-      password.trim() == adminPassword;
+      password.trim().toLowerCase() == adminPassword.toLowerCase();
 }
 
 bool verifyStaffLogin(String username, String password) {
@@ -36,7 +36,7 @@ bool verifyStaffLogin(String username, String password) {
   if (account == null) {
     return false;
   }
-  return password.trim() == account.password;
+  return password.trim().toLowerCase() == account.password.toLowerCase();
 }
 
 String staffLocationCodeForUsername(String username) {

@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/services/location_seed_service.dart';
 
 class AbstractSummary {
   final double totalSaleAmount;
@@ -41,6 +42,7 @@ class AbstractRepository {
     required DateTime toDate,
   }) async {
     try {
+      await LocationSeedService.ensureLocationSeeded(locationCode);
       final fromKey = _formatDate(fromDate);
       final toKey = _formatDate(toDate);
       final rows = await _readBillsForLocationCode(locationCode);

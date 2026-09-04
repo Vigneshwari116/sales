@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -64,7 +66,7 @@ class _AppRootState extends State<AppRoot> {
 
     if (loggedIn && AppConfig.isLocationSet) {
       final role = await SessionService.getRole();
-      await AppSessionService.onLoginComplete();
+      unawaited(AppSessionService.onLoginComplete());
 
       if (role == SessionRole.admin) {
         return const AdminDashboardScreen();

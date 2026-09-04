@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/app_license.dart';
@@ -73,7 +75,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (isAdmin) {
         await AppConfig.setLocation('win1');
         await SessionService.saveLogin(username, role: SessionRole.admin);
-        await AppSessionService.onLoginComplete();
 
         if (!mounted) return;
 
@@ -83,13 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 (_) => const AdminDashboardScreen(),
           ),
         );
+        unawaited(AppSessionService.onLoginComplete());
         return;
       }
 
       final locationCode = staffLocationCodeForUsername(username);
       await AppConfig.setLocation(locationCode);
       await SessionService.saveLogin(username, role: SessionRole.staff);
-      await AppSessionService.onLoginComplete();
 
       if (!mounted) return;
 
@@ -99,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
               (_) => const StaffDashboardScreen(),
         ),
       );
+      unawaited(AppSessionService.onLoginComplete());
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -152,7 +154,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.navy,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Admin: admin / admin123',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _userCtrl,
                       autocorrect: false,

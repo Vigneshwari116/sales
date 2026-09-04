@@ -8,11 +8,14 @@ import 'package:sales/services/sync_service.dart';
 
 class AppSessionService {
   static Future<void> onLoginComplete() async {
-    await LocalDb.instance.initialize();
+    try {
+      await LocalDb.instance.initialize();
+    } catch (_) {
+      // Login must succeed even if the local database is temporarily unavailable.
+    }
 
     final role = await SessionService.getRole();
     if (role == SessionRole.admin) {
-      unawaited(_seedAdminLocationsInBackground());
       return;
     }
 
@@ -20,16 +23,12 @@ class AppSessionService {
     SyncService.instance.start(location: AppConfig.displayLocationName);
   }
 
-  static Future<void> _seedAdminLocationsInBackground() async {
-    try {
-      await LocationSeedService.ensureAllLocationsSeeded();
-    } catch (_) {
-      // Seeding must not block or crash login — data loads on next session.
-    }
-  }
-
   static Future<void> onLogout() async {
     SyncService.instance.stop();
-    await LocalDb.instance.close();
+    try {
+      await LocalDb.instance.close();
+    } catch (_) {
+      // Ignore close errors during logout.
+    }
   }
 }

@@ -1,7 +1,9 @@
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart' as db;
 import 'package:sales/db/location_database.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/location_seed_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class LocalLedgerEntry {
@@ -42,6 +44,8 @@ class LedgerRepository {
     String? to,
   }) async {
     try {
+      final locationCode = locationCodeFromDisplayName(location);
+      await LocationSeedService.ensureLocationSeeded(locationCode);
       final rows = await LocationDatabase.getLedgerEntries(
         location: location,
         from: from,
