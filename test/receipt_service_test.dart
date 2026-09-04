@@ -34,6 +34,7 @@ void main() {
     expect(text, contains('CGST%  2.5SGST%  2.5'));
     expect(text, contains('GRAND TOTAL'));
     expect(text.split('-----').length, greaterThan(4));
+    _expectLinesWithinThermalWidth(text);
   });
 
   test('tippasandra receipt uses tippasandra address', () {
@@ -43,6 +44,7 @@ void main() {
     expect(text, contains('Bangalore-560075'));
     expect(text, contains('AMOUNT'));
     expect(text, contains('GRAND TOTAL'));
+    _expectLinesWithinThermalWidth(text);
   });
 
   test('grabhiv receipt shows per-item gst lines', () {
@@ -72,5 +74,45 @@ void main() {
     expect(lines.where((line) => line.contains('CGST% 2.5')).length, 2);
     expect(text, contains('TOTAL'));
     expect(text, contains('1100.00'));
+    _expectLinesWithinThermalWidth(text);
   });
+
+  test('bommasandra receipt aligns amount column for multi-item bill', () {
+    final bill = SaleBill(
+      billNo: 17345,
+      location: 'Win1',
+      billDate: DateTime(2024, 9, 4),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [
+        BillItem(qty: 1, rate: 1200),
+        BillItem(qty: 1, rate: 210),
+      ],
+      totalQty: 2,
+      totalAmount: 1343,
+      totalCgst: 33.5,
+      totalSgst: 33.5,
+      totalIgst: 0,
+      grandTotal: 1410,
+    );
+
+    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final itemLines = lines.where((line) => line.contains('1200.00')).toList();
+
+    expect(itemLines, hasLength(1));
+    expect(itemLines.first.endsWith('1200.00'), isTrue);
+    expect(itemLines.first.length, lessThanOrEqualTo(32));
+    _expectLinesWithinThermalWidth(lines.join('\n'));
+  });
+}
+
+void _expectLinesWithinThermalWidth(String text) {
+  for (final line in text.split('\n')) {
+    expect(
+      line.length,
+      lessThanOrEqualTo(32),
+      reason: 'Line exceeds 58mm thermal width: "$line"',
+    );
+  }
 }

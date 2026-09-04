@@ -76,23 +76,26 @@ class BillPrintService {
   }) async {
     final text = ReceiptService.buildReceiptText(bill);
     final doc = pw.Document();
-    final fontSize = type == PrinterType.thermal ? 6.8 : 7.0;
+    final fontSize = type == PrinterType.thermal ? 6.2 : 7.0;
     final style = pw.TextStyle(
       font: pw.Font.courierBold(),
       fontSize: fontSize,
-      lineSpacing: 1.1,
+      lineSpacing: 1.0,
       color: PdfColors.black,
     );
 
     final lines = text.split('\n');
-    const lineHeightMm = 4.2;
-    final contentHeightMm = lines.length * lineHeightMm + 10;
-    final pageWidthMm = 80.0;
+    const lineHeightMm = 3.8;
+    final contentHeightMm = lines.length * lineHeightMm + 8;
+    final pageWidthMm = type == PrinterType.thermal ? 58.0 : 80.0;
+    final marginLeftMm = type == PrinterType.thermal ? 1.5 : 3.0;
+    final marginRightMm = type == PrinterType.thermal ? 2.5 : 3.0;
+    final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
     final pageFormat = PdfPageFormat(
       pageWidthMm * PdfPageFormat.mm,
       contentHeightMm * PdfPageFormat.mm,
-      marginLeft: 3 * PdfPageFormat.mm,
-      marginRight: 3 * PdfPageFormat.mm,
+      marginLeft: marginLeftMm * PdfPageFormat.mm,
+      marginRight: marginRightMm * PdfPageFormat.mm,
       marginTop: 2 * PdfPageFormat.mm,
       marginBottom: 2 * PdfPageFormat.mm,
     );
@@ -106,12 +109,19 @@ class BillPrintService {
           children: [
             for (final line in lines)
               pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 0.2),
-                child: pw.Text(
-                  line.isEmpty ? ' ' : line,
-                  style: style,
-                  maxLines: 2,
-                  softWrap: true,
+                padding: const pw.EdgeInsets.only(bottom: 0.1),
+                child: pw.SizedBox(
+                  width: printableWidthMm * PdfPageFormat.mm,
+                  child: pw.FittedBox(
+                    fit: pw.BoxFit.scaleDown,
+                    alignment: pw.Alignment.centerLeft,
+                    child: pw.Text(
+                      line.isEmpty ? ' ' : line,
+                      style: style,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  ),
                 ),
               ),
           ],

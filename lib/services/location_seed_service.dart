@@ -6,6 +6,7 @@ import 'package:sales/db/location_database.dart';
 
 class LocationSeedService {
   static const _seedVersion = '1';
+  static final Map<String, Future<void>> _activeSeeds = {};
   static const _assetByLocation = {
     'win1': 'assets/seed/win1_sales.csv',
     'win2': 'assets/seed/win2_sales.csv',
@@ -38,6 +39,22 @@ class LocationSeedService {
       return;
     }
 
+    final running = _activeSeeds[locationCode];
+    if (running != null) {
+      await running;
+      return;
+    }
+
+    final task = _seedLocation(locationCode);
+    _activeSeeds[locationCode] = task;
+    try {
+      await task;
+    } finally {
+      _activeSeeds.remove(locationCode);
+    }
+  }
+
+  static Future<void> _seedLocation(String locationCode) async {
     final prefs = await SharedPreferences.getInstance();
     final seedKey = 'location_seed_${locationCode}_v$_seedVersion';
     if (prefs.getBool(seedKey) == true) {

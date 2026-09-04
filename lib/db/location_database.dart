@@ -195,54 +195,44 @@ class LocationDatabase {
     required List<ImportedBillRow> rows,
     required String now,
   }) async {
+    const chunkSize = 400;
     var imported = 0;
 
-    for (final row in rows) {
-      final existing = await txn.query(
-        'bills',
-        where: 'location = ? AND bill_no = ?',
-        whereArgs: [locationName, row.billNo],
-        limit: 1,
-      );
+    for (var start = 0; start < rows.length; start += chunkSize) {
+      final end = start + chunkSize > rows.length
+          ? rows.length
+          : start + chunkSize;
+      final chunk = rows.sublist(start, end);
+      final batch = txn.batch();
 
-      final values = <String, Object?>{
-        'bill_no': row.billNo,
-        'location': locationName,
-        'bill_date': row.billDate,
-        'payment_mode': row.paymentMode,
-        'customer_name': row.customerName,
-        'mobile': row.mobile,
-        'items_json': jsonEncode(<Map<String, dynamic>>[]),
-        'total_qty': 0,
-        'total_amount': row.totalAmount,
-        'total_cgst': row.totalCgst,
-        'total_sgst': row.totalSgst,
-        'total_igst': row.totalIgst,
-        'grand_total': row.grandTotal,
-        'sync_status': 'synced',
-        'updated_at': now,
-        'deleted': 0,
-      };
-
-      if (existing.isNotEmpty) {
-        await txn.update(
-          'bills',
-          values,
-          where: 'local_id = ?',
-          whereArgs: [existing.first['local_id']],
-        );
-      } else {
-        await txn.insert(
+      for (final row in chunk) {
+        batch.insert(
           'bills',
           {
             'local_id': const Uuid().v4(),
-            ...values,
+            'bill_no': row.billNo,
+            'location': locationName,
+            'bill_date': row.billDate,
+            'payment_mode': row.paymentMode,
+            'customer_name': row.customerName,
+            'mobile': row.mobile,
+            'items_json': jsonEncode(<Map<String, dynamic>>[]),
+            'total_qty': 0,
+            'total_amount': row.totalAmount,
+            'total_cgst': row.totalCgst,
+            'total_sgst': row.totalSgst,
+            'total_igst': row.totalIgst,
+            'grand_total': row.grandTotal,
+            'sync_status': 'synced',
+            'updated_at': now,
+            'deleted': 0,
           },
-          conflictAlgorithm: ConflictAlgorithm.abort,
+          conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
 
-      imported++;
+      await batch.commit(noResult: true);
+      imported += chunk.length;
     }
 
     return imported;
