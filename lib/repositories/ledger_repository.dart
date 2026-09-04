@@ -1,5 +1,6 @@
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/db/local_db.dart' as db;
+import 'package:sales/db/location_database.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/sync_service.dart';
 
@@ -41,8 +42,8 @@ class LedgerRepository {
     String? to,
   }) async {
     try {
-      final rows = await db.LocalDb.instance.getLedgerEntries(
-        location,
+      final rows = await LocationDatabase.getLedgerEntries(
+        location: location,
         from: from,
         to: to,
       );

@@ -55,6 +55,21 @@ If `users` is empty, default **admin / admin** is created.
 | GET | `/api/ledger?location=Win1` |
 | GET | `/api/gst/sync?location=win1` |
 | POST | `/api/gst/config` |
+| POST | `/api/locations/reset` |
+
+## Import historical sales CSV
+
+Use the sales-report CSV format (`BILLNO,DATE,NAME,MOBILE,CASH,CARD/UPI,TOTAL,CGST,SGST,IGST,GRAND TOTAL`):
+
+```bash
+cd server
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5434/salesbill_db" \
+  npm run import-csv -- win1 /path/to/bommasandra_sales_report.csv
+```
+
+Locations: `win1` (Bommasandra), `win2` (Tippasandra), `win3` (Grabhivapalya).
+
+In the Flutter admin app, you can also import the same CSV from **Admin → SYNC → IMPORT CSV**, then use **DATE RANGE** in Abstract or Ledger to view the uploaded bills.
 
 > Prefer `/api/sync/bill-updates` for pulls. Older VPS builds may still
 > treat `/api/bills/updates-since` as `/api/bills/:billNo` and return
