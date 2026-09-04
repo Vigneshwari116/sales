@@ -55,6 +55,7 @@ If `users` is empty, default **admin / admin** is created.
 | GET | `/api/ledger?location=Win1` |
 | GET | `/api/gst/sync?location=win1` |
 | POST | `/api/gst/config` |
+| POST | `/api/locations/reset` |
 
 > Prefer `/api/sync/bill-updates` for pulls. Older VPS builds may still
 > treat `/api/bills/updates-since` as `/api/bills/:billNo` and return
