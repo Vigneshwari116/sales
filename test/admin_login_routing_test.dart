@@ -132,8 +132,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'win1');
-    await tester.enterText(find.byType(TextFormField).at(1), 'staff123');
+    await tester.enterText(find.byType(TextFormField).at(0), 'rksb');
+    await tester.enterText(find.byType(TextFormField).at(1), 'rksb');
     await tester.tap(find.text('LOGIN'));
     await _awaitLoginWork(tester);
 
@@ -147,7 +147,7 @@ void main() {
     expect(await SessionService.getRole(), SessionRole.admin);
 
     await SessionService.clearLogin();
-    await SessionService.saveLogin('win1', role: SessionRole.staff);
+    await SessionService.saveLogin('rksb', role: SessionRole.staff);
     expect(await SessionService.getRole(), SessionRole.staff);
   });
 }

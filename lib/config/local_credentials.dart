@@ -1,7 +1,6 @@
 /// Local login credentials — not sent to the server.
 library;
 
-const String staffPassword = 'staff123';
 const String adminUsername = 'admin';
 const String adminPassword = 'admin123';
 
@@ -14,15 +13,25 @@ const String syncPassword = 'RKS';
 /// Password required before staff data reset runs.
 const String resetPassword = 'RKS';
 
-/// Staff usernames map 1:1 to location codes.
-const List<String> staffLocationUsernames = ['win1', 'win2', 'win3'];
+const Map<String, ({String locationCode, String password})> _staffAccounts = {
+  'rksb': (locationCode: 'win1', password: 'rksb'),
+  'rkst': (locationCode: 'win2', password: 'rkst'),
+  'rksg': (locationCode: 'win3', password: 'rksg'),
+};
+
+/// Staff usernames for each branch.
+const List<String> staffLocationUsernames = ['rksb', 'rkst', 'rksg'];
 
 bool isStaffUsername(String username) {
-  return staffLocationUsernames.contains(username.trim().toLowerCase());
+  return _staffAccounts.containsKey(username.trim().toLowerCase());
 }
 
 bool verifyStaffLogin(String username, String password) {
-  return isStaffUsername(username) && password == staffPassword;
+  final account = _staffAccounts[username.trim().toLowerCase()];
+  if (account == null) {
+    return false;
+  }
+  return password == account.password;
 }
 
 bool verifyAdminLogin(String username, String password) {
@@ -31,5 +40,9 @@ bool verifyAdminLogin(String username, String password) {
 }
 
 String staffLocationCodeForUsername(String username) {
-  return username.trim().toLowerCase();
+  final account = _staffAccounts[username.trim().toLowerCase()];
+  if (account == null) {
+    throw ArgumentError('Unknown staff username: $username');
+  }
+  return account.locationCode;
 }

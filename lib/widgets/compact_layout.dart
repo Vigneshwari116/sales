@@ -173,23 +173,36 @@ class CompactAbstractSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          _statCard('Amount', amountValue),
-          _statCard('GST', gstValue),
-          _statCard(grandTotalLabel, grandTotalValue),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final parentWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final stackVertically = parentWidth < 520;
+        final effectiveCardWidth = stackVertically
+            ? parentWidth
+            : math.min(cardWidth, (parentWidth - 20) / 3);
+
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            direction: stackVertically ? Axis.vertical : Axis.horizontal,
+            children: [
+              _statCard('Amount', amountValue, effectiveCardWidth),
+              _statCard('GST', gstValue, effectiveCardWidth),
+              _statCard(grandTotalLabel, grandTotalValue, effectiveCardWidth),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _statCard(String label, String value) {
+  Widget _statCard(String label, String value, double width) {
     return Container(
-      width: cardWidth,
+      width: width,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,

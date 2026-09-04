@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
@@ -123,33 +125,46 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final code in allLocationCodes)
-                _locationCard(displayNameForLocationCode(code)),
-            ],
-          ),
-        ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 520;
+          final cardWidth = isNarrow
+              ? constraints.maxWidth
+              : math.min(470.0, constraints.maxWidth);
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final code in allLocationCodes)
+                    _locationCard(
+                      displayNameForLocationCode(code),
+                      cardWidth: cardWidth,
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _locationCard(String locationName) {
+  Widget _locationCard(String locationName, {required double cardWidth}) {
     final summary = _todayByLocation[locationName];
     final lastSynced = _lastSyncedByLocation[locationName];
     final syncLabel = _formatLastSynced(lastSynced);
     final amount = summary?.totalSaleAmount ?? 0;
     final gst = summary?.totalGst ?? 0;
+    final isNarrow = cardWidth < 520;
 
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
-      width: 470,
+      width: cardWidth,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
@@ -171,7 +186,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
             gstValue: _formatMoney(gst),
             grandTotalValue: _formatMoney(amount + gst),
             grandTotalLabel: 'Total sales',
-            cardWidth: 146,
+            cardWidth: isNarrow ? cardWidth - 20 : 146,
           ),
           const SizedBox(height: 6),
           Text(
