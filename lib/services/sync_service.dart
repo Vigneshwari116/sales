@@ -196,6 +196,13 @@ class SyncService with WidgetsBindingObserver {
       );
     }
 
+    final resetBlock = await LocationResetService.ensureServerResetBeforeSync(
+      location,
+    );
+    if (resetBlock != null) {
+      return PullResult(ok: false, pulledCount: 0, error: resetBlock);
+    }
+
     _autoPullInProgress = true;
     try {
       final lastPull = await LocalDb.instance.getLastPullAt(location);
@@ -258,7 +265,19 @@ class SyncService with WidgetsBindingObserver {
     manualPushInProgress.value = true;
 
     try {
-      await LocationResetService.flushPendingServerResets();
+      final resetBlock = await LocationResetService.ensureServerResetBeforeSync(
+        location,
+      );
+      if (resetBlock != null) {
+        return ManualSyncResult(
+          ok: false,
+          pushedCount: 0,
+          pushFailedCount: 0,
+          pulledCount: 0,
+          error: resetBlock,
+        );
+      }
+
       final pushResult = await _executePush(location);
       final pullResult = await pullAdminUpdates(location);
 
@@ -320,6 +339,18 @@ class SyncService with WidgetsBindingObserver {
     manualPushInProgress.value = true;
 
     try {
+      final resetBlock = await LocationResetService.ensureServerResetBeforeSync(
+        location,
+      );
+      if (resetBlock != null) {
+        return ManualPushResult(
+          ok: false,
+          syncedCount: 0,
+          failedCount: 0,
+          error: resetBlock,
+        );
+      }
+
       return await _executePush(location);
     } finally {
       manualPushInProgress.value = false;

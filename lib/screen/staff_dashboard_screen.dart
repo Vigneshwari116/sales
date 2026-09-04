@@ -272,12 +272,15 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
 
       if (result.serverResetQueued) {
         _message =
-            'Local sales data cleared. Server reset queued for next sync.';
+            '${LocationResetService.resetWipesLocalAndServerMessage} '
+            'Local data cleared. Server wipe queued — run SYNC when online.';
       } else if (result.serverCleared) {
-        _message = 'All sales data cleared locally and on the server. '
-            'Next bill will be #1.';
+        _message =
+            'Local and server sales data cleared. Next bill will be #1.';
       } else {
-        _message = 'All local sales data cleared. Next bill will be #1.';
+        _message =
+            '${LocationResetService.resetWipesLocalAndServerMessage} '
+            'Local data cleared. Next bill will be #1.';
       }
     });
   }
@@ -300,7 +303,9 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Push pending bills and pull admin updates.',
+                    'Push pending bills and pull admin updates. '
+                    'If you reset while offline, run SYNC when back online '
+                    'before creating new bills.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: AppTextSizes.fieldText),
                   ),

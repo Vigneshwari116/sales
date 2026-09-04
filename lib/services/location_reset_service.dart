@@ -23,9 +23,39 @@ class LocationResetResult {
   });
 }
 
+class FlushPendingResetsResult {
+  final bool ok;
+  final List<String> remainingLocationCodes;
+
+  const FlushPendingResetsResult({
+    required this.ok,
+    required this.remainingLocationCodes,
+  });
+}
+
 /// Clears all sales data for the current location locally and on the server.
 class LocationResetService {
   static const String _pendingKey = 'pending_server_reset_locations';
+
+  static const String resetWipesLocalAndServerMessage =
+      'RESET wipes local and server data for this location. '
+      'Always finish with SYNC if you reset while offline.';
+
+  static const String pendingResetOfflineMessage =
+      'Server reset pending. Go online and use SYNC to wipe server data '
+      'before uploading or downloading bills.';
+
+  static const String pendingResetFailedMessage =
+      'Server reset could not complete. Try SYNC again before uploading bills.';
+
+  @visibleForTesting
+  static Future<SalesApiResult<void>> Function({
+    required String location,
+    required String password,
+  })? resetLocationSalesOverride;
+
+  @visibleForTesting
+  static Future<bool> Function()? isDeviceOnlineOverride;
 
   static Future<LocationResetResult> resetCurrentLocation({
     required String locationDisplayName,
@@ -53,7 +83,7 @@ class LocationResetService {
       final online = await _isDeviceOnline();
 
       if (online) {
-        final apiResult = await SalesApi.resetLocationSales(
+        final apiResult = await _resetLocationSales(
           location: locationDisplayName,
           password: resetPassword,
         );
@@ -88,9 +118,40 @@ class LocationResetService {
     }
   }
 
-  static Future<void> flushPendingServerResets() async {
+  /// Runs any queued server wipe before sync/push/pull.
+  /// Returns an error message when bills must not be uploaded or downloaded yet.
+  static Future<String?> ensureServerResetBeforeSync(
+    String locationDisplayName,
+  ) async {
+    final locationCode = locationCodeFromDisplayName(locationDisplayName);
+    if (!await hasPendingServerReset(locationCode)) {
+      return null;
+    }
+
     if (!await _isDeviceOnline()) {
-      return;
+      return pendingResetOfflineMessage;
+    }
+
+    final flushResult = await flushPendingServerResets();
+    if (!flushResult.ok && flushResult.remainingLocationCodes.contains(locationCode)) {
+      return pendingResetFailedMessage;
+    }
+
+    if (await hasPendingServerReset(locationCode)) {
+      return pendingResetFailedMessage;
+    }
+
+    return null;
+  }
+
+  static Future<FlushPendingResetsResult> flushPendingServerResets() async {
+    if (!await _isDeviceOnline()) {
+      final prefs = await SharedPreferences.getInstance();
+      final pending = prefs.getStringList(_pendingKey) ?? const [];
+      return FlushPendingResetsResult(
+        ok: pending.isEmpty,
+        remainingLocationCodes: pending,
+      );
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -99,13 +160,13 @@ class LocationResetService {
     );
 
     if (pending.isEmpty) {
-      return;
+      return const FlushPendingResetsResult(ok: true, remainingLocationCodes: []);
     }
 
     final remaining = <String>[];
     for (final code in pending) {
       final displayName = displayNameForLocationCode(code);
-      final result = await SalesApi.resetLocationSales(
+      final result = await _resetLocationSales(
         location: displayName,
         password: resetPassword,
       );
@@ -119,6 +180,11 @@ class LocationResetService {
     } else {
       await prefs.setStringList(_pendingKey, remaining);
     }
+
+    return FlushPendingResetsResult(
+      ok: remaining.isEmpty,
+      remainingLocationCodes: remaining,
+    );
   }
 
   static Future<bool> hasPendingServerReset(String locationCode) async {
@@ -151,13 +217,35 @@ class LocationResetService {
     }
   }
 
+  static Future<SalesApiResult<void>> _resetLocationSales({
+    required String location,
+    required String password,
+  }) {
+    final override = resetLocationSalesOverride;
+    if (override != null) {
+      return override(location: location, password: password);
+    }
+
+    return SalesApi.resetLocationSales(
+      location: location,
+      password: password,
+    );
+  }
+
   @visibleForTesting
   static Future<void> clearPendingForTesting() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_pendingKey);
+    resetLocationSalesOverride = null;
+    isDeviceOnlineOverride = null;
   }
 
   static Future<bool> _isDeviceOnline() async {
+    final override = isDeviceOnlineOverride;
+    if (override != null) {
+      return override();
+    }
+
     try {
       final results = await Connectivity().checkConnectivity();
       return results.any((result) => result != ConnectivityResult.none);

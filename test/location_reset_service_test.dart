@@ -27,4 +27,18 @@ void main() {
     expect(await LocationResetService.hasPendingServerReset('win2'), isTrue);
     expect(await LocationResetService.hasPendingServerReset('win1'), isFalse);
   });
+
+  test('ensureServerResetBeforeSync blocks while offline reset is queued',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'pending_server_reset_locations': ['win1'],
+    });
+    LocationResetService.isDeviceOnlineOverride = () async => false;
+
+    final message = await LocationResetService.ensureServerResetBeforeSync(
+      'Win1',
+    );
+
+    expect(message, LocationResetService.pendingResetOfflineMessage);
+  });
 }

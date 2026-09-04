@@ -85,7 +85,9 @@ class SyncGateService {
           title: const Text('Reset all sales data?'),
           content: const Text(
             'This will permanently delete ALL sales data for this location '
-            '(both on this device and on the server) and reset bill numbers to 1. '
+            'on this device and on the server, and reset bill numbers to 1.\n\n'
+            'RESET wipes local and server data for this location. '
+            'Always finish with SYNC if you reset while offline.\n\n'
             'Continue?',
           ),
           actions: [
