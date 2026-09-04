@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/app_license.dart';
 import 'package:sales/config/local_credentials.dart';
 import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/staff_dashboard_screen.dart';
@@ -44,6 +45,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (!AppLicense.isValid) {
+      setState(() => _error = AppLicense.expiryMessage);
+      return;
+    }
 
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text.trim();

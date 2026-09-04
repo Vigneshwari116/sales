@@ -4,92 +4,191 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 
 class ReceiptService {
-  static const String businessName = businessDisplayName;
-  static const String businessAddressLine1 =
-      '47/3/4, 2nd Cross KUDULU MAIN ROAD';
-  static const String businessAddressLine2 = 'Bangalore-68';
+  static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// Thermal width in characters — keep lines within this to avoid PDF clipping.
+  /// Thermal width in characters — keep lines within this to avoid clipping.
   static const int _width = 48;
-  static const int _snoWidth = 4;
-  static const int _rateWidth = 10;
-  static const int _qtyWidth = 10;
-  static const int _valueWidth =
-      _width - _snoWidth - _rateWidth - _qtyWidth;
 
   static String buildReceiptText(SaleBill bill) {
+    final code = locationCodeFromDisplayName(bill.location);
+    switch (code) {
+      case 'win3':
+        return _buildGrabhivFormat(bill);
+      case 'win2':
+        return _buildTippasandraFormat(bill);
+      case 'win1':
+      default:
+        return _buildBommasandraFormat(bill);
+    }
+  }
+
+  /// Grabhivapalya — per-item GST% lines, AMOUNT column, compact totals.
+  static String _buildGrabhivFormat(SaleBill bill) {
     final buffer = StringBuffer();
     final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
-    final line = '-' * _width;
-    final branch = branchLabelForDisplayName(bill.location);
+    final profile = _locationProfile('win3');
 
     buffer.writeln(_center(businessName));
-    buffer.writeln(_center(branch));
-    buffer.writeln(_center(businessAddressLine1));
-    buffer.writeln(_center(businessAddressLine2));
+    buffer.writeln(_center(profile.addressLine));
     buffer.writeln(_center('GSTIN:$gstin'));
     buffer.writeln(_billDateLine(bill.billNo, dateText));
     buffer.writeln(_fieldLine('NAME', bill.customerName));
     buffer.writeln(_fieldLine('MOBILE', bill.mobile));
-    buffer.writeln(_itemHeader());
-    buffer.writeln(line);
+    buffer.writeln(_grabhivItemHeader());
 
-    for (var i = 0; i < bill.items.length; i++) {
-      final BillItem item = bill.items[i];
-      buffer.writeln(_itemLine(i + 1, item));
+    for (final item in bill.items) {
+      buffer.writeln(_grabhivItemLine(item));
       buffer.writeln(
         '     CGST% ${_formatPct(item.cgstPct)}'
         '  SGST% ${_formatPct(item.sgstPct)}',
       );
     }
 
+    buffer.writeln(_grabhivTotalLine(bill.totalQty, bill.grandTotal));
+    buffer.writeln(_rightAmountLine('CGST', bill.totalCgst));
+    buffer.writeln(_rightAmountLine('SGST', bill.totalSgst));
+    buffer.writeln(_grabhivGrandTotalLine(bill.grandTotal));
+    _writeFooter(buffer);
+    return buffer.toString();
+  }
+
+  /// Bommasandra — dashed separators, combined GST% block after items.
+  static String _buildBommasandraFormat(SaleBill bill) {
+    return _buildDashedBranchFormat(bill, 'win1');
+  }
+
+  /// Tippasandra — dashed separators, combined GST% block after items.
+  static String _buildTippasandraFormat(SaleBill bill) {
+    return _buildDashedBranchFormat(bill, 'win2');
+  }
+
+  static String _buildDashedBranchFormat(SaleBill bill, String locationCode) {
+    final buffer = StringBuffer();
+    final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
+    final profile = _locationProfile(locationCode);
+    final line = '-' * _width;
+
+    buffer.writeln(_center(businessName));
+    buffer.writeln(_center(profile.addressLine));
+    buffer.writeln(_center('GSTIN:$gstin'));
+    buffer.writeln(_billDateLine(bill.billNo, dateText));
+    buffer.writeln(_fieldLine('NAME', bill.customerName));
+    buffer.writeln(_fieldLine('MOBILE', bill.mobile));
     buffer.writeln(line);
-    buffer.writeln(_summaryLine('TOTAL QTY', bill.totalQty));
-    buffer.writeln(_summaryLine('SUBTOTAL', bill.totalAmount));
-    buffer.writeln(_summaryLine('CGST', bill.totalCgst));
-    buffer.writeln(_summaryLine('SGST', bill.totalSgst));
-    buffer.writeln(_summaryLine('GRAND TOTAL', bill.grandTotal));
+    buffer.writeln(_dashedItemHeader());
     buffer.writeln(line);
+
+    for (final item in bill.items) {
+      buffer.writeln(_dashedItemLine(item));
+    }
+
+    buffer.writeln(line);
+    final cgstPct = bill.items.isNotEmpty ? bill.items.first.cgstPct : 2.5;
+    final sgstPct = bill.items.isNotEmpty ? bill.items.first.sgstPct : 2.5;
+    buffer.writeln(
+      'CGST%  ${_formatPct(cgstPct)}'
+      'SGST%  ${_formatPct(sgstPct)}',
+    );
+    buffer.writeln(line);
+    buffer.writeln(line);
+    buffer.writeln(_dashedTotalLine(bill.totalQty, bill.grandTotal));
+    buffer.writeln();
+    buffer.writeln(_rightAmountLine('CGST', bill.totalCgst));
+    buffer.writeln(_rightAmountLine('SGST', bill.totalSgst));
+    buffer.writeln(line);
+    buffer.writeln(_rightAmountLine('GRAND TOTAL', bill.grandTotal));
+    buffer.writeln(line);
+    _writeFooter(buffer);
+    return buffer.toString();
+  }
+
+  static void _writeFooter(StringBuffer buffer) {
+    buffer.writeln();
     buffer.writeln(_center('TERMS AND CONDITION'));
     buffer.writeln(_center('EXCHANGE ONLY 3 DAYS'));
     buffer.writeln(_center('AMOUNT NOT REFUND'));
     buffer.writeln(_center('THANK YOU VISIT AGAIN'));
-
-    return buffer.toString();
   }
 
-  static String _itemHeader() {
-    return '${_padRight('SNO', _snoWidth)}'
-        '${_padRight('RATE', _rateWidth)}'
-        '${_padRight('QTY', _qtyWidth)}'
-        '${_padLeft('VALUE', _valueWidth)}';
+  static _LocationReceiptProfile _locationProfile(String locationCode) {
+    switch (locationCode) {
+      case 'win2':
+        return const _LocationReceiptProfile(
+          addressLine: 'NO175,NEW TIPPSANDRA MAIN ROAD,Bangalore-560075',
+        );
+      case 'win3':
+        return const _LocationReceiptProfile(
+          addressLine: '47/3/4,2nd Cross KUDULU MAIN ROAD,Bangalore-68',
+        );
+      case 'win1':
+      default:
+        return const _LocationReceiptProfile(
+          addressLine: '47/3/4,2nd Cross KUDULU MAIN ROAD,Bangalore-68',
+        );
+    }
   }
 
-  static String _itemLine(int sno, BillItem item) {
-    return '${_padRight('$sno', _snoWidth)}'
-        '${_padRight(_money(item.rate), _rateWidth)}'
-        '${_padRight(_money(item.qty), _qtyWidth)}'
-        '${_padLeft(_money(item.grossAmt), _valueWidth)}';
+  static String _grabhivItemHeader() {
+    return '${_padRight('SNO', 4)}'
+        '${_padRight('RATE', 10)}'
+        '${_padRight('QTY', 6)}'
+        '${_padLeft('AMOUNT', _width - 20)}';
   }
 
-  static String _summaryLine(String label, double amount) {
-    return _summaryLineText(label, _money(amount));
+  static String _grabhivItemLine(BillItem item) {
+    return '${_padRight('', 4)}'
+        '${_padRight(_money(item.rate), 10)}'
+        '${_padRight(_money(item.qty), 6)}'
+        '${_padLeft(_money(item.grossAmt), _width - 20)}';
   }
 
-  static String _summaryLineText(String label, String amountText) {
-    final labelPart = _padRight(label, _width - amountText.length);
-    return '$labelPart$amountText';
+  static String _grabhivTotalLine(double qty, double grandTotal) {
+    final left = _padRight('TOTAL', 20);
+    final qtyPart = _padRight(_money(qty), 10);
+    final amountPart = _padLeft(_money(grandTotal), _width - 30);
+    return '$left$qtyPart$amountPart';
+  }
+
+  static String _grabhivGrandTotalLine(double grandTotal) {
+    final label = _padRight('GRAND TOTAL', 28);
+    return '$label${_padLeft(_money(grandTotal), _width - 28)}';
+  }
+
+  static String _dashedItemHeader() {
+    return '${_padRight('SNO', 5)}'
+        '${_padRight('RATE', 10)}'
+        '${_padRight('QTY', 14)}'
+        '${_padLeft('AMOUNT', _width - 29)}';
+  }
+
+  static String _dashedItemLine(BillItem item) {
+    return '${_padRight('', 5)}'
+        '${_padRight(_money(item.rate), 10)}'
+        '${_padRight(_money(item.qty), 14)}'
+        '${_padLeft(_money(item.grossAmt), _width - 29)}';
+  }
+
+  static String _dashedTotalLine(double qty, double grandTotal) {
+    final left = _padRight('TOTAL', 20);
+    final qtyPart = _padRight(_money(qty), 10);
+    final amountPart = _padLeft(_money(grandTotal), _width - 30);
+    return '$left$qtyPart$amountPart';
+  }
+
+  static String _rightAmountLine(String label, double amount) {
+    final labelPart = _padRight(label, 28);
+    return '$labelPart${_padLeft(_money(amount), _width - 28)}';
   }
 
   static String _fieldLine(String label, String value) {
-    final text = value.trim().isEmpty ? '-' : value.trim();
-    return '$label: $text';
+    final text = value.trim().isEmpty ? '' : value.trim();
+    return '$label:$text';
   }
 
   static String _billDateLine(int billNo, String dateText) {
-    final left = 'BILL NO: $billNo';
-    final right = 'DATE: $dateText';
+    final left = 'BILL NO:$billNo';
+    final right = 'DATE:$dateText';
     if (left.length + right.length + 1 > _width) {
       return '$left\n${_padLeft(right, _width)}';
     }
@@ -133,4 +232,10 @@ class ReceiptService {
     }
     return value.toStringAsFixed(1);
   }
+}
+
+class _LocationReceiptProfile {
+  final String addressLine;
+
+  const _LocationReceiptProfile({required this.addressLine});
 }

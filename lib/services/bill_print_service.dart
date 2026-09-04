@@ -76,21 +76,23 @@ class BillPrintService {
   }) async {
     final text = ReceiptService.buildReceiptText(bill);
     final doc = pw.Document();
+    final fontSize = type == PrinterType.thermal ? 6.8 : 7.0;
     final style = pw.TextStyle(
       font: pw.Font.courierBold(),
-      fontSize: type == PrinterType.thermal ? 7.0 : 7.5,
-      lineSpacing: 1.15,
+      fontSize: fontSize,
+      lineSpacing: 1.1,
       color: PdfColors.black,
     );
 
     final lines = text.split('\n');
-    const lineHeightMm = 4.8;
-    final contentHeightMm = lines.length * lineHeightMm + 12;
+    const lineHeightMm = 4.2;
+    final contentHeightMm = lines.length * lineHeightMm + 10;
+    final pageWidthMm = 80.0;
     final pageFormat = PdfPageFormat(
-      90 * PdfPageFormat.mm,
+      pageWidthMm * PdfPageFormat.mm,
       contentHeightMm * PdfPageFormat.mm,
-      marginLeft: 2 * PdfPageFormat.mm,
-      marginRight: 2 * PdfPageFormat.mm,
+      marginLeft: 3 * PdfPageFormat.mm,
+      marginRight: 3 * PdfPageFormat.mm,
       marginTop: 2 * PdfPageFormat.mm,
       marginBottom: 2 * PdfPageFormat.mm,
     );
@@ -104,12 +106,12 @@ class BillPrintService {
           children: [
             for (final line in lines)
               pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 0.5),
+                padding: const pw.EdgeInsets.only(bottom: 0.2),
                 child: pw.Text(
                   line.isEmpty ? ' ' : line,
                   style: style,
-                  maxLines: 1,
-                  softWrap: false,
+                  maxLines: 2,
+                  softWrap: true,
                 ),
               ),
           ],
