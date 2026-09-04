@@ -26,17 +26,17 @@ bool isStaffUsername(String username) {
   return _staffAccounts.containsKey(username.trim().toLowerCase());
 }
 
+bool verifyAdminLogin(String username, String password) {
+  return username.trim().toLowerCase() == adminUsername &&
+      password.trim() == adminPassword;
+}
+
 bool verifyStaffLogin(String username, String password) {
   final account = _staffAccounts[username.trim().toLowerCase()];
   if (account == null) {
     return false;
   }
-  return password == account.password;
-}
-
-bool verifyAdminLogin(String username, String password) {
-  return username.trim().toLowerCase() == adminUsername &&
-      password == adminPassword;
+  return password.trim() == account.password;
 }
 
 String staffLocationCodeForUsername(String username) {

@@ -34,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _userCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
   bool _obscure = true;
+  bool _loggingIn = false;
   String? _error;
 
   @override
@@ -64,37 +65,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _error = null);
 
-    await SessionService.clearBillSession();
+    setState(() => _loggingIn = true);
 
-    if (isAdmin) {
-      await AppConfig.setLocation('win1');
-      await SessionService.saveLogin(username, role: SessionRole.admin);
+    try {
+      await SessionService.clearBillSession();
+
+      if (isAdmin) {
+        await AppConfig.setLocation('win1');
+        await SessionService.saveLogin(username, role: SessionRole.admin);
+        await AppSessionService.onLoginComplete();
+
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: LoginScreen.adminHomeBuilder ??
+                (_) => const AdminDashboardScreen(),
+          ),
+        );
+        return;
+      }
+
+      final locationCode = staffLocationCodeForUsername(username);
+      await AppConfig.setLocation(locationCode);
+      await SessionService.saveLogin(username, role: SessionRole.staff);
       await AppSessionService.onLoginComplete();
 
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: LoginScreen.adminHomeBuilder ??
-              (_) => const AdminDashboardScreen(),
+          builder: LoginScreen.staffHomeBuilder ??
+              (_) => const StaffDashboardScreen(),
         ),
       );
-      return;
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Login failed. Please try again.';
+        _loggingIn = false;
+      });
     }
-
-    final locationCode = staffLocationCodeForUsername(username);
-    await AppConfig.setLocation(locationCode);
-    await SessionService.saveLogin(username, role: SessionRole.staff);
-    await AppSessionService.onLoginComplete();
-
-    if (!mounted) return;
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: LoginScreen.staffHomeBuilder ??
-            (_) => const StaffDashboardScreen(),
-      ),
-    );
   }
 
   @override
@@ -188,14 +199,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: _login,
-                        child: const Text(
-                          'LOGIN',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
+                        onPressed: _loggingIn ? null : _login,
+                        child: _loggingIn
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'LOGIN',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
                       ),
                     ),
                   ],
