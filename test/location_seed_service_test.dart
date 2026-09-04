@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -12,7 +13,7 @@ import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/location_database.dart';
 import 'package:sales/repositories/abstract_repository.dart';
 import 'package:sales/repositories/ledger_repository.dart';
-import 'package:sales/services/csv_import_service.dart';
+import 'package:sales/services/location_seed_service.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -37,20 +38,31 @@ void main() {
   late Directory tempDir;
 
   setUpAll(() async {
-    tempDir = await Directory.systemTemp.createTemp('csv_import_test_');
+    tempDir = await Directory.systemTemp.createTemp('location_seed_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     SharedPreferences.setMockInitialValues({});
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', (message) async {
+      final key = const StringCodec().decodeMessage(message);
+      if (key == 'assets/seed/win2_sales.csv') {
+        return const StringCodec().encodeMessage(_sampleCsv);
+      }
+      return null;
+    });
   });
 
   tearDownAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', null);
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
   });
 
   tearDown(() async {
+    SharedPreferences.setMockInitialValues({});
     await AppConfig.clearLocation();
     for (final code in allLocationCodes) {
       final file = File('${tempDir.path}/${code}_sales.db');
@@ -60,14 +72,9 @@ void main() {
     }
   });
 
-  test('imports CSV rows into a location database', () async {
-    final result = await CsvImportService.importCsvContent(
-      locationCode: 'win2',
-      content: _sampleCsv,
-    );
-
-    expect(result.ok, isTrue);
-    expect(result.importedCount, 3);
+  test('seeds bundled CSV into a location database once', () async {
+    await LocationSeedService.ensureLocationSeeded('win2');
+    await LocationSeedService.ensureLocationSeeded('win2');
 
     final ledger = await LedgerRepository.getLedger(
       location: displayNameForLocationCode('win2'),
@@ -79,14 +86,11 @@ void main() {
     expect(ledger.summary.grandTotal, 2150);
   });
 
-  test('imported data appears in abstract date range summary', () async {
-    await CsvImportService.importCsvContent(
-      locationCode: 'win3',
-      content: _sampleCsv,
-    );
+  test('seeded data appears in abstract date range summary', () async {
+    await LocationSeedService.ensureLocationSeeded('win2');
 
     final summary = await AbstractRepository.getSummaryForLocationCode(
-      locationCode: 'win3',
+      locationCode: 'win2',
       fromDate: DateTime(2026, 1, 1),
       toDate: DateTime(2026, 1, 1),
     );
@@ -95,12 +99,9 @@ void main() {
     expect(summary.totalGst, 92);
   });
 
-  test('ledger reads imported rows for non-active admin location file', () async {
+  test('ledger reads seeded rows for non-active admin location file', () async {
     await AppConfig.setLocation('win1');
-    await CsvImportService.importCsvContent(
-      locationCode: 'win2',
-      content: _sampleCsv,
-    );
+    await LocationSeedService.ensureLocationSeeded('win2');
 
     final ledger = await LocationDatabase.getLedgerEntries(
       location: displayNameForLocationCode('win2'),

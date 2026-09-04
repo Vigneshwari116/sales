@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/screen/admin_cross_abstract_screen.dart';
 import 'package:sales/screen/admin_location_grid_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/app_session_service.dart';
-import 'package:sales/services/csv_import_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -231,11 +229,8 @@ class _AdminSyncPanel extends StatefulWidget {
 class _AdminSyncPanelState extends State<_AdminSyncPanel> {
   String _selectedLocationCode = 'win1';
   bool _syncing = false;
-  bool _importing = false;
   String? _message;
   bool? _lastSyncOk;
-
-  bool get _busy => _syncing || _importing;
 
   Future<void> _syncLocation() async {
     final allowed = await SyncGateService.confirmSync(context);
@@ -256,58 +251,6 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
       _syncing = false;
       _message = result.summaryMessage;
       _lastSyncOk = result.ok;
-    });
-
-    if (result.ok) {
-      widget.onSyncComplete?.call();
-    }
-  }
-
-  Future<void> _importCsv() async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['csv'],
-      withData: false,
-    );
-
-    if (!mounted || picked == null || picked.files.isEmpty) {
-      return;
-    }
-
-    final filePath = picked.files.single.path;
-    if (filePath == null || filePath.isEmpty) {
-      setState(() {
-        _message = 'Could not read the selected CSV file';
-        _lastSyncOk = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _importing = true;
-      _message = null;
-      _lastSyncOk = null;
-    });
-
-    final result = await CsvImportService.importFile(
-      locationCode: _selectedLocationCode,
-      filePath: filePath,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _importing = false;
-      _lastSyncOk = result.ok;
-      if (result.ok) {
-        final skippedSuffix = result.skippedCount > 0
-            ? ' (${result.skippedCount} row(s) skipped)'
-            : '';
-        _message =
-            'Imported ${result.importedCount} bill(s) for ${branchLabelForLocationCode(_selectedLocationCode)}$skippedSuffix';
-      } else {
-        _message = result.error ?? 'CSV import failed';
-      }
     });
 
     if (result.ok) {
@@ -347,7 +290,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                           ),
                         )
                         .toList(),
-                    onChanged: _busy
+                    onChanged: _syncing
                         ? null
                         : (value) {
                             if (value == null) return;
@@ -357,7 +300,7 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     key: const Key('admin_sync_now_button'),
-                    onPressed: _busy ? null : _syncLocation,
+                    onPressed: _syncing ? null : _syncLocation,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -374,36 +317,6 @@ class _AdminSyncPanelState extends State<_AdminSyncPanel> {
                           )
                         : const Icon(Icons.cloud_upload_outlined, size: 18),
                     label: Text(_syncing ? 'SYNCING...' : 'SYNC LOCATION'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    key: const Key('admin_import_csv_button'),
-                    onPressed: _busy ? null : _importCsv,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      minimumSize: const Size(0, 34),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: _importing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.upload_file_outlined, size: 18),
-                    label: Text(_importing ? 'IMPORTING...' : 'IMPORT CSV'),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Import a location sales report CSV, then use DATE RANGE in Abstract or Ledger to view the uploaded bills.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: AppTextSizes.listSubtitle,
-                      color: Colors.grey.shade700,
-                    ),
                   ),
                   if (_message != null) ...[
                     const SizedBox(height: 16),

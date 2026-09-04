@@ -1,23 +1,17 @@
-import 'dart:io';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/location_database.dart';
 
-class CsvImportResult {
-  final bool ok;
-  final int importedCount;
-  final int skippedCount;
-  final String? error;
+class LocationSeedService {
+  static const _seedVersion = '1';
+  static const _assetByLocation = {
+    'win1': 'assets/seed/win1_sales.csv',
+    'win2': 'assets/seed/win2_sales.csv',
+    'win3': 'assets/seed/win3_sales.csv',
+  };
 
-  const CsvImportResult({
-    required this.ok,
-    required this.importedCount,
-    required this.skippedCount,
-    this.error,
-  });
-}
-
-class CsvImportService {
   static const _expectedHeaders = [
     'BILLNO',
     'DATE',
@@ -32,74 +26,51 @@ class CsvImportService {
     'GRAND TOTAL',
   ];
 
-  static Future<CsvImportResult> importFile({
-    required String locationCode,
-    required String filePath,
-  }) async {
-    if (!isActiveLocationCode(locationCode)) {
-      return const CsvImportResult(
-        ok: false,
-        importedCount: 0,
-        skippedCount: 0,
-        error: 'Invalid location',
-      );
-    }
-
-    try {
-      final content = await File(filePath).readAsString();
-      return importCsvContent(
-        locationCode: locationCode,
-        content: content,
-      );
-    } catch (error) {
-      return CsvImportResult(
-        ok: false,
-        importedCount: 0,
-        skippedCount: 0,
-        error: 'Could not read file: $error',
-      );
+  /// Loads bundled sales CSV data into each location database when empty.
+  static Future<void> ensureAllLocationsSeeded() async {
+    for (final code in allLocationCodes) {
+      await ensureLocationSeeded(code);
     }
   }
 
-  static Future<CsvImportResult> importCsvContent({
-    required String locationCode,
-    required String content,
-  }) async {
+  static Future<void> ensureLocationSeeded(String locationCode) async {
+    if (!isActiveLocationCode(locationCode)) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final seedKey = 'location_seed_${locationCode}_v$_seedVersion';
+    if (prefs.getBool(seedKey) == true) {
+      return;
+    }
+
+    if (await LocationDatabase.hasBills(locationCode)) {
+      await prefs.setBool(seedKey, true);
+      return;
+    }
+
+    final assetPath = _assetByLocation[locationCode];
+    if (assetPath == null) {
+      return;
+    }
+
+    final content = await rootBundle.loadString(assetPath);
     final parsed = _parseCsv(content);
-    if (!parsed.ok) {
-      return CsvImportResult(
-        ok: false,
-        importedCount: 0,
-        skippedCount: 0,
-        error: parsed.error,
-      );
+    if (!parsed.ok || parsed.rows.isEmpty) {
+      return;
     }
 
-    if (parsed.rows.isEmpty) {
-      return const CsvImportResult(
-        ok: false,
-        importedCount: 0,
-        skippedCount: 0,
-        error: 'No bill rows found in CSV',
-      );
-    }
-
-    final imported = await LocationDatabase.upsertImportedBills(
+    await LocationDatabase.upsertImportedBills(
       locationCode: locationCode,
       rows: parsed.rows,
     );
 
-    return CsvImportResult(
-      ok: true,
-      importedCount: imported,
-      skippedCount: parsed.skippedCount,
-    );
+    await prefs.setBool(seedKey, true);
   }
 
   static ({
     bool ok,
     List<ImportedBillRow> rows,
-    int skippedCount,
     String? error,
   }) _parseCsv(String content) {
     final lines = content
@@ -109,12 +80,7 @@ class CsvImportService {
         .toList(growable: false);
 
     if (lines.isEmpty) {
-      return (
-        ok: false,
-        rows: const [],
-        skippedCount: 0,
-        error: 'CSV file is empty',
-      );
+      return (ok: false, rows: const [], error: 'CSV file is empty');
     }
 
     final header = _splitCsvLine(lines.first)
@@ -125,18 +91,15 @@ class CsvImportService {
       return (
         ok: false,
         rows: const [],
-        skippedCount: 0,
         error: 'Unexpected CSV header. Expected sales report columns.',
       );
     }
 
     final rows = <ImportedBillRow>[];
-    var skipped = 0;
 
     for (final line in lines.skip(1)) {
       final values = _splitCsvLine(line);
       if (values.length < _expectedHeaders.length) {
-        skipped++;
         continue;
       }
 
@@ -146,14 +109,8 @@ class CsvImportService {
       final mobile = values[3].trim();
       final cash = _parseAmount(values[4]);
       final cardUpi = _parseAmount(values[5]);
-      final totalAmount = _parseAmount(values[6]);
-      final totalCgst = _parseAmount(values[7]);
-      final totalSgst = _parseAmount(values[8]);
-      final totalIgst = _parseAmount(values[9]);
-      final grandTotal = _parseAmount(values[10]);
 
       if (billNo == null || billNo <= 0 || billDate.isEmpty) {
-        skipped++;
         continue;
       }
 
@@ -168,16 +125,16 @@ class CsvImportService {
             cardUpi: cardUpi,
             name: name,
           ),
-          totalAmount: totalAmount,
-          totalCgst: totalCgst,
-          totalSgst: totalSgst,
-          totalIgst: totalIgst,
-          grandTotal: grandTotal,
+          totalAmount: _parseAmount(values[6]),
+          totalCgst: _parseAmount(values[7]),
+          totalSgst: _parseAmount(values[8]),
+          totalIgst: _parseAmount(values[9]),
+          grandTotal: _parseAmount(values[10]),
         ),
       );
     }
 
-    return (ok: true, rows: rows, skippedCount: skipped, error: null);
+    return (ok: true, rows: rows, error: null);
   }
 
   static bool _headersMatch(List<String> header) {

@@ -52,6 +52,47 @@ class LocationDatabase {
     );
   }
 
+  static Future<bool> hasBills(String locationCode) async {
+    final locationName = displayNameForLocationCode(locationCode);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        await LocalDb.instance.initialize();
+        final db = await LocalDb.instance.database;
+        final rows = await db.rawQuery(
+          'SELECT COUNT(*) AS count FROM bills WHERE location = ? AND deleted = 0',
+          [locationName],
+        );
+        return ((rows.first['count'] as num?)?.toInt() ?? 0) > 0;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    if (!await File(path).exists()) {
+      return false;
+    }
+
+    final db = await openDatabase(
+      path,
+      readOnly: true,
+      singleInstance: false,
+    );
+
+    try {
+      final rows = await db.rawQuery(
+        'SELECT COUNT(*) AS count FROM bills WHERE location = ? AND deleted = 0',
+        [locationName],
+      );
+      return ((rows.first['count'] as num?)?.toInt() ?? 0) > 0;
+    } catch (_) {
+      return false;
+    } finally {
+      await db.close();
+    }
+  }
+
   static Future<int> upsertImportedBills({
     required String locationCode,
     required List<ImportedBillRow> rows,
