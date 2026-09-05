@@ -11,11 +11,18 @@ import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
-  /// TVS RP3200: 80mm roll, 72mm max printable width.
+  /// TVS RP3200: 80mm roll, 72mm max printable width (576 dots @ 8 dots/mm).
   static const double thermalPageWidthMm = 80.0;
   static const double thermalPrintableWidthMm = 72.0;
   static const double _thermalMarginMm =
       (thermalPageWidthMm - thermalPrintableWidthMm) / 2;
+
+  /// RP3200 Font A (12×24 dots): 48 columns, 1.50×3.00mm per character.
+  static const double thermalFontSizePt = 7.0;
+  static const double thermalCharWidthMm = 1.50;
+  static const double thermalLineSpacingMm = 4.25;
+  static const double _thermalLineHeightFactor =
+      (thermalLineSpacingMm * PdfPageFormat.mm) / thermalFontSizePt;
 
   static Future<String> saveReceiptToDesktop(SaleBill bill) async {
     final text = ReceiptService.buildReceiptText(bill);
@@ -105,8 +112,12 @@ class BillPrintService {
     required PrinterType type,
   }) {
     final lines = text.split('\n');
-    final fontSize = type == PrinterType.thermal ? 5.6 : 7.0;
-    const lineHeightMm = 2.2;
+    final fontSize =
+        type == PrinterType.thermal ? thermalFontSizePt : 7.0;
+    final lineHeightMm =
+        type == PrinterType.thermal ? thermalLineSpacingMm : 4.25;
+    final lineHeightFactor =
+        type == PrinterType.thermal ? _thermalLineHeightFactor : 1.72;
     const verticalMarginMm = 2.0;
     const bottomBufferMm = 4.0;
 
@@ -135,6 +146,7 @@ class BillPrintService {
       pageFormat: pageFormat,
       printableWidthMm: printableWidthMm,
       fontSize: fontSize,
+      lineHeightFactor: lineHeightFactor,
     );
   }
 
@@ -146,7 +158,7 @@ class BillPrintService {
       font: pw.Font.courierBold(),
       fontSize: layout.fontSize,
       lineSpacing: 0,
-      height: 1,
+      height: layout.lineHeightFactor,
       color: PdfColors.black,
     );
 
@@ -229,11 +241,13 @@ class _ReceiptPdfLayout {
   final PdfPageFormat pageFormat;
   final double printableWidthMm;
   final double fontSize;
+  final double lineHeightFactor;
 
   const _ReceiptPdfLayout({
     required this.text,
     required this.pageFormat,
     required this.printableWidthMm,
     required this.fontSize,
+    required this.lineHeightFactor,
   });
 }

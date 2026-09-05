@@ -46,8 +46,10 @@ void main() {
     expect(footerIndex, greaterThan(grandTotalIndex));
   });
 
-  test('thermal pdf uses 80mm page width and dynamic height', () async {
+  test('thermal pdf uses 80mm page width and RP3200 Font A line spacing', () async {
     final bill = _sampleBill();
+    final text = ReceiptService.buildReceiptText(bill);
+    final lineCount = text.split('\n').length;
     final bytes = await BillPrintService.buildPdfBytes(bill);
     final pageFormat = BillPrintService.pageFormatForBill(bill);
     final pdfText = String.fromCharCodes(bytes);
@@ -64,7 +66,12 @@ void main() {
     // 80mm ≈ 226.77pt; allow small float tolerance from PDF generation.
     expect(pageWidthPt, closeTo(pageFormat.width, 1.0));
     expect(pageWidthPt, closeTo(226.77, 2.0));
-    expect(pageHeightPt, greaterThan(100));
     expect(pageHeightPt, closeTo(pageFormat.height, 2.0));
+
+    // Height grows with 4.25mm per line (RP3200 default line spacing).
+    final expectedHeightMm =
+        lineCount * BillPrintService.thermalLineSpacingMm + 8.0;
+    final actualHeightMm = pageHeightPt / 72 * 25.4;
+    expect(actualHeightMm, closeTo(expectedHeightMm, 2.0));
   });
 }
