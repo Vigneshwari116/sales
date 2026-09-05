@@ -24,9 +24,27 @@ SaleBill _sampleBill({required String location}) {
 }
 
 void main() {
-  test('receipt uses original format with dashed separators and per-item gst',
-      () {
-    final text = ReceiptService.buildReceiptText(_sampleBill(location: 'Win1'));
+  test('address prints on one line like the original receipt', () {
+    final lines = ReceiptService.buildReceiptText(_sampleBill(location: 'Win1'))
+        .split('\n');
+    final addressLine = lines[1];
+
+    expect(
+      addressLine,
+      '47/3/4,2nd Cross KUDULU MAIN ROAD,Bangalore-68',
+    );
+  });
+
+  test('name and mobile are consecutive without blank lines', () {
+    final lines = ReceiptService.buildReceiptText(_sampleBill(location: 'Win1'))
+        .split('\n');
+    final nameIndex = lines.indexWhere((line) => line.startsWith('NAME:'));
+    final mobileIndex = lines.indexWhere((line) => line.startsWith('MOBILE:'));
+
+    expect(nameIndex, greaterThanOrEqualTo(0));
+    expect(mobileIndex, nameIndex + 1);
+
+    final text = lines.join('\n');
 
     expect(text, contains('R K S ENTERPRIISES'));
     expect(text, contains('KUDULU MAIN ROAD'));
@@ -145,7 +163,7 @@ void main() {
 
     expect(itemLines, hasLength(1));
     expect(itemLines.first.endsWith('1200.00'), isTrue);
-    expect(itemLines.first.length, lessThanOrEqualTo(32));
+    expect(itemLines.first.length, lessThanOrEqualTo(62));
     _expectLinesWithinThermalWidth(lines.join('\n'));
   });
 }
@@ -154,8 +172,8 @@ void _expectLinesWithinThermalWidth(String text) {
   for (final line in text.split('\n')) {
     expect(
       line.length,
-      lessThanOrEqualTo(32),
-      reason: 'Line exceeds 58mm thermal width: "$line"',
+      lessThanOrEqualTo(62),
+      reason: 'Line exceeds 4-inch thermal width: "$line"',
     );
   }
 }

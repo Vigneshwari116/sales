@@ -64,40 +64,56 @@ class BillPrintService {
       printer: printer,
       onLayout: (_) async => pdfBytes,
       name: 'Bill_${bill.billNo}',
-      usePrinterSettings: true,
+      usePrinterSettings: false,
     );
 
     return printed;
+  }
+
+  @visibleForTesting
+  static Future<Uint8List> buildPdfBytes(
+    SaleBill bill, {
+    PrinterType type = PrinterType.thermal,
+  }) {
+    return _buildPdfBytes(bill, type: type);
   }
 
   static Future<Uint8List> _buildPdfBytes(
     SaleBill bill, {
     required PrinterType type,
   }) async {
-    final text = ReceiptService.buildReceiptText(bill);
+    final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
+    final lines = text.split('\n');
     final doc = pw.Document();
-    final fontSize = type == PrinterType.thermal ? 6.2 : 7.0;
+    final fontSize = type == PrinterType.thermal ? 5.4 : 7.0;
+    const lineHeightMm = 2.2;
+    const verticalMarginMm = 2.5;
+    const bottomBufferMm = 10.0;
+    const thermalPageWidthMm = 101.6;
+
+    final contentHeightMm =
+        lines.length * lineHeightMm + verticalMarginMm * 2 + bottomBufferMm;
+    final pageWidthMm =
+        type == PrinterType.thermal ? thermalPageWidthMm : thermalPageWidthMm;
+    final marginLeftMm = type == PrinterType.thermal ? 3.0 : 3.0;
+    final marginRightMm = type == PrinterType.thermal ? 3.0 : 3.0;
+    final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
+
     final style = pw.TextStyle(
       font: pw.Font.courierBold(),
       fontSize: fontSize,
-      lineSpacing: 1.0,
+      lineSpacing: 0,
+      height: 1,
       color: PdfColors.black,
     );
 
-    final lines = text.split('\n');
-    const lineHeightMm = 3.8;
-    final contentHeightMm = lines.length * lineHeightMm + 8;
-    final pageWidthMm = type == PrinterType.thermal ? 58.0 : 80.0;
-    final marginLeftMm = type == PrinterType.thermal ? 1.5 : 3.0;
-    final marginRightMm = type == PrinterType.thermal ? 2.5 : 3.0;
-    final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
     final pageFormat = PdfPageFormat(
       pageWidthMm * PdfPageFormat.mm,
       contentHeightMm * PdfPageFormat.mm,
       marginLeft: marginLeftMm * PdfPageFormat.mm,
       marginRight: marginRightMm * PdfPageFormat.mm,
-      marginTop: 2 * PdfPageFormat.mm,
-      marginBottom: 2 * PdfPageFormat.mm,
+      marginTop: verticalMarginMm * PdfPageFormat.mm,
+      marginBottom: verticalMarginMm * PdfPageFormat.mm,
     );
 
     doc.addPage(
@@ -108,20 +124,13 @@ class BillPrintService {
           mainAxisSize: pw.MainAxisSize.min,
           children: [
             for (final line in lines)
-              pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 0.1),
-                child: pw.SizedBox(
-                  width: printableWidthMm * PdfPageFormat.mm,
-                  child: pw.FittedBox(
-                    fit: pw.BoxFit.scaleDown,
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Text(
-                      line.isEmpty ? ' ' : line,
-                      style: style,
-                      maxLines: 1,
-                      softWrap: false,
-                    ),
-                  ),
+              pw.SizedBox(
+                width: printableWidthMm * PdfPageFormat.mm,
+                child: pw.Text(
+                  line.isEmpty ? ' ' : line,
+                  style: style,
+                  maxLines: 1,
+                  softWrap: false,
                 ),
               ),
           ],
@@ -130,6 +139,15 @@ class BillPrintService {
     );
 
     return doc.save();
+  }
+
+  static String _normalizedReceiptText(String text) {
+    return text
+        .replaceAll('\r\n', '\n')
+        .split('\n')
+        .map((line) => line.replaceAll('\r', ''))
+        .join('\n')
+        .trimRight();
   }
 
   static Future<String> _receiptSaveDirectory() async {
