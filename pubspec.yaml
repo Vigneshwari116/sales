@@ -47,6 +47,7 @@ dependencies:
   connectivity_plus: ^6.1.4
   excel: ^4.0.6
   share_plus: ^10.1.4
+  windows_printer: ^0.2.1
 
 dependency_overrides: {}
 

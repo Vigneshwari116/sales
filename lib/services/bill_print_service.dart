@@ -7,8 +7,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/esc_pos_receipt_service.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
+import 'package:sales/services/thermal_raw_printer.dart';
 
 class BillPrintService {
   /// TVS RP3200: 80mm roll, 72mm max printable width (576 dots @ 8 dots/mm).
@@ -54,6 +56,14 @@ class BillPrintService {
         'Fast printer routing is not configured yet. '
         'Persist a fast printer in settings, but assign its print flow '
         'before calling printReceipt with PrinterType.fast.',
+      );
+    }
+
+    if (type == PrinterType.thermal) {
+      final escPosBytes = EscPosReceiptService.buildReceiptBytes(bill);
+      return printRawEscPos(
+        printerName: printerName,
+        data: escPosBytes,
       );
     }
 
