@@ -4,6 +4,7 @@ import 'package:sales/db/local_db.dart' as db;
 import 'package:sales/db/location_database.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/location_seed_service.dart';
+import 'package:sales/services/summary_update_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class LocalLedgerEntry {
@@ -94,7 +95,11 @@ class LedgerRepository {
   }
 
   static Future<void> softDeleteBill(String localId) async {
+    final bill = await db.LocalDb.instance.getBillByLocalId(localId);
     await db.LocalDb.instance.markBillDeleted(localId);
+    if (bill != null) {
+      await SummaryUpdateService.onBillDeleted(bill);
+    }
   }
 
   static Future<void> refreshFromServer({required String location}) async {

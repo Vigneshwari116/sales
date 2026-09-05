@@ -11,6 +11,7 @@ import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/app_expired_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/staff_dashboard_screen.dart';
+import 'package:sales/screen/summary_viewer_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/theme/app_theme.dart';
@@ -73,6 +74,9 @@ class _AppRootState extends State<AppRoot> {
       }
       if (role == SessionRole.staff) {
         return const StaffDashboardScreen();
+      }
+      if (role == SessionRole.summaryViewer) {
+        return const SummaryViewerDashboardScreen();
       }
     }
 

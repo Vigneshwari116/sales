@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
-import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/db/summary_db.dart';
 import 'package:sales/repositories/location_sync_repository.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -23,9 +23,9 @@ class AdminLocationGridScreen extends StatefulWidget {
 }
 
 class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
-  Map<String, AbstractSummary> _todayByLocation = {
+  Map<String, double> _todayByLocation = {
     for (final code in allLocationCodes)
-      displayNameForLocationCode(code): AbstractSummary.zero(),
+      displayNameForLocationCode(code): 0,
   };
   Map<String, DateTime?> _lastSyncedByLocation = {
     for (final code in allLocationCodes)
@@ -48,16 +48,19 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
 
   Future<void> _load() async {
     try {
+      await SummaryDb.instance.initialize();
       final today = DateTime.now();
-      final summaries = <String, AbstractSummary>{};
+      final day = '${today.year.toString().padLeft(4, '0')}-'
+          '${today.month.toString().padLeft(2, '0')}-'
+          '${today.day.toString().padLeft(2, '0')}';
+      final summaries = <String, double>{};
       final lastSynced = <String, DateTime?>{};
 
       for (final code in allLocationCodes) {
         final name = displayNameForLocationCode(code);
-        summaries[name] = await AbstractRepository.getSummaryForLocationCode(
-          locationCode: code,
-          fromDate: today,
-          toDate: today,
+        summaries[name] = await SummaryDb.instance.getTotalForDay(
+          day: day,
+          location: name,
         );
         lastSynced[name] =
             await LocationSyncRepository.getLastSyncedAtForLocationCode(code);
@@ -155,12 +158,9 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
   }
 
   Widget _locationCard(String locationName, {required double cardWidth}) {
-    final summary = _todayByLocation[locationName];
+    final total = _todayByLocation[locationName] ?? 0;
     final lastSynced = _lastSyncedByLocation[locationName];
     final syncLabel = _formatLastSynced(lastSynced);
-    final amount = summary?.totalSaleAmount ?? 0;
-    final gst = summary?.totalGst ?? 0;
-    final isNarrow = cardWidth < 520;
 
     return Container(
       key: Key('admin_location_card_${locationName.toLowerCase()}'),
@@ -181,12 +181,22 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
             compact: true,
           ),
           const SizedBox(height: 8),
-          CompactAbstractSummary(
-            amountValue: _formatMoney(amount),
-            gstValue: _formatMoney(gst),
-            grandTotalValue: _formatMoney(amount + gst),
-            grandTotalLabel: 'Total sales',
-            cardWidth: isNarrow ? cardWidth - 20 : 146,
+          Text(
+            "Today's sales",
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedBlue,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _formatMoney(total),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppColors.navy,
+            ),
           ),
           const SizedBox(height: 6),
           Text(

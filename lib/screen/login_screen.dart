@@ -6,6 +6,7 @@ import 'package:sales/config/app_license.dart';
 import 'package:sales/config/local_credentials.dart';
 import 'package:sales/screen/admin_dashboard_screen.dart';
 import 'package:sales/screen/staff_dashboard_screen.dart';
+import 'package:sales/screen/summary_viewer_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/theme/app_theme.dart';
@@ -22,9 +23,13 @@ class LoginScreen extends StatefulWidget {
   static WidgetBuilder? staffHomeBuilder;
 
   @visibleForTesting
+  static WidgetBuilder? summaryHomeBuilder;
+
+  @visibleForTesting
   static void resetTestHooks() {
     adminHomeBuilder = null;
     staffHomeBuilder = null;
+    summaryHomeBuilder = null;
   }
 
   @override
@@ -59,8 +64,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final isAdmin = verifyAdminLogin(username, password);
     final isStaff = verifyStaffLogin(username, password);
+    final isSummaryViewer = verifySummaryViewerLogin(username, password);
 
-    if (!isAdmin && !isStaff) {
+    if (!isAdmin && !isStaff && !isSummaryViewer) {
       setState(() => _error = 'Incorrect username or password.');
       return;
     }
@@ -82,6 +88,21 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(
             builder: LoginScreen.adminHomeBuilder ??
                 (_) => const AdminDashboardScreen(),
+          ),
+        );
+        unawaited(AppSessionService.onLoginComplete());
+        return;
+      }
+
+      if (isSummaryViewer) {
+        await SessionService.saveLogin(username, role: SessionRole.summaryViewer);
+
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: LoginScreen.summaryHomeBuilder ??
+                (_) => const SummaryViewerDashboardScreen(),
           ),
         );
         unawaited(AppSessionService.onLoginComplete());
