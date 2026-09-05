@@ -638,13 +638,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
       final int savedBillNo = _billNo;
 
-      try {
-        await BillPrintService.saveReceiptToDesktop(bill);
-        await BillPrintService.saveReceiptPdfToDesktop(bill);
-      } catch (_) {
-        // Desktop save is best-effort; bill is already persisted locally.
-      }
-
       final defaultPrinter = await PrinterSettingsService.getDefaultPrinter(
         PrinterType.thermal,
       );
