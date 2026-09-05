@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/screen/admin_cross_abstract_screen.dart';
 import 'package:sales/screen/admin_location_grid_screen.dart';
+import 'package:sales/screen/admin_report_screen.dart';
 import 'package:sales/screen/login_screen.dart';
 import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/services/app_session_service.dart';
@@ -16,6 +17,7 @@ import 'package:sales/widgets/compact_layout.dart';
 enum _AdminSection {
   dashboard,
   abstract,
+  report,
   ledger,
   sync,
 }
@@ -71,6 +73,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return 'DASHBOARD';
       case _AdminSection.abstract:
         return 'ABSTRACT';
+      case _AdminSection.report:
+        return 'REPORT';
       case _AdminSection.ledger:
         return 'LEDGER';
       case _AdminSection.sync:
@@ -84,6 +88,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return Icons.dashboard_outlined;
       case _AdminSection.abstract:
         return Icons.summarize_outlined;
+      case _AdminSection.report:
+        return Icons.assessment_outlined;
       case _AdminSection.ledger:
         return Icons.menu_book_outlined;
       case _AdminSection.sync:
@@ -100,6 +106,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       case _AdminSection.abstract:
         return const AdminCrossAbstractScreen();
+      case _AdminSection.report:
+        return const AdminReportScreen();
       case _AdminSection.ledger:
         return Column(
           children: [
