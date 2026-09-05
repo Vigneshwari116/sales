@@ -154,16 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.navy,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Admin: admin / admin123',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _userCtrl,
                       autocorrect: false,
