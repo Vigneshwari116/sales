@@ -21,7 +21,11 @@ class ReportExcelService {
     );
 
     final saveDir = await _saveDirectory();
-    final fileName = _fileName(fromDate: fromDate, toDate: toDate);
+    final fileName = _fileName(
+      breakdown: breakdown,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
     final file = File('$saveDir${Platform.pathSeparator}$fileName');
     await file.writeAsBytes(bytes);
 
@@ -77,20 +81,56 @@ class ReportExcelService {
     }
 
     var rowIndex = 1;
-    for (final row in breakdown.rows) {
+    for (final group in breakdown.groups) {
+      if (group.bills.isEmpty) continue;
+
       _writeBillRow(
         sheet: sheet,
         rowIndex: rowIndex,
-        billNo: '${row.billNo}',
-        date: _formatDate(row.date),
-        name: row.customerName,
-        mobile: row.mobile.isEmpty ? '—' : row.mobile,
-        cash: row.isCashPayment ? money.format(row.grandTotal) : '',
-        card: row.isCashPayment ? '' : money.format(row.grandTotal),
-        total: money.format(row.total),
-        cgst: money.format(row.cgst),
-        sgstIgst: money.format(row.sgstIgst),
-        grandTotal: money.format(row.grandTotal),
+        billNo: group.label,
+        date: '',
+        name: '',
+        mobile: '',
+        cash: '',
+        card: '',
+        total: '',
+        cgst: '',
+        sgstIgst: '',
+        grandTotal: '',
+      );
+      rowIndex++;
+
+      for (final row in group.bills) {
+        _writeBillRow(
+          sheet: sheet,
+          rowIndex: rowIndex,
+          billNo: '${row.billNo}',
+          date: _formatDate(row.date),
+          name: row.customerName,
+          mobile: row.mobile.isEmpty ? '—' : row.mobile,
+          cash: row.isCashPayment ? money.format(row.grandTotal) : '',
+          card: row.isCashPayment ? '' : money.format(row.grandTotal),
+          total: money.format(row.total),
+          cgst: money.format(row.cgst),
+          sgstIgst: money.format(row.sgstIgst),
+          grandTotal: money.format(row.grandTotal),
+        );
+        rowIndex++;
+      }
+
+      _writeBillRow(
+        sheet: sheet,
+        rowIndex: rowIndex,
+        billNo: '',
+        date: '',
+        name: '',
+        mobile: breakdown.periodTotalLabel,
+        cash: money.format(group.subtotal.cash),
+        card: money.format(group.subtotal.card),
+        total: money.format(group.subtotal.total),
+        cgst: money.format(group.subtotal.cgst),
+        sgstIgst: money.format(group.subtotal.sgstIgst),
+        grandTotal: money.format(group.subtotal.grandTotal),
       );
       rowIndex++;
     }
@@ -155,13 +195,16 @@ class ReportExcelService {
   }
 
   static String _fileName({
+    required ReportBreakdown breakdown,
     required DateTime fromDate,
     required DateTime toDate,
   }) {
     final fromPart = DateFormat('dd-MM-yyyy').format(fromDate);
     final toPart = DateFormat('dd-MM-yyyy').format(toDate);
     final rangePart = fromPart == toPart ? fromPart : '${fromPart}_to_$toPart';
-    return 'Report_AllLocations_$rangePart.xlsx';
+    final granularityPart =
+        breakdown.granularity == ReportGranularity.day ? 'Daily' : 'Monthly';
+    return 'Report_${granularityPart}_$rangePart.xlsx';
   }
 
   static Future<String> _saveDirectory() async {

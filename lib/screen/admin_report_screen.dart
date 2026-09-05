@@ -5,7 +5,7 @@ import 'package:sales/services/report_excel_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
-/// Admin cross-location bill report with Excel export.
+/// Admin cross-location grouped bill report with Excel export.
 class AdminReportScreen extends StatefulWidget {
   @visibleForTesting
   final Future<ReportBreakdown> Function({
@@ -88,7 +88,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
   Future<void> _exportExcel() async {
     final breakdown = _breakdown;
-    if (breakdown == null || breakdown.rows.isEmpty) {
+    if (breakdown == null || !breakdown.hasBills) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No report rows to export')),
       );
@@ -142,6 +142,14 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final from = DateFormat('dd MMM yyyy').format(_fromDate);
     final to = DateFormat('dd MMM yyyy').format(_toDate);
     return from == to ? from : '$from — $to';
+  }
+
+  String get _granularityLabel {
+    final breakdown = _breakdown;
+    if (breakdown == null) return '';
+    return breakdown.granularity == ReportGranularity.day
+        ? 'Day-wise breakdown (single month)'
+        : 'Month-wise breakdown (multi-month range)';
   }
 
   @override
@@ -228,11 +236,23 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       ),
                     ),
                   ),
+                if (_granularityLabel.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: Text(
+                      _granularityLabel,
+                      style: const TextStyle(
+                        fontSize: AppTextSizes.listSubtitle,
+                        color: AppColors.mutedBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: _breakdown == null
                       ? const SizedBox.shrink()
-                      : _breakdown!.rows.isEmpty
+                      : !_breakdown!.hasBills
                           ? _buildEmptyState()
                           : CenteredContent(
                               maxWidth: 1200,
@@ -297,6 +317,9 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   Widget _buildTable(ReportBreakdown breakdown) {
+    final periodHeader =
+        breakdown.granularity == ReportGranularity.day ? 'DAY' : 'MONTH';
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -308,15 +331,21 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _headerRow(),
-          ...breakdown.rows.map(_dataRow),
+          _headerRow(periodHeader),
+          for (final group in breakdown.groups) ...[
+            if (group.bills.isNotEmpty) ...[
+              _periodHeaderRow(group.label),
+              ...group.bills.map(_dataRow),
+              _periodTotalRow(group.subtotal, breakdown.periodTotalLabel),
+            ],
+          ],
           _grandTotalRow(breakdown.grandTotal),
         ],
       ),
     );
   }
 
-  Widget _headerRow() {
+  Widget _headerRow(String periodHeader) {
     return Container(
       color: AppColors.tableHeader,
       child: Row(
@@ -331,6 +360,23 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           _cell('CGST', flex: 5, bold: true, alignRight: true),
           _cell('SGST/IGST', flex: 6, bold: true, alignRight: true),
           _cell('GRAND TOTAL', flex: 7, bold: true, alignRight: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _periodHeaderRow(String label) {
+    return Container(
+      color: AppColors.headerBand,
+      child: Row(
+        children: [
+          _cell(label, flex: 27, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 5, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 7, bold: true),
         ],
       ),
     );
@@ -352,6 +398,28 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
         _cell(_formatMoney(row.sgstIgst), flex: 6, alignRight: true),
         _cell(_formatMoney(row.grandTotal), flex: 7, alignRight: true),
       ],
+    );
+  }
+
+  Widget _periodTotalRow(ReportTotals totals, String label) {
+    return Container(
+      color: const Color(0xFFF3F6FA),
+      child: Row(
+        children: [
+          _cell('', flex: 5, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 9, bold: true),
+          _cell(label, flex: 7, bold: true),
+          _cell(_formatMoney(totals.cash), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.card), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.total), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.cgst), flex: 5, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.sgstIgst),
+              flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.grandTotal),
+              flex: 7, bold: true, alignRight: true),
+        ],
+      ),
     );
   }
 

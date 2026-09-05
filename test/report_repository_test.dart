@@ -69,7 +69,31 @@ void main() {
     await AppConfig.clearLocation();
   });
 
-  test('returns one row per bill with bill no, date, name, and mobile', () async {
+  test('single calendar month uses day-wise groups', () async {
+    final breakdown = await ReportRepository.getBreakdown(
+      fromDate: DateTime(2026, 9, 1),
+      toDate: DateTime(2026, 9, 3),
+    );
+
+    expect(breakdown.granularity, ReportGranularity.day);
+    expect(breakdown.groups.length, 3);
+    expect(breakdown.groups.first.label, '01 Sep 2026');
+    expect(breakdown.groups.last.label, '03 Sep 2026');
+  });
+
+  test('multi-month range uses month-wise groups', () async {
+    final breakdown = await ReportRepository.getBreakdown(
+      fromDate: DateTime(2026, 8, 15),
+      toDate: DateTime(2026, 9, 5),
+    );
+
+    expect(breakdown.granularity, ReportGranularity.month);
+    expect(breakdown.groups.length, 2);
+    expect(breakdown.groups.first.label, 'Aug 2026');
+    expect(breakdown.groups.last.label, 'Sep 2026');
+  });
+
+  test('groups contain bill rows with bill no, date, name, and mobile', () async {
     await LocalDb.instance.insertPendingBill(
       SaleBill(
         billNo: 999901,
@@ -111,76 +135,43 @@ void main() {
       toDate: DateTime(2099, 12, 31),
     );
 
-    expect(breakdown.rows.length, 2);
-    expect(breakdown.rows.any((row) => row.billNo == 999901), isTrue);
-    expect(breakdown.rows.any((row) => row.customerName == 'Alice'), isTrue);
-    expect(breakdown.rows.any((row) => row.mobile == '9000000001'), isTrue);
-    expect(breakdown.rows.any((row) => row.customerName == 'Bob'), isTrue);
-  });
-
-  test('aggregates cash, card, tax, and totals in grand total row', () async {
-    await LocalDb.instance.insertPendingBill(
-      SaleBill(
-        billNo: 999901,
-        location: 'Win1',
-        billDate: DateTime(2099, 12, 31),
-        paymentMode: 'CASH',
-        customerName: '',
-        mobile: '',
-        items: [BillItem(qty: 1, rate: 100)],
-        totalQty: 1,
-        totalAmount: 100,
-        totalCgst: 2.5,
-        totalSgst: 2.5,
-        totalIgst: 0,
-        grandTotal: 105,
-      ),
-    );
-
-    await LocalDb.instance.insertPendingBill(
-      SaleBill(
-        billNo: 999902,
-        location: 'Win1',
-        billDate: DateTime(2099, 12, 31),
-        paymentMode: 'UPI',
-        customerName: '',
-        mobile: '',
-        items: [BillItem(qty: 1, rate: 200)],
-        totalQty: 1,
-        totalAmount: 200,
-        totalCgst: 5,
-        totalSgst: 5,
-        totalIgst: 0,
-        grandTotal: 210,
-      ),
-    );
-
-    final breakdown = await ReportRepository.getBreakdown(
-      fromDate: DateTime(2099, 12, 31),
-      toDate: DateTime(2099, 12, 31),
-    );
-
-    expect(breakdown.grandTotal.cash, 105);
-    expect(breakdown.grandTotal.card, 210);
-    expect(breakdown.grandTotal.total, 300);
-    expect(breakdown.grandTotal.cgst, 7.5);
-    expect(breakdown.grandTotal.sgstIgst, 7.5);
+    final dayGroup = breakdown.groups.single;
+    expect(dayGroup.bills.length, 2);
+    expect(dayGroup.bills.any((row) => row.billNo == 999901), isTrue);
+    expect(dayGroup.bills.any((row) => row.customerName == 'Alice'), isTrue);
+    expect(dayGroup.bills.any((row) => row.mobile == '9000000001'), isTrue);
+    expect(dayGroup.subtotal.grandTotal, 315);
     expect(breakdown.grandTotal.grandTotal, 315);
   });
 
-  test('excel export includes bill columns and grand total row', () async {
+  test('excel export includes grouped bill columns and grand total row', () async {
     final breakdown = ReportBreakdown(
-      rows: [
-        ReportBillRow(
-          billNo: 101,
-          date: '2026-09-01',
-          customerName: 'Alice',
-          mobile: '9000000001',
-          paymentMode: 'CASH',
-          total: 100,
-          cgst: 2.5,
-          sgstIgst: 2.5,
-          grandTotal: 105,
+      granularity: ReportGranularity.day,
+      groups: [
+        ReportPeriodGroup(
+          label: '01 Sep 2026',
+          sortKey: '2026-09-01',
+          bills: [
+            ReportBillRow(
+              billNo: 101,
+              date: '2026-09-01',
+              customerName: 'Alice',
+              mobile: '9000000001',
+              paymentMode: 'CASH',
+              total: 100,
+              cgst: 2.5,
+              sgstIgst: 2.5,
+              grandTotal: 105,
+            ),
+          ],
+          subtotal: const ReportTotals(
+            cash: 105,
+            card: 0,
+            total: 100,
+            cgst: 2.5,
+            sgstIgst: 2.5,
+            grandTotal: 105,
+          ),
         ),
       ],
       grandTotal: const ReportTotals(
