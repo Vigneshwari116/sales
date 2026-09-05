@@ -83,17 +83,17 @@ class BillPrintService {
     required PrinterType type,
   }) async {
     final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
+    final lines = text.split('\n');
     final doc = pw.Document();
-    final fontSize = type == PrinterType.thermal ? 6.0 : 7.0;
-    const lineHeightMm = 2.45;
-    const verticalMarginMm = 3.0;
-    const bottomBufferMm = 8.0;
+    final fontSize = type == PrinterType.thermal ? 5.6 : 7.0;
+    const lineHeightMm = 2.2;
+    const verticalMarginMm = 2.5;
+    const bottomBufferMm = 10.0;
 
-    final lineCount = '\n'.allMatches(text).length + 1;
     final contentHeightMm =
-        lineCount * lineHeightMm + verticalMarginMm * 2 + bottomBufferMm;
-    final pageWidthMm = type == PrinterType.thermal ? 58.0 : 80.0;
-    final marginLeftMm = type == PrinterType.thermal ? 1.5 : 3.0;
+        lines.length * lineHeightMm + verticalMarginMm * 2 + bottomBufferMm;
+    final pageWidthMm = type == PrinterType.thermal ? 80.0 : 80.0;
+    final marginLeftMm = type == PrinterType.thermal ? 2.0 : 3.0;
     final marginRightMm = type == PrinterType.thermal ? 2.0 : 3.0;
     final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
 
@@ -101,6 +101,7 @@ class BillPrintService {
       font: pw.Font.courierBold(),
       fontSize: fontSize,
       lineSpacing: 0,
+      height: 1,
       color: PdfColors.black,
     );
 
@@ -116,13 +117,21 @@ class BillPrintService {
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
-        build: (context) => pw.SizedBox(
-          width: printableWidthMm * PdfPageFormat.mm,
-          child: pw.Text(
-            text,
-            style: style,
-            softWrap: false,
-          ),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            for (final line in lines)
+              pw.SizedBox(
+                width: printableWidthMm * PdfPageFormat.mm,
+                child: pw.Text(
+                  line.isEmpty ? ' ' : line,
+                  style: style,
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ),
+          ],
         ),
       ),
     );

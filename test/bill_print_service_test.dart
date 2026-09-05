@@ -55,9 +55,11 @@ void main() {
     expect(bytes.length, greaterThan(1000));
     expect(pdfText, contains('/MediaBox'));
     final mediaBoxMatch =
-        RegExp(r'/MediaBox\[0 0 [\d.]+ ([\d.]+)\]').firstMatch(pdfText);
+        RegExp(r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]').firstMatch(pdfText);
     expect(mediaBoxMatch, isNotNull);
-    final pageHeightPt = double.parse(mediaBoxMatch!.group(1)!);
+    final pageWidthPt = double.parse(mediaBoxMatch!.group(1)!);
+    final pageHeightPt = double.parse(mediaBoxMatch.group(2)!);
+    expect(pageWidthPt, greaterThan(200));
     expect(pageHeightPt, greaterThan(180));
   });
 }

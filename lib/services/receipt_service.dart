@@ -7,11 +7,11 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// 58mm thermal paper — ~32 monospace chars fit without clipping.
-  static const int _width = 32;
+  /// 80mm (3-inch) thermal paper — ~48 monospace chars like the original bills.
+  static const int _width = 48;
   static const int _snoW = 4;
-  static const int _rateW = 8;
-  static const int _qtyW = 6;
+  static const int _rateW = 10;
+  static const int _qtyW = 8;
   static const int _amountW = _width - _snoW - _rateW - _qtyW;
   static const int _labelW = _width - _amountW;
 
@@ -28,7 +28,7 @@ class ReceiptService {
     final line = '-' * _width;
 
     buffer.writeln(_center(businessName));
-    _writeCenteredLines(buffer, profile.addressLine);
+    buffer.writeln(_singleLineAddress(profile.addressLine));
     buffer.writeln(_center('GSTIN:$gstin'));
     buffer.writeln(_billDateLine(bill.billNo, dateText));
     buffer.writeln(_fieldLine('NAME', bill.customerName));
@@ -55,9 +55,9 @@ class ReceiptService {
   }
 
   static void _writeFooter(StringBuffer buffer) {
-    buffer.writeln(_center('TERMS AND CONDITION'));
-    buffer.writeln(_center('EXCHANGE ONLY 3 DAYS'));
-    buffer.writeln(_center('AMOUNT NOT REFUND'));
+    buffer.writeln('TERMS AND CONDITION');
+    buffer.writeln('EXCHANGE ONLY 3 DAYS');
+    buffer.writeln('AMOUNT NOT REFUND');
     buffer.writeln(_center('THANK YOU VISIT AGAIN'));
   }
 
@@ -77,6 +77,14 @@ class ReceiptService {
           addressLine: '47/3/4,2nd Cross KUDULU MAIN ROAD,Bangalore-68',
         );
     }
+  }
+
+  static String _singleLineAddress(String address) {
+    final trimmed = address.trim();
+    if (trimmed.length <= _width) {
+      return trimmed;
+    }
+    return trimmed.substring(0, _width);
   }
 
   static String _itemHeader() {
@@ -123,36 +131,6 @@ class ReceiptService {
     }
     final gap = _width - left.length - right.length;
     return '$left${' ' * gap}$right';
-  }
-
-  static void _writeCenteredLines(StringBuffer buffer, String text) {
-    for (final line in _wrapToWidth(text)) {
-      buffer.writeln(_center(line));
-    }
-  }
-
-  static List<String> _wrapToWidth(String text) {
-    if (text.length <= _width) {
-      return [text];
-    }
-    final lines = <String>[];
-    var remaining = text;
-    while (remaining.isNotEmpty) {
-      if (remaining.length <= _width) {
-        lines.add(remaining);
-        break;
-      }
-      var breakAt = remaining.lastIndexOf(',', _width);
-      if (breakAt <= 0) {
-        breakAt = _width;
-      }
-      lines.add(remaining.substring(0, breakAt).trim());
-      remaining = remaining.substring(breakAt).trimLeft();
-      if (remaining.startsWith(',')) {
-        remaining = remaining.substring(1).trimLeft();
-      }
-    }
-    return lines;
   }
 
   static String _center(String text) {
