@@ -17,7 +17,7 @@ class ReceiptService {
 
   static String buildReceiptText(SaleBill bill) {
     final code = locationCodeFromDisplayName(bill.location);
-    return _buildOriginalFormat(bill, code);
+    return _buildOriginalFormat(bill, code).trimRight();
   }
 
   /// Original thermal layout — dashed separators, per-item CGST/SGST lines.
@@ -55,7 +55,6 @@ class ReceiptService {
   }
 
   static void _writeFooter(StringBuffer buffer) {
-    buffer.writeln();
     buffer.writeln(_center('TERMS AND CONDITION'));
     buffer.writeln(_center('EXCHANGE ONLY 3 DAYS'));
     buffer.writeln(_center('AMOUNT NOT REFUND'));
@@ -112,8 +111,8 @@ class ReceiptService {
   }
 
   static String _fieldLine(String label, String value) {
-    final text = value.trim().isEmpty ? '' : value.trim();
-    return '$label:$text';
+    final text = value.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
+    return text.isEmpty ? '$label:' : '$label:$text';
   }
 
   static String _billDateLine(int billNo, String dateText) {
