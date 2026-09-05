@@ -21,11 +21,7 @@ class ReportExcelService {
     );
 
     final saveDir = await _saveDirectory();
-    final fileName = _fileName(
-      breakdown: breakdown,
-      fromDate: fromDate,
-      toDate: toDate,
-    );
+    final fileName = _fileName(fromDate: fromDate, toDate: toDate);
     final file = File('$saveDir${Platform.pathSeparator}$fileName');
     await file.writeAsBytes(bytes);
 
@@ -61,10 +57,11 @@ class ReportExcelService {
     final sheet = excel[sheetName];
     final money = NumberFormat('#,##0.00');
 
-    final periodHeader =
-        breakdown.granularity == ReportGranularity.day ? 'DAY' : 'MONTH';
-    final headers = [
-      periodHeader,
+    const headers = [
+      'BILLNO',
+      'DATE',
+      'NAME',
+      'MOBILE',
       'CASH',
       'CARD/UPI',
       'TOTAL',
@@ -81,12 +78,15 @@ class ReportExcelService {
 
     var rowIndex = 1;
     for (final row in breakdown.rows) {
-      _writeRow(
+      _writeBillRow(
         sheet: sheet,
         rowIndex: rowIndex,
-        label: row.label,
-        cash: money.format(row.cash),
-        card: money.format(row.card),
+        billNo: '${row.billNo}',
+        date: _formatDate(row.date),
+        name: row.customerName,
+        mobile: row.mobile.isEmpty ? '—' : row.mobile,
+        cash: row.isCashPayment ? money.format(row.grandTotal) : '',
+        card: row.isCashPayment ? '' : money.format(row.grandTotal),
         total: money.format(row.total),
         cgst: money.format(row.cgst),
         sgstIgst: money.format(row.sgstIgst),
@@ -95,10 +95,13 @@ class ReportExcelService {
       rowIndex++;
     }
 
-    _writeRow(
+    _writeBillRow(
       sheet: sheet,
       rowIndex: rowIndex,
-      label: 'Grand Total',
+      billNo: '',
+      date: '',
+      name: '',
+      mobile: 'Grand Total',
       cash: money.format(breakdown.grandTotal.cash),
       card: money.format(breakdown.grandTotal.card),
       total: money.format(breakdown.grandTotal.total),
@@ -110,10 +113,13 @@ class ReportExcelService {
     return Uint8List.fromList(excel.encode()!);
   }
 
-  static void _writeRow({
+  static void _writeBillRow({
     required Sheet sheet,
     required int rowIndex,
-    required String label,
+    required String billNo,
+    required String date,
+    required String name,
+    required String mobile,
     required String cash,
     required String card,
     required String total,
@@ -121,7 +127,18 @@ class ReportExcelService {
     required String sgstIgst,
     required String grandTotal,
   }) {
-    final values = [label, cash, card, total, cgst, sgstIgst, grandTotal];
+    final values = [
+      billNo,
+      date,
+      name,
+      mobile,
+      cash,
+      card,
+      total,
+      cgst,
+      sgstIgst,
+      grandTotal,
+    ];
     for (var column = 0; column < values.length; column++) {
       sheet
           .cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: rowIndex))
@@ -129,17 +146,22 @@ class ReportExcelService {
     }
   }
 
+  static String _formatDate(String value) {
+    try {
+      return DateFormat('dd-MMM-yy').format(DateTime.parse(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
   static String _fileName({
-    required ReportBreakdown breakdown,
     required DateTime fromDate,
     required DateTime toDate,
   }) {
     final fromPart = DateFormat('dd-MM-yyyy').format(fromDate);
     final toPart = DateFormat('dd-MM-yyyy').format(toDate);
     final rangePart = fromPart == toPart ? fromPart : '${fromPart}_to_$toPart';
-    final granularityPart =
-        breakdown.granularity == ReportGranularity.day ? 'Daily' : 'Monthly';
-    return 'Report_${granularityPart}_$rangePart.xlsx';
+    return 'Report_AllLocations_$rangePart.xlsx';
   }
 
   static Future<String> _saveDirectory() async {

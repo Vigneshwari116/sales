@@ -5,7 +5,7 @@ import 'package:sales/services/report_excel_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
-/// Admin cross-location day-wise / month-wise sales report.
+/// Admin cross-location bill report with Excel export.
 class AdminReportScreen extends StatefulWidget {
   @visibleForTesting
   final Future<ReportBreakdown> Function({
@@ -23,7 +23,7 @@ class AdminReportScreen extends StatefulWidget {
 }
 
 class _AdminReportScreenState extends State<AdminReportScreen> {
-  static const double _tableMinWidth = 760;
+  static const double _tableMinWidth = 1000;
 
   DateTime _fromDate = DateTime.now();
   DateTime _toDate = DateTime.now();
@@ -123,18 +123,25 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
 
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
 
+  String _formatDate(String value) {
+    try {
+      return DateFormat('dd-MMM-yy').format(DateTime.parse(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
+  String _paymentColumnAmount(ReportBillRow row, {required bool cash}) {
+    if (row.isCashPayment != cash) {
+      return '';
+    }
+    return _formatMoney(row.grandTotal);
+  }
+
   String get _periodLabel {
     final from = DateFormat('dd MMM yyyy').format(_fromDate);
     final to = DateFormat('dd MMM yyyy').format(_toDate);
     return from == to ? from : '$from — $to';
-  }
-
-  String get _granularityLabel {
-    final breakdown = _breakdown;
-    if (breakdown == null) return '';
-    return breakdown.granularity == ReportGranularity.day
-        ? 'Day-wise breakdown (single month)'
-        : 'Month-wise breakdown (multi-month range)';
   }
 
   @override
@@ -221,57 +228,75 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       ),
                     ),
                   ),
-                if (_granularityLabel.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Text(
-                      _granularityLabel,
-                      style: const TextStyle(
-                        fontSize: AppTextSizes.listSubtitle,
-                        color: AppColors.mutedBlue,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: _breakdown == null
                       ? const SizedBox.shrink()
-                      : CenteredContent(
-                          maxWidth: 1100,
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final needsHScroll =
-                                  constraints.maxWidth < _tableMinWidth;
-                              final table = _buildTable(_breakdown!);
+                      : _breakdown!.rows.isEmpty
+                          ? _buildEmptyState()
+                          : CenteredContent(
+                              maxWidth: 1200,
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final needsHScroll =
+                                      constraints.maxWidth < _tableMinWidth;
+                                  final table = _buildTable(_breakdown!);
 
-                              if (!needsHScroll) {
-                                return SingleChildScrollView(child: table);
-                              }
+                                  if (!needsHScroll) {
+                                    return SingleChildScrollView(child: table);
+                                  }
 
-                              return SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: SingleChildScrollView(
-                                  child: SizedBox(
-                                    width: _tableMinWidth,
-                                    child: table,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                                  return SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: SingleChildScrollView(
+                                      child: SizedBox(
+                                        width: _tableMinWidth,
+                                        child: table,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                 ),
               ],
             ),
     );
   }
 
-  Widget _buildTable(ReportBreakdown breakdown) {
-    final periodHeader =
-        breakdown.granularity == ReportGranularity.day ? 'DAY' : 'MONTH';
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.receipt_long_outlined,
+                size: 48, color: AppColors.mutedBlue),
+            const SizedBox(height: 16),
+            const Text(
+              'No bills in selected range',
+              style: TextStyle(
+                fontSize: AppTextSizes.sectionHeader,
+                fontWeight: FontWeight.bold,
+                color: AppColors.navy,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'All locations — $_periodLabel',
+              style: const TextStyle(fontSize: AppTextSizes.listSubtitle),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildTable(ReportBreakdown breakdown) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -283,7 +308,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _headerRow(periodHeader),
+          _headerRow(),
           ...breakdown.rows.map(_dataRow),
           _grandTotalRow(breakdown.grandTotal),
         ],
@@ -291,51 +316,62 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     );
   }
 
-  Widget _headerRow(String periodHeader) {
+  Widget _headerRow() {
     return Container(
       color: AppColors.tableHeader,
       child: Row(
         children: [
-          _cell(periodHeader, flex: 8, bold: true),
-          _cell('CASH', flex: 7, bold: true, alignRight: true),
-          _cell('CARD/UPI', flex: 7, bold: true, alignRight: true),
-          _cell('TOTAL', flex: 7, bold: true, alignRight: true),
-          _cell('CGST', flex: 6, bold: true, alignRight: true),
-          _cell('SGST/IGST', flex: 7, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', flex: 8, bold: true, alignRight: true),
+          _cell('BILLNO', flex: 5, bold: true),
+          _cell('DATE', flex: 6, bold: true),
+          _cell('NAME', flex: 9, bold: true),
+          _cell('MOBILE', flex: 7, bold: true),
+          _cell('CASH', flex: 6, bold: true, alignRight: true),
+          _cell('CARD/UPI', flex: 6, bold: true, alignRight: true),
+          _cell('TOTAL', flex: 6, bold: true, alignRight: true),
+          _cell('CGST', flex: 5, bold: true, alignRight: true),
+          _cell('SGST/IGST', flex: 6, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', flex: 7, bold: true, alignRight: true),
         ],
       ),
     );
   }
 
-  Widget _dataRow(ReportRow row) {
+  Widget _dataRow(ReportBillRow row) {
     return Row(
       children: [
-        _cell(row.label, flex: 8),
-        _cell(_formatMoney(row.cash), flex: 7, alignRight: true),
-        _cell(_formatMoney(row.card), flex: 7, alignRight: true),
-        _cell(_formatMoney(row.total), flex: 7, alignRight: true),
-        _cell(_formatMoney(row.cgst), flex: 6, alignRight: true),
-        _cell(_formatMoney(row.sgstIgst), flex: 7, alignRight: true),
-        _cell(_formatMoney(row.grandTotal), flex: 8, alignRight: true),
+        _cell('${row.billNo}', flex: 5),
+        _cell(_formatDate(row.date), flex: 6),
+        _cell(row.customerName, flex: 9),
+        _cell(row.mobile.isEmpty ? '—' : row.mobile, flex: 7),
+        _cell(_paymentColumnAmount(row, cash: true),
+            flex: 6, alignRight: true),
+        _cell(_paymentColumnAmount(row, cash: false),
+            flex: 6, alignRight: true),
+        _cell(_formatMoney(row.total), flex: 6, alignRight: true),
+        _cell(_formatMoney(row.cgst), flex: 5, alignRight: true),
+        _cell(_formatMoney(row.sgstIgst), flex: 6, alignRight: true),
+        _cell(_formatMoney(row.grandTotal), flex: 7, alignRight: true),
       ],
     );
   }
 
-  Widget _grandTotalRow(ReportRow row) {
+  Widget _grandTotalRow(ReportTotals totals) {
     return Container(
       color: AppColors.headerBand,
       child: Row(
         children: [
-          _cell('Grand Total', flex: 8, bold: true),
-          _cell(_formatMoney(row.cash), flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(row.card), flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(row.total), flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(row.cgst), flex: 6, bold: true, alignRight: true),
-          _cell(_formatMoney(row.sgstIgst),
+          _cell('', flex: 5, bold: true),
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 9, bold: true),
+          _cell('Grand Total', flex: 7, bold: true),
+          _cell(_formatMoney(totals.cash), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.card), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.total), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.cgst), flex: 5, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.sgstIgst),
+              flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.grandTotal),
               flex: 7, bold: true, alignRight: true),
-          _cell(_formatMoney(row.grandTotal),
-              flex: 8, bold: true, alignRight: true),
         ],
       ),
     );

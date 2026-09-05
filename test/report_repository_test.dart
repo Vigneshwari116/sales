@@ -28,6 +28,16 @@ class _FakePathProvider extends Fake
   Future<String?> getApplicationDocumentsPath() async => root;
 }
 
+Future<void> _deleteTestDb() async {
+  final dir = await getApplicationSupportDirectory();
+  for (final code in ['win1', 'win2', 'win3']) {
+    final file = File('${dir.path}/${code}_sales.db');
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
@@ -49,40 +59,66 @@ void main() {
   setUp(() async {
     await AppConfig.setLocation('win1');
     await LocalDb.resetForTesting();
+    await _deleteTestDb();
     await LocalDb.instance.initialize();
   });
 
   tearDown(() async {
     await LocalDb.resetForTesting();
+    await _deleteTestDb();
     await AppConfig.clearLocation();
   });
 
-  test('single calendar month uses day-wise rows', () async {
-    final breakdown = await ReportRepository.getBreakdown(
-      fromDate: DateTime(2026, 9, 1),
-      toDate: DateTime(2026, 9, 3),
+  test('returns one row per bill with bill no, date, name, and mobile', () async {
+    await LocalDb.instance.insertPendingBill(
+      SaleBill(
+        billNo: 999901,
+        location: 'Win1',
+        billDate: DateTime(2099, 12, 31),
+        paymentMode: 'CASH',
+        customerName: 'Alice',
+        mobile: '9000000001',
+        items: [BillItem(qty: 1, rate: 100)],
+        totalQty: 1,
+        totalAmount: 100,
+        totalCgst: 2.5,
+        totalSgst: 2.5,
+        totalIgst: 0,
+        grandTotal: 105,
+      ),
     );
 
-    expect(breakdown.granularity, ReportGranularity.day);
-    expect(breakdown.rows.length, 3);
-    expect(breakdown.rows.first.label, '01 Sep 2026');
-    expect(breakdown.rows.last.label, '03 Sep 2026');
-  });
-
-  test('multi-month range uses month-wise rows', () async {
-    final breakdown = await ReportRepository.getBreakdown(
-      fromDate: DateTime(2026, 8, 15),
-      toDate: DateTime(2026, 9, 5),
+    await LocalDb.instance.insertPendingBill(
+      SaleBill(
+        billNo: 999902,
+        location: 'Win1',
+        billDate: DateTime(2099, 12, 31),
+        paymentMode: 'UPI',
+        customerName: 'Bob',
+        mobile: '9000000002',
+        items: [BillItem(qty: 1, rate: 200)],
+        totalQty: 1,
+        totalAmount: 200,
+        totalCgst: 5,
+        totalSgst: 5,
+        totalIgst: 0,
+        grandTotal: 210,
+      ),
     );
 
-    expect(breakdown.granularity, ReportGranularity.month);
+    final breakdown = await ReportRepository.getBreakdown(
+      fromDate: DateTime(2099, 12, 31),
+      toDate: DateTime(2099, 12, 31),
+    );
+
     expect(breakdown.rows.length, 2);
-    expect(breakdown.rows.first.label, 'Aug 2026');
-    expect(breakdown.rows.last.label, 'Sep 2026');
+    expect(breakdown.rows.any((row) => row.billNo == 999901), isTrue);
+    expect(breakdown.rows.any((row) => row.customerName == 'Alice'), isTrue);
+    expect(breakdown.rows.any((row) => row.mobile == '9000000001'), isTrue);
+    expect(breakdown.rows.any((row) => row.customerName == 'Bob'), isTrue);
   });
 
-  test('aggregates cash, card, tax, and totals from active location bills',
-      () async {
+  test('aggregates cash, card, tax, and totals in grand total row', () async {
     await LocalDb.instance.insertPendingBill(
       SaleBill(
         billNo: 999901,
@@ -124,43 +160,36 @@ void main() {
       toDate: DateTime(2099, 12, 31),
     );
 
-    final dayRow = breakdown.rows.single;
-    expect(dayRow.cash, 105);
-    expect(dayRow.card, 210);
-    expect(dayRow.total, 300);
-    expect(dayRow.cgst, 7.5);
-    expect(dayRow.sgstIgst, 7.5);
-    expect(dayRow.grandTotal, 315);
-
     expect(breakdown.grandTotal.cash, 105);
     expect(breakdown.grandTotal.card, 210);
+    expect(breakdown.grandTotal.total, 300);
+    expect(breakdown.grandTotal.cgst, 7.5);
+    expect(breakdown.grandTotal.sgstIgst, 7.5);
     expect(breakdown.grandTotal.grandTotal, 315);
   });
 
-  test('excel export includes headers, rows, and grand total row', () async {
+  test('excel export includes bill columns and grand total row', () async {
     final breakdown = ReportBreakdown(
-      granularity: ReportGranularity.day,
       rows: [
-        ReportRow(
-          label: '01 Sep 2026',
-          sortKey: '2026-09-01',
-          cash: 100,
-          card: 200,
-          total: 250,
-          cgst: 10,
-          sgstIgst: 10,
-          grandTotal: 270,
+        ReportBillRow(
+          billNo: 101,
+          date: '2026-09-01',
+          customerName: 'Alice',
+          mobile: '9000000001',
+          paymentMode: 'CASH',
+          total: 100,
+          cgst: 2.5,
+          sgstIgst: 2.5,
+          grandTotal: 105,
         ),
       ],
-      grandTotal: ReportRow(
-        label: 'Grand Total',
-        sortKey: 'grand_total',
-        cash: 100,
-        card: 200,
-        total: 250,
-        cgst: 10,
-        sgstIgst: 10,
-        grandTotal: 270,
+      grandTotal: const ReportTotals(
+        cash: 105,
+        card: 0,
+        total: 100,
+        cgst: 2.5,
+        sgstIgst: 2.5,
+        grandTotal: 105,
       ),
     );
 
