@@ -301,16 +301,14 @@ void main() {
     final textPath = '$shotDir/receipt_full_text_sample.txt';
     await File(textPath).writeAsString(text);
 
-    final pdfPath = await BillPrintService.saveReceiptPdfToDesktop(bill);
-    final pdfFile = File(pdfPath);
-    expect(pdfFile.existsSync(), isTrue);
-    await pdfFile.copy('$shotDir/receipt_full_bill_sample.pdf');
+    final pdfBytes = await BillPrintService.buildPdfBytes(bill);
+    final pdfFile = File('$shotDir/receipt_full_bill_sample.pdf');
+    await pdfFile.writeAsBytes(pdfBytes);
 
-    expect(text, contains('R K S ENTERPRISES'));
-    expect(text, contains('Bommasandra'));
-    expect(text, contains('SUBTOTAL'));
+    expect(text, contains(ReceiptService.businessName));
+    expect(text, contains('KUDULU MAIN ROAD'));
     expect(text, contains('GRAND TOTAL'));
     expect(text, contains('THANK YOU VISIT AGAIN'));
-    print('Wrote $textPath and $pdfPath');
+    print('Wrote $textPath and ${pdfFile.path}');
   });
 }

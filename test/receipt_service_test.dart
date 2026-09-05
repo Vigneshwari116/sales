@@ -163,7 +163,7 @@ void main() {
 
     expect(itemLines, hasLength(1));
     expect(itemLines.first.endsWith('1200.00'), isTrue);
-    expect(itemLines.first.length, lessThanOrEqualTo(62));
+    expect(itemLines.first.length, lessThanOrEqualTo(48));
     _expectLinesWithinThermalWidth(lines.join('\n'));
   });
 }
@@ -172,8 +172,8 @@ void _expectLinesWithinThermalWidth(String text) {
   for (final line in text.split('\n')) {
     expect(
       line.length,
-      lessThanOrEqualTo(62),
-      reason: 'Line exceeds 4-inch thermal width: "$line"',
+      lessThanOrEqualTo(48),
+      reason: 'Line exceeds 3-inch (80mm) thermal width: "$line"',
     );
   }
 }

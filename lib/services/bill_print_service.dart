@@ -7,10 +7,25 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/esc_pos_receipt_service.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
+import 'package:sales/services/thermal_raw_printer.dart';
 
 class BillPrintService {
+  /// TVS RP3200: 80mm roll, 72mm max printable width (576 dots @ 8 dots/mm).
+  static const double thermalPageWidthMm = 80.0;
+  static const double thermalPrintableWidthMm = 72.0;
+  static const double _thermalMarginMm =
+      (thermalPageWidthMm - thermalPrintableWidthMm) / 2;
+
+  /// RP3200 Font A (12×24 dots): 48 columns, 1.50×3.00mm per character.
+  static const double thermalFontSizePt = 7.0;
+  static const double thermalCharWidthMm = 1.50;
+  static const double thermalLineSpacingMm = 4.25;
+  static const double _thermalLineHeightFactor =
+      (thermalLineSpacingMm * PdfPageFormat.mm) / thermalFontSizePt;
+
   static Future<String> saveReceiptToDesktop(SaleBill bill) async {
     final text = ReceiptService.buildReceiptText(bill);
     final saveDir = await _receiptSaveDirectory();
@@ -44,6 +59,14 @@ class BillPrintService {
       );
     }
 
+    if (type == PrinterType.thermal) {
+      final escPosBytes = EscPosReceiptService.buildReceiptBytes(bill);
+      return printRawEscPos(
+        printerName: printerName,
+        data: escPosBytes,
+      );
+    }
+
     final printers = await Printing.listPrinters();
     Printer? printer;
 
@@ -58,12 +81,17 @@ class BillPrintService {
       throw Exception('Printer "$printerName" not found');
     }
 
-    final pdfBytes = await _buildPdfBytes(bill, type: type);
+    final layout = _computePageLayout(
+      _normalizedReceiptText(ReceiptService.buildReceiptText(bill)),
+      type: type,
+    );
 
     final printed = await Printing.directPrintPdf(
       printer: printer,
-      onLayout: (_) async => pdfBytes,
+      onLayout: (_) async => _buildPdfBytesFromLayout(layout),
       name: 'Bill_${bill.billNo}',
+      format: layout.pageFormat,
+      dynamicLayout: false,
       usePrinterSettings: false,
     );
 
@@ -74,38 +102,45 @@ class BillPrintService {
   static Future<Uint8List> buildPdfBytes(
     SaleBill bill, {
     PrinterType type = PrinterType.thermal,
-  }) {
-    return _buildPdfBytes(bill, type: type);
-  }
-
-  static Future<Uint8List> _buildPdfBytes(
-    SaleBill bill, {
-    required PrinterType type,
   }) async {
     final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
+    final layout = _computePageLayout(text, type: type);
+    return _buildPdfBytesFromLayout(layout);
+  }
+
+  @visibleForTesting
+  static PdfPageFormat pageFormatForBill(
+    SaleBill bill, {
+    PrinterType type = PrinterType.thermal,
+  }) {
+    final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
+    return _computePageLayout(text, type: type).pageFormat;
+  }
+
+  static _ReceiptPdfLayout _computePageLayout(
+    String text, {
+    required PrinterType type,
+  }) {
     final lines = text.split('\n');
-    final doc = pw.Document();
-    final fontSize = type == PrinterType.thermal ? 5.4 : 7.0;
-    const lineHeightMm = 2.2;
-    const verticalMarginMm = 2.5;
-    const bottomBufferMm = 10.0;
-    const thermalPageWidthMm = 101.6;
+    final fontSize =
+        type == PrinterType.thermal ? thermalFontSizePt : 7.0;
+    final lineHeightMm =
+        type == PrinterType.thermal ? thermalLineSpacingMm : 4.25;
+    final lineHeightFactor =
+        type == PrinterType.thermal ? _thermalLineHeightFactor : 1.72;
+    const verticalMarginMm = 2.0;
+    const bottomBufferMm = 4.0;
 
-    final contentHeightMm =
-        lines.length * lineHeightMm + verticalMarginMm * 2 + bottomBufferMm;
-    final pageWidthMm =
-        type == PrinterType.thermal ? thermalPageWidthMm : thermalPageWidthMm;
-    final marginLeftMm = type == PrinterType.thermal ? 3.0 : 3.0;
-    final marginRightMm = type == PrinterType.thermal ? 3.0 : 3.0;
-    final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
+    final pageWidthMm = thermalPageWidthMm;
+    final marginLeftMm = _thermalMarginMm;
+    final marginRightMm = _thermalMarginMm;
+    final printableWidthMm = thermalPrintableWidthMm;
 
-    final style = pw.TextStyle(
-      font: pw.Font.courierBold(),
-      fontSize: fontSize,
-      lineSpacing: 0,
-      height: 1,
-      color: PdfColors.black,
-    );
+    final contentHeightMm = lines.isEmpty
+        ? verticalMarginMm * 2 + bottomBufferMm
+        : lines.length * lineHeightMm +
+            verticalMarginMm * 2 +
+            bottomBufferMm;
 
     final pageFormat = PdfPageFormat(
       pageWidthMm * PdfPageFormat.mm,
@@ -116,29 +151,51 @@ class BillPrintService {
       marginBottom: verticalMarginMm * PdfPageFormat.mm,
     );
 
+    return _ReceiptPdfLayout(
+      text: text,
+      pageFormat: pageFormat,
+      printableWidthMm: printableWidthMm,
+      fontSize: fontSize,
+      lineHeightFactor: lineHeightFactor,
+    );
+  }
+
+  static Future<Uint8List> _buildPdfBytesFromLayout(
+    _ReceiptPdfLayout layout,
+  ) async {
+    final doc = pw.Document();
+    final style = pw.TextStyle(
+      font: pw.Font.courierBold(),
+      fontSize: layout.fontSize,
+      lineSpacing: 0,
+      height: layout.lineHeightFactor,
+      color: PdfColors.black,
+    );
+
     doc.addPage(
       pw.Page(
-        pageFormat: pageFormat,
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          mainAxisSize: pw.MainAxisSize.min,
-          children: [
-            for (final line in lines)
-              pw.SizedBox(
-                width: printableWidthMm * PdfPageFormat.mm,
-                child: pw.Text(
-                  line.isEmpty ? ' ' : line,
-                  style: style,
-                  maxLines: 1,
-                  softWrap: false,
-                ),
-              ),
-          ],
+        pageFormat: layout.pageFormat,
+        build: (context) => pw.SizedBox(
+          width: layout.printableWidthMm * PdfPageFormat.mm,
+          child: pw.Text(
+            layout.text,
+            style: style,
+            softWrap: false,
+          ),
         ),
       ),
     );
 
-    return doc.save();
+    return await doc.save();
+  }
+
+  static Future<Uint8List> _buildPdfBytes(
+    SaleBill bill, {
+    required PrinterType type,
+  }) async {
+    final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
+    final layout = _computePageLayout(text, type: type);
+    return _buildPdfBytesFromLayout(layout);
   }
 
   static String _normalizedReceiptText(String text) {
@@ -187,4 +244,20 @@ class BillPrintService {
     final dir = await getApplicationDocumentsDirectory();
     return dir.path;
   }
+}
+
+class _ReceiptPdfLayout {
+  final String text;
+  final PdfPageFormat pageFormat;
+  final double printableWidthMm;
+  final double fontSize;
+  final double lineHeightFactor;
+
+  const _ReceiptPdfLayout({
+    required this.text,
+    required this.pageFormat,
+    required this.printableWidthMm,
+    required this.fontSize,
+    required this.lineHeightFactor,
+  });
 }
