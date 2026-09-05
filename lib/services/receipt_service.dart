@@ -17,61 +17,13 @@ class ReceiptService {
 
   static String buildReceiptText(SaleBill bill) {
     final code = locationCodeFromDisplayName(bill.location);
-    switch (code) {
-      case 'win3':
-        return _buildGrabhivFormat(bill);
-      case 'win2':
-        return _buildTippasandraFormat(bill);
-      case 'win1':
-      default:
-        return _buildBommasandraFormat(bill);
-    }
+    return _buildOriginalFormat(bill, code);
   }
 
-  /// Grabhivapalya — per-item GST% lines, AMOUNT column, compact totals.
-  static String _buildGrabhivFormat(SaleBill bill) {
+  /// Original thermal layout — dashed separators, per-item CGST/SGST lines.
+  static String _buildOriginalFormat(SaleBill bill, String locationCode) {
     final buffer = StringBuffer();
-    final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
-    final profile = _locationProfile('win3');
-
-    buffer.writeln(_center(businessName));
-    _writeCenteredLines(buffer, profile.addressLine);
-    buffer.writeln(_center('GSTIN:$gstin'));
-    buffer.writeln(_billDateLine(bill.billNo, dateText));
-    buffer.writeln(_fieldLine('NAME', bill.customerName));
-    buffer.writeln(_fieldLine('MOBILE', bill.mobile));
-    buffer.writeln(_grabhivItemHeader());
-
-    for (final item in bill.items) {
-      buffer.writeln(_grabhivItemLine(item));
-      buffer.writeln(
-        '${_padRight('', _snoW)}'
-        'CGST% ${_formatPct(item.cgstPct)}'
-        ' SGST% ${_formatPct(item.sgstPct)}',
-      );
-    }
-
-    buffer.writeln(_grabhivTotalLine(bill.totalQty, bill.grandTotal));
-    buffer.writeln(_rightAmountLine('CGST', bill.totalCgst));
-    buffer.writeln(_rightAmountLine('SGST', bill.totalSgst));
-    buffer.writeln(_grabhivGrandTotalLine(bill.grandTotal));
-    _writeFooter(buffer);
-    return buffer.toString();
-  }
-
-  /// Bommasandra — dashed separators, combined GST% block after items.
-  static String _buildBommasandraFormat(SaleBill bill) {
-    return _buildDashedBranchFormat(bill, 'win1');
-  }
-
-  /// Tippasandra — dashed separators, combined GST% block after items.
-  static String _buildTippasandraFormat(SaleBill bill) {
-    return _buildDashedBranchFormat(bill, 'win2');
-  }
-
-  static String _buildDashedBranchFormat(SaleBill bill, String locationCode) {
-    final buffer = StringBuffer();
-    final dateText = DateFormat('dd-MM-yyyy').format(bill.billDate);
+    final dateText = DateFormat('dd/MM/yyyy').format(bill.billDate);
     final profile = _locationProfile(locationCode);
     final line = '-' * _width;
 
@@ -82,24 +34,17 @@ class ReceiptService {
     buffer.writeln(_fieldLine('NAME', bill.customerName));
     buffer.writeln(_fieldLine('MOBILE', bill.mobile));
     buffer.writeln(line);
-    buffer.writeln(_dashedItemHeader());
+    buffer.writeln(_itemHeader());
     buffer.writeln(line);
 
     for (final item in bill.items) {
-      buffer.writeln(_dashedItemLine(item));
+      buffer.writeln(_itemLine(item));
+      buffer.writeln(line);
+      buffer.writeln(_itemGstLine(item));
+      buffer.writeln(line);
     }
 
-    buffer.writeln(line);
-    final cgstPct = bill.items.isNotEmpty ? bill.items.first.cgstPct : 2.5;
-    final sgstPct = bill.items.isNotEmpty ? bill.items.first.sgstPct : 2.5;
-    buffer.writeln(
-      'CGST%  ${_formatPct(cgstPct)}'
-      'SGST%  ${_formatPct(sgstPct)}',
-    );
-    buffer.writeln(line);
-    buffer.writeln(line);
-    buffer.writeln(_dashedTotalLine(bill.totalQty, bill.grandTotal));
-    buffer.writeln();
+    buffer.writeln(_totalLine(bill.totalQty, bill.grandTotal));
     buffer.writeln(_rightAmountLine('CGST', bill.totalCgst));
     buffer.writeln(_rightAmountLine('SGST', bill.totalSgst));
     buffer.writeln(line);
@@ -135,56 +80,35 @@ class ReceiptService {
     }
   }
 
-  static String _grabhivItemHeader() {
+  static String _itemHeader() {
     return '${_padRight('SNO', _snoW)}'
         '${_padRight('RATE', _rateW)}'
         '${_padRight('QTY', _qtyW)}'
         '${_padLeft('AMOUNT', _amountW)}';
   }
 
-  static String _grabhivItemLine(BillItem item) {
+  static String _itemLine(BillItem item) {
     return '${_padRight('', _snoW)}'
-        '${_padRight(_money(item.rate), _rateW)}'
-        '${_padRight(_money(item.qty), _qtyW)}'
-        '${_padLeft(_money(item.grossAmt), _amountW)}';
+        '${_padRight(_rate(item.rate), _rateW)}'
+        '${_padRight(_qty(item.qty), _qtyW)}'
+        '${_padLeft(_amount(item.grossAmt), _amountW)}';
   }
 
-  static String _grabhivTotalLine(double qty, double grandTotal) {
+  static String _itemGstLine(BillItem item) {
+    return 'CGST% ${_formatPct(item.cgstPct)}'
+        'SGST% ${_formatPct(item.sgstPct)}';
+  }
+
+  static String _totalLine(double qty, double grandTotal) {
     final left = _padRight('TOTAL', _snoW + _rateW);
-    final qtyPart = _padRight(_money(qty), _qtyW);
-    final amountPart = _padLeft(_money(grandTotal), _amountW);
-    return '$left$qtyPart$amountPart';
-  }
-
-  static String _grabhivGrandTotalLine(double grandTotal) {
-    final label = _padRight('GRAND TOTAL', _labelW);
-    return '$label${_padLeft(_money(grandTotal), _amountW)}';
-  }
-
-  static String _dashedItemHeader() {
-    return '${_padRight('SNO', _snoW)}'
-        '${_padRight('RATE', _rateW)}'
-        '${_padRight('QTY', _qtyW)}'
-        '${_padLeft('AMOUNT', _amountW)}';
-  }
-
-  static String _dashedItemLine(BillItem item) {
-    return '${_padRight('', _snoW)}'
-        '${_padRight(_money(item.rate), _rateW)}'
-        '${_padRight(_money(item.qty), _qtyW)}'
-        '${_padLeft(_money(item.grossAmt), _amountW)}';
-  }
-
-  static String _dashedTotalLine(double qty, double grandTotal) {
-    final left = _padRight('TOTAL', _snoW + _rateW);
-    final qtyPart = _padRight(_money(qty), _qtyW);
-    final amountPart = _padLeft(_money(grandTotal), _amountW);
+    final qtyPart = _padRight(_qty(qty), _qtyW);
+    final amountPart = _padLeft(_amount(grandTotal), _amountW);
     return '$left$qtyPart$amountPart';
   }
 
   static String _rightAmountLine(String label, double amount) {
     final labelPart = _padRight(label, _labelW);
-    return '$labelPart${_padLeft(_money(amount), _amountW)}';
+    return '$labelPart${_padLeft(_amount(amount), _amountW)}';
   }
 
   static String _fieldLine(String label, String value) {
@@ -258,7 +182,21 @@ class ReceiptService {
     return text.padLeft(width);
   }
 
-  static String _money(double value) {
+  static String _amount(double value) {
+    return value.toStringAsFixed(2);
+  }
+
+  static String _qty(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toString();
+  }
+
+  static String _rate(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
     return value.toStringAsFixed(2);
   }
 
