@@ -13,6 +13,9 @@ const String syncPassword = 'RKS';
 /// Password required before staff data reset runs.
 const String resetPassword = 'RKS';
 
+const String summaryViewerUsername = 'RKSM';
+const String summaryViewerPassword = 'rksm';
+
 const Map<String, ({String locationCode, String password})> _staffAccounts = {
   'rksb': (locationCode: 'win1', password: 'rksb'),
   'rkst': (locationCode: 'win2', password: 'rkst'),
@@ -29,6 +32,11 @@ bool isStaffUsername(String username) {
 bool verifyAdminLogin(String username, String password) {
   return username.trim().toLowerCase() == adminUsername &&
       password.trim().toLowerCase() == adminPassword.toLowerCase();
+}
+
+bool verifySummaryViewerLogin(String username, String password) {
+  return username.trim().toUpperCase() == summaryViewerUsername &&
+      password.trim().toLowerCase() == summaryViewerPassword;
 }
 
 bool verifyStaffLogin(String username, String password) {

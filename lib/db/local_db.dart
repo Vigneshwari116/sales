@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
+import 'package:sales/services/summary_update_service.dart';
 
 /// A bill row joined with its local metadata for reads.
 class StoredBill {
@@ -336,6 +337,7 @@ class LocalDb {
 
     final db = await database;
     var applied = 0;
+    final summaryUpdates = <({SaleBill? previous, SaleBill current})>[];
 
     await db.transaction((txn) async {
       for (final bill in bills) {
@@ -346,7 +348,9 @@ class LocalDb {
           limit: 1,
         );
 
+        SaleBill? previous;
         if (existingRows.isNotEmpty) {
+          previous = _rowToStoredBill(existingRows.first)?.bill;
           final localId = existingRows.first['local_id'] as String;
           final now = DateTime.now().toUtc().toIso8601String();
           await txn.update(
@@ -375,9 +379,17 @@ class LocalDb {
           );
         }
 
+        summaryUpdates.add((previous: previous, current: bill));
         applied++;
       }
     });
+
+    for (final update in summaryUpdates) {
+      await SummaryUpdateService.onPulledBill(
+        previous: update.previous,
+        current: update.current,
+      );
+    }
 
     final locations = bills.map((bill) => bill.location).toSet();
     for (final location in locations) {

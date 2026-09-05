@@ -86,6 +86,29 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     _loadReport();
   }
 
+  Future<void> _selectMonth() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      helpText: 'SELECT MONTH',
+      initialDatePickerMode: DatePickerMode.year,
+    );
+
+    if (picked == null || !mounted) return;
+
+    final monthStart = DateTime(picked.year, picked.month, 1);
+    final monthEnd = DateTime(picked.year, picked.month + 1, 0);
+
+    setState(() {
+      _fromDate = monthStart;
+      _toDate = monthEnd;
+    });
+    _loadReport();
+  }
+
   Future<void> _exportExcel() async {
     final breakdown = _breakdown;
     if (breakdown == null || !breakdown.hasBills) {
@@ -213,6 +236,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                       OutlinedButton(
                         onPressed: _setToday,
                         child: const Text('TODAY'),
+                      ),
+                      OutlinedButton(
+                        key: const Key('admin_report_select_month_button'),
+                        onPressed: _selectMonth,
+                        child: const Text('SELECT MONTH'),
                       ),
                       OutlinedButton.icon(
                         key: const Key('admin_report_export_excel_text_button'),

@@ -6,6 +6,7 @@ import 'package:sales/screen/bill_item.dart';
 enum SessionRole {
   staff,
   admin,
+  summaryViewer,
 }
 
 class SessionService {
@@ -35,6 +36,8 @@ class SessionService {
         return SessionRole.staff;
       case 'admin':
         return SessionRole.admin;
+      case 'summary':
+        return SessionRole.summaryViewer;
       default:
         return null;
     }
@@ -49,7 +52,11 @@ class SessionService {
     await prefs.setString(_usernameKey, username);
     await prefs.setString(
       _roleKey,
-      role == SessionRole.admin ? 'admin' : 'staff',
+      switch (role) {
+        SessionRole.admin => 'admin',
+        SessionRole.staff => 'staff',
+        SessionRole.summaryViewer => 'summary',
+      },
     );
   }
 

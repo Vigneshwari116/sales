@@ -123,6 +123,24 @@ void main() {
     expect(await SessionService.getRole(), SessionRole.admin);
   });
 
+  testWidgets('summary viewer credentials route to summary home', (tester) async {
+    LoginScreen.summaryHomeBuilder = (_) => const Scaffold(
+          key: Key('routed_summary_home'),
+          body: Text('summary-home'),
+        );
+
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'RKSM');
+    await tester.enterText(find.byType(TextFormField).at(1), 'rksm');
+    await tester.tap(find.text('LOGIN'));
+    await _awaitLoginWork(tester);
+
+    expect(find.byKey(const Key('routed_summary_home')), findsOneWidget);
+    expect(await SessionService.getRole(), SessionRole.summaryViewer);
+  });
+
   testWidgets('staff credentials route to staff home', (tester) async {
     LoginScreen.staffHomeBuilder = (_) => const Scaffold(
           key: Key('routed_staff_home'),
