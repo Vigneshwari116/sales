@@ -168,4 +168,16 @@ void main() {
 
     expect(find.byKey(const Key('admin_sync_now_button')), findsOneWidget);
   });
+
+  testWidgets('sidebar switches to report section', (tester) async {
+    await pumpAdminDashboard(tester);
+
+    await tester.tap(find.byKey(const Key('admin_nav_report')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('REPORT'), findsOneWidget);
+    expect(find.byKey(const Key('admin_report_export_excel_button')),
+        findsOneWidget);
+  });
 }
