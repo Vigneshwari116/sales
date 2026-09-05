@@ -7,11 +7,11 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// 80mm (3-inch) thermal paper — ~48 monospace chars like the original bills.
-  static const int _width = 48;
+  /// 4-inch (101.6mm) thermal paper — ~62 monospace chars.
+  static const int _width = 62;
   static const int _snoW = 4;
-  static const int _rateW = 10;
-  static const int _qtyW = 8;
+  static const int _rateW = 12;
+  static const int _qtyW = 10;
   static const int _amountW = _width - _snoW - _rateW - _qtyW;
   static const int _labelW = _width - _amountW;
 

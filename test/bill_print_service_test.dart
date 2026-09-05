@@ -59,7 +59,7 @@ void main() {
     expect(mediaBoxMatch, isNotNull);
     final pageWidthPt = double.parse(mediaBoxMatch!.group(1)!);
     final pageHeightPt = double.parse(mediaBoxMatch.group(2)!);
-    expect(pageWidthPt, greaterThan(200));
+    expect(pageWidthPt, greaterThan(280));
     expect(pageHeightPt, greaterThan(180));
   });
 }

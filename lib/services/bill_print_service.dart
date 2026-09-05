@@ -85,16 +85,18 @@ class BillPrintService {
     final text = _normalizedReceiptText(ReceiptService.buildReceiptText(bill));
     final lines = text.split('\n');
     final doc = pw.Document();
-    final fontSize = type == PrinterType.thermal ? 5.6 : 7.0;
+    final fontSize = type == PrinterType.thermal ? 5.4 : 7.0;
     const lineHeightMm = 2.2;
     const verticalMarginMm = 2.5;
     const bottomBufferMm = 10.0;
+    const thermalPageWidthMm = 101.6;
 
     final contentHeightMm =
         lines.length * lineHeightMm + verticalMarginMm * 2 + bottomBufferMm;
-    final pageWidthMm = type == PrinterType.thermal ? 80.0 : 80.0;
-    final marginLeftMm = type == PrinterType.thermal ? 2.0 : 3.0;
-    final marginRightMm = type == PrinterType.thermal ? 2.0 : 3.0;
+    final pageWidthMm =
+        type == PrinterType.thermal ? thermalPageWidthMm : thermalPageWidthMm;
+    final marginLeftMm = type == PrinterType.thermal ? 3.0 : 3.0;
+    final marginRightMm = type == PrinterType.thermal ? 3.0 : 3.0;
     final printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
 
     final style = pw.TextStyle(
