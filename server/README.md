@@ -37,6 +37,7 @@ docker compose up -d --build
 |-------|---------|
 | `users` | Login (`id`, `username`, `password_hash`) |
 | `bills` | All saved sales bills |
+| `daily_totals` | Running daily sale totals per location (dashboard only) |
 
 If `users` is empty, default **admin / admin** is created.
 
@@ -55,6 +56,8 @@ If `users` is empty, default **admin / admin** is created.
 | GET | `/api/ledger?location=Win1` |
 | GET | `/api/gst/sync?location=win1` |
 | POST | `/api/gst/config` |
+| POST | `/api/daily-total` |
+| GET | `/api/daily-totals?date=YYYY-MM-DD` |
 | POST | `/api/locations/reset` |
 
 > Prefer `/api/sync/bill-updates` for pulls. Older VPS builds may still

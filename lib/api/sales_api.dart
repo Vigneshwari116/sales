@@ -475,4 +475,72 @@ class SalesApi {
       return SalesApiResult.failure('Could not reach the server.');
     }
   }
+
+  static Future<SalesApiResult<double>> incrementDailyTotal({
+    required String locationCode,
+    required String date,
+    required double amount,
+  }) async {
+    final uri = Uri.parse('$salesBillApiBaseUrl/api/daily-total');
+
+    try {
+      final res = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'location': locationCode,
+              'date': date,
+              'amount': amount,
+            }),
+          )
+          .timeout(_timeout);
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode == 200 && body['ok'] == true) {
+        return SalesApiResult.success((body['amount'] as num).toDouble());
+      }
+
+      return SalesApiResult.failure(
+        body['error'] as String? ?? 'Could not update daily total',
+      );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
+
+  static Future<SalesApiResult<Map<String, double>>> getDailyTotals({
+    DateTime? date,
+  }) async {
+    final day = date ?? DateTime.now();
+    final dayKey = '${day.year.toString().padLeft(4, '0')}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}';
+
+    final uri = Uri.parse('$salesBillApiBaseUrl/api/daily-totals').replace(
+      queryParameters: {'date': dayKey},
+    );
+
+    try {
+      final res = await _client.get(uri).timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode == 200 && body['ok'] == true) {
+        final totalsJson = body['totals'] as Map<String, dynamic>? ?? {};
+        final totals = <String, double>{
+          'win1': (totalsJson['win1'] as num?)?.toDouble() ?? 0,
+          'win2': (totalsJson['win2'] as num?)?.toDouble() ?? 0,
+          'win3': (totalsJson['win3'] as num?)?.toDouble() ?? 0,
+        };
+        return SalesApiResult.success(totals);
+      }
+
+      return SalesApiResult.failure(
+        body['error'] as String? ?? 'Could not load daily totals',
+      );
+    } catch (_) {
+      return SalesApiResult.failure('Could not reach the server.');
+    }
+  }
 }

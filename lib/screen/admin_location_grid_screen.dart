@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/summary_db.dart';
+import 'package:sales/repositories/daily_total_repository.dart';
 import 'package:sales/repositories/location_sync_repository.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -27,6 +28,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
     for (final code in allLocationCodes)
       displayNameForLocationCode(code): 0,
   };
+  bool _usingLiveTotals = false;
   Map<String, DateTime?> _lastSyncedByLocation = {
     for (final code in allLocationCodes)
       displayNameForLocationCode(code): null,
@@ -53,15 +55,25 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
       final day = '${today.year.toString().padLeft(4, '0')}-'
           '${today.month.toString().padLeft(2, '0')}-'
           '${today.day.toString().padLeft(2, '0')}';
+
+      final liveTotals = await DailyTotalRepository.fetchLiveTotals(date: today);
       final summaries = <String, double>{};
       final lastSynced = <String, DateTime?>{};
 
+      if (liveTotals != null) {
+        summaries.addAll(liveTotals);
+      } else {
+        for (final code in allLocationCodes) {
+          final name = displayNameForLocationCode(code);
+          summaries[name] = await SummaryDb.instance.getTotalForDay(
+            day: day,
+            location: name,
+          );
+        }
+      }
+
       for (final code in allLocationCodes) {
         final name = displayNameForLocationCode(code);
-        summaries[name] = await SummaryDb.instance.getTotalForDay(
-          day: day,
-          location: name,
-        );
         lastSynced[name] =
             await LocationSyncRepository.getLastSyncedAtForLocationCode(code);
       }
@@ -70,6 +82,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
 
       setState(() {
         _todayByLocation = summaries;
+        _usingLiveTotals = liveTotals != null;
         _lastSyncedByLocation = lastSynced;
       });
     } catch (_) {
@@ -182,7 +195,7 @@ class _AdminLocationGridScreenState extends State<AdminLocationGridScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            "Today's sales",
+            _usingLiveTotals ? 'Live total (all branches)' : "Today's sales",
             style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,

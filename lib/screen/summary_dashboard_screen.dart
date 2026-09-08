@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/summary_db.dart';
+import 'package:sales/repositories/daily_total_repository.dart';
 import 'package:sales/repositories/summary_repository.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -23,6 +24,7 @@ class SummaryDashboardScreen extends StatefulWidget {
 
 class _SummaryDashboardScreenState extends State<SummaryDashboardScreen> {
   bool _loading = true;
+  bool _usingLiveTotals = false;
   double _todayTotal = 0;
   Map<String, double> _todayByLocation = {
     for (final code in allLocationCodes)
@@ -54,13 +56,19 @@ class _SummaryDashboardScreenState extends State<SummaryDashboardScreen> {
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
 
+    final liveTotals = await DailyTotalRepository.fetchLiveTotals(date: now);
     final byLocation = <String, double>{};
-    for (final code in allLocationCodes) {
-      final name = displayNameForLocationCode(code);
-      byLocation[name] = await SummaryDb.instance.getTotalForDay(
-        day: day,
-        location: name,
-      );
+
+    if (liveTotals != null) {
+      byLocation.addAll(liveTotals);
+    } else {
+      for (final code in allLocationCodes) {
+        final name = displayNameForLocationCode(code);
+        byLocation[name] = await SummaryDb.instance.getTotalForDay(
+          day: day,
+          location: name,
+        );
+      }
     }
 
     final monthDays = await SummaryRepository.getDayTotalsForMonth(
@@ -73,6 +81,7 @@ class _SummaryDashboardScreenState extends State<SummaryDashboardScreen> {
     setState(() {
       _todayByLocation = byLocation;
       _todayTotal = byLocation.values.fold(0, (sum, value) => sum + value);
+      _usingLiveTotals = liveTotals != null;
       _monthDays = monthDays;
       _loading = false;
     });
@@ -157,9 +166,11 @@ class _SummaryDashboardScreenState extends State<SummaryDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "TODAY'S TOTAL SALES (ALL LOCATIONS)",
-            style: TextStyle(
+          Text(
+            _usingLiveTotals
+                ? "TODAY'S LIVE TOTAL SALES (ALL LOCATIONS)"
+                : "TODAY'S TOTAL SALES (ALL LOCATIONS)",
+            style: const TextStyle(
               fontSize: AppTextSizes.listSubtitle,
               fontWeight: FontWeight.w600,
               color: AppColors.mutedBlue,
@@ -209,9 +220,9 @@ class _SummaryDashboardScreenState extends State<SummaryDashboardScreen> {
             compact: true,
           ),
           const SizedBox(height: 8),
-          const Text(
-            "Today's sales",
-            style: TextStyle(
+          Text(
+            _usingLiveTotals ? 'Live total (all branches)' : "Today's sales",
+            style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.mutedBlue,

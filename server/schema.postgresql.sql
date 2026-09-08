@@ -35,5 +35,16 @@ CREATE INDEX IF NOT EXISTS idx_bills_location_date
 CREATE INDEX IF NOT EXISTS idx_bills_location_updated_at
   ON bills (location, updated_at);
 
+CREATE TABLE IF NOT EXISTS daily_totals (
+  location TEXT NOT NULL,
+  bill_date DATE NOT NULL,
+  amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (location, bill_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_totals_bill_date
+  ON daily_totals (bill_date);
+
 -- View saved bills:
 -- SELECT bill_no, bill_date, customer_name, grand_total, items_json FROM bills ORDER BY bill_no DESC;
