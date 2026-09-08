@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/db/summary_db.dart';
+import 'package:sales/services/location_bill_detail_seed_service.dart';
 import 'package:sales/services/location_seed_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -28,6 +29,9 @@ class AppSessionService {
     try {
       await LocalDb.instance.initialize();
       await LocationSeedService.ensureLocationSeeded(AppConfig.locationCode);
+      await LocationBillDetailSeedService.ensureLocationSeeded(
+        AppConfig.locationCode,
+      );
       await SummaryDb.instance.initialize();
       await SummaryDb.instance.ensureBootstrapped();
     } catch (_) {

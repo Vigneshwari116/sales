@@ -1,8 +1,10 @@
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/app_config.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart' as db;
 import 'package:sales/db/location_database.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/location_bill_detail_seed_service.dart';
 import 'package:sales/services/location_seed_service.dart';
 import 'package:sales/services/summary_update_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -10,6 +12,7 @@ import 'package:sales/services/sync_service.dart';
 class LocalLedgerEntry {
   final String localId;
   final int billNo;
+  final String location;
   final String date;
   final String customerName;
   final String mobile;
@@ -24,6 +27,7 @@ class LocalLedgerEntry {
   LocalLedgerEntry({
     required this.localId,
     required this.billNo,
+    required this.location,
     required this.date,
     required this.customerName,
     required this.mobile,
@@ -47,6 +51,7 @@ class LedgerRepository {
     try {
       final locationCode = locationCodeFromDisplayName(location);
       await LocationSeedService.ensureLocationSeeded(locationCode);
+      await LocationBillDetailSeedService.ensureLocationSeeded(locationCode);
       final rows = await LocationDatabase.getLedgerEntries(
         location: location,
         from: from,
@@ -58,6 +63,7 @@ class LedgerRepository {
             (row) => LocalLedgerEntry(
               localId: row.localId,
               billNo: row.billNo,
+              location: row.location,
               date: row.billDate,
               customerName: row.customerName,
               mobile: row.mobile,
@@ -90,8 +96,20 @@ class LedgerRepository {
     }
   }
 
-  static Future<SaleBill?> getBillByLocalId(String localId) async {
-    return db.LocalDb.instance.getBillByLocalId(localId);
+  static Future<SaleBill?> getBillByLocalId({
+    required String location,
+    required String localId,
+  }) async {
+    final locationCode = locationCodeFromDisplayName(location);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      return db.LocalDb.instance.getBillByLocalId(localId);
+    }
+
+    return LocationDatabase.getBillByLocalId(
+      locationCode: locationCode,
+      localId: localId,
+    );
   }
 
   static Future<void> softDeleteBill(String localId) async {

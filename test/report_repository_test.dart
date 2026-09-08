@@ -77,8 +77,8 @@ void main() {
 
     expect(breakdown.granularity, ReportGranularity.day);
     expect(breakdown.groups.length, 3);
-    expect(breakdown.groups.first.label, '01 Sep 2026');
-    expect(breakdown.groups.last.label, '03 Sep 2026');
+    expect(breakdown.groups.first.label, '03 Sep 2026');
+    expect(breakdown.groups.last.label, '01 Sep 2026');
   });
 
   test('multi-month range uses month-wise groups', () async {
@@ -89,8 +89,8 @@ void main() {
 
     expect(breakdown.granularity, ReportGranularity.month);
     expect(breakdown.groups.length, 2);
-    expect(breakdown.groups.first.label, 'Aug 2026');
-    expect(breakdown.groups.last.label, 'Sep 2026');
+    expect(breakdown.groups.first.label, 'Sep 2026');
+    expect(breakdown.groups.last.label, 'Aug 2026');
   });
 
   test('groups contain bill rows with bill no, date, name, and mobile', () async {

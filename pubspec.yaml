@@ -77,6 +77,9 @@ flutter:
     - assets/seed/win1_sales.csv
     - assets/seed/win2_sales.csv
     - assets/seed/win3_sales.csv
+    - assets/seed/win1_bill_detail.csv
+    - assets/seed/win2_bill_detail.csv
+    - assets/seed/win3_bill_detail.csv
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

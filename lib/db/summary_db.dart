@@ -337,7 +337,7 @@ class SummaryDb {
             FROM day_summary
             WHERE day LIKE ?
             GROUP BY day
-            ORDER BY day ASC
+            ORDER BY day DESC
             ''',
             ['$prefix%'],
           )
@@ -345,7 +345,7 @@ class SummaryDb {
             'day_summary',
             where: 'location = ? AND day LIKE ?',
             whereArgs: [location, '$prefix%'],
-            orderBy: 'day ASC',
+            orderBy: 'day DESC',
           );
 
     return rows

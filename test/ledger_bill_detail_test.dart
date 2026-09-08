@@ -111,4 +111,42 @@ void main() {
     );
     expect(find.text('Pending sync'), findsOneWidget);
   });
+
+  testWidgets('back button pops bill detail screen', (tester) async {
+    final bill = _sampleBill();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => LedgerBillDetailScreen(
+                      bill: bill,
+                      localId: 'detail-test-id',
+                      syncStatus: 'synced',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LedgerBillDetailScreen), findsOneWidget);
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LedgerBillDetailScreen), findsNothing);
+    expect(find.text('Open'), findsOneWidget);
+  });
 }
