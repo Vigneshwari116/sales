@@ -196,25 +196,32 @@ class LocationBillDetailSeedService {
     final totalTax = row.cgstAmt + row.sgstAmt + row.igstAmt;
 
     if (row.igstAmt > 0 || row.igstPct > 0) {
-      final pct = row.igstPct > 0
+      final double pct = row.igstPct > 0
           ? row.igstPct
           : taxable > 0
               ? (row.igstAmt / taxable) * 100
-              : 0;
+              : 0.0;
       return BillItem(
         qty: row.qty,
         rate: row.rate,
-        cgstPct: 0,
-        sgstPct: 0,
+        cgstPct: 0.0,
+        sgstPct: 0.0,
         igstPct: pct,
       );
     }
 
-    final cgstPct = taxable > 0 ? (row.cgstAmt / taxable) * 100 : 2.5;
-    final sgstPct = taxable > 0 ? (row.sgstAmt / taxable) * 100 : 2.5;
+    final double cgstPct =
+        taxable > 0 ? (row.cgstAmt / taxable) * 100 : 2.5;
+    final double sgstPct =
+        taxable > 0 ? (row.sgstAmt / taxable) * 100 : 2.5;
 
     if (totalTax <= 0) {
-      return BillItem(qty: row.qty, rate: row.rate, cgstPct: 0, sgstPct: 0);
+      return BillItem(
+        qty: row.qty,
+        rate: row.rate,
+        cgstPct: 0.0,
+        sgstPct: 0.0,
+      );
     }
 
     return BillItem(
