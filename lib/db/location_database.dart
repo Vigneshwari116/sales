@@ -9,6 +9,8 @@ import 'package:uuid/uuid.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/models/sale_bill.dart';
+import 'package:sales/screen/bill_item.dart';
 
 /// Opens and reads per-location SQLite files used by admin views.
 class LocationDatabase {
@@ -91,6 +93,147 @@ class LocationDatabase {
     } finally {
       await db.close();
     }
+  }
+
+  static Future<int> applyImportedBillDetails({
+    required String locationCode,
+    required Map<int, ImportedBillDetail> detailsByBillNo,
+  }) async {
+    if (detailsByBillNo.isEmpty) {
+      return 0;
+    }
+
+    final locationName = displayNameForLocationCode(locationCode);
+    final now = DateTime.now().toUtc().toIso8601String();
+    var updated = 0;
+
+    Future<int> apply(DatabaseExecutor db) async {
+      return _applyBillDetails(
+        db,
+        locationName: locationName,
+        detailsByBillNo: detailsByBillNo,
+        now: now,
+      );
+    }
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      await LocalDb.instance.initialize();
+      final db = await LocalDb.instance.database;
+      updated = await db.transaction((txn) => apply(txn));
+      return updated;
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    final db = await _openWritableDatabase(path);
+
+    try {
+      updated = await db.transaction((txn) => apply(txn));
+    } finally {
+      await db.close();
+    }
+
+    return updated;
+  }
+
+  static Future<SaleBill?> getBillByLocalId({
+    required String locationCode,
+    required String localId,
+  }) async {
+    final locationName = displayNameForLocationCode(locationCode);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        await LocalDb.instance.initialize();
+        return LocalDb.instance.getBillByLocalId(localId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    if (!await File(path).exists()) {
+      return null;
+    }
+
+    final db = await openDatabase(
+      path,
+      readOnly: true,
+      singleInstance: false,
+    );
+
+    try {
+      final rows = await db.query(
+        'bills',
+        where: 'local_id = ? AND location = ? AND deleted = 0',
+        whereArgs: [localId, locationName],
+        limit: 1,
+      );
+
+      if (rows.isEmpty) {
+        return null;
+      }
+
+      return _rowToSaleBill(rows.first);
+    } finally {
+      await db.close();
+    }
+  }
+
+  static Future<bool> dayHasLineItemDetail({
+    required String location,
+    required String day,
+  }) async {
+    final locationCode = _locationCodeFromDisplayName(location);
+    final locationName = displayNameForLocationCode(locationCode);
+
+    Future<bool> query(Database db) async {
+      final rows = await db.rawQuery(
+        '''
+        SELECT items_json
+        FROM bills
+        WHERE location = ? AND bill_date = ? AND deleted = 0
+        LIMIT 50
+        ''',
+        [locationName, day],
+      );
+
+      for (final row in rows) {
+        if (hasStoredLineItems(row['items_json'] as String? ?? '[]')) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        await LocalDb.instance.initialize();
+        return query(await LocalDb.instance.database);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    if (!await File(path).exists()) {
+      return false;
+    }
+
+    final db = await openDatabase(
+      path,
+      readOnly: true,
+      singleInstance: false,
+    );
+
+    try {
+      return query(db);
+    } finally {
+      await db.close();
+    }
+  }
+
+  static bool hasStoredLineItems(String itemsJson) {
+    return LocalDb.parseBillItems(itemsJson).isNotEmpty;
   }
 
   static Future<int> upsertImportedBills({
@@ -185,6 +328,106 @@ class LocationDatabase {
           .toList(growable: false);
     } finally {
       await db.close();
+    }
+  }
+
+  static Future<int> _applyBillDetails(
+    DatabaseExecutor txn, {
+    required String locationName,
+    required Map<int, ImportedBillDetail> detailsByBillNo,
+    required String now,
+  }) async {
+    var updated = 0;
+
+    for (final detail in detailsByBillNo.values) {
+      final existing = await txn.query(
+        'bills',
+        where: 'location = ? AND bill_no = ?',
+        whereArgs: [locationName, detail.billNo],
+        limit: 1,
+      );
+
+      if (existing.isEmpty) {
+        continue;
+      }
+
+      final totals = _totalsFromItems(detail.items);
+      final current = existing.first;
+      final paymentMode = detail.paymentMode.isNotEmpty
+          ? detail.paymentMode
+          : current['payment_mode'] as String? ?? 'CASH';
+
+      await txn.update(
+        'bills',
+        {
+          'items_json': jsonEncode(
+            detail.items.map((item) => item.toJson()).toList(),
+          ),
+          'total_qty': totals['totalQty']!,
+          'total_amount': totals['totalAmount']!,
+          'total_cgst': totals['totalCgst']!,
+          'total_sgst': totals['totalSgst']!,
+          'total_igst': totals['totalIgst']!,
+          'grand_total': totals['grandTotal']!,
+          'payment_mode': paymentMode,
+          'updated_at': now,
+        },
+        where: 'local_id = ?',
+        whereArgs: [current['local_id']],
+      );
+      updated++;
+    }
+
+    return updated;
+  }
+
+  static Map<String, double> _totalsFromItems(List<BillItem> items) {
+    var totalQty = 0.0;
+    var totalAmount = 0.0;
+    var totalCgst = 0.0;
+    var totalSgst = 0.0;
+    var totalIgst = 0.0;
+    var grandTotal = 0.0;
+
+    for (final item in items) {
+      totalQty += item.qty;
+      totalAmount += item.amount;
+      totalCgst += item.cgst;
+      totalSgst += item.sgst;
+      totalIgst += item.igst;
+      grandTotal += item.grossAmt;
+    }
+
+    return {
+      'totalQty': totalQty,
+      'totalAmount': totalAmount,
+      'totalCgst': totalCgst,
+      'totalSgst': totalSgst,
+      'totalIgst': totalIgst,
+      'grandTotal': grandTotal,
+    };
+  }
+
+  static SaleBill? _rowToSaleBill(Map<String, dynamic> row) {
+    try {
+      final itemsJson = row['items_json'] as String? ?? '[]';
+      return SaleBill(
+        billNo: (row['bill_no'] as num).toInt(),
+        location: row['location'] as String,
+        billDate: DateTime.parse(row['bill_date'] as String),
+        paymentMode: row['payment_mode'] as String? ?? 'CASH',
+        customerName: row['customer_name'] as String? ?? '',
+        mobile: row['mobile'] as String? ?? '',
+        items: LocalDb.parseBillItems(itemsJson),
+        totalQty: (row['total_qty'] as num).toDouble(),
+        totalAmount: (row['total_amount'] as num).toDouble(),
+        totalCgst: (row['total_cgst'] as num).toDouble(),
+        totalSgst: (row['total_sgst'] as num).toDouble(),
+        totalIgst: (row['total_igst'] as num).toDouble(),
+        grandTotal: (row['grand_total'] as num).toDouble(),
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -383,6 +626,20 @@ class LocationDatabase {
   static String _locationCodeFromDisplayName(String location) {
     return locationCodeFromDisplayName(location);
   }
+}
+
+class ImportedBillDetail {
+  final int billNo;
+  final String billDate;
+  final String paymentMode;
+  final List<BillItem> items;
+
+  const ImportedBillDetail({
+    required this.billNo,
+    required this.billDate,
+    required this.paymentMode,
+    required this.items,
+  });
 }
 
 class ImportedBillRow {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/report_repository.dart';
+import 'package:sales/screen/admin_day_bills_screen.dart';
+import 'package:sales/screen/admin_month_days_screen.dart';
 import 'package:sales/services/report_excel_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -145,21 +147,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
-
-  String _formatDate(String value) {
-    try {
-      return DateFormat('dd-MMM-yy').format(DateTime.parse(value));
-    } catch (_) {
-      return value;
-    }
-  }
-
-  String _paymentColumnAmount(ReportBillRow row, {required bool cash}) {
-    if (row.isCashPayment != cash) {
-      return '';
-    }
-    return _formatMoney(row.grandTotal);
-  }
 
   String get _periodLabel {
     final from = DateFormat('dd MMM yyyy').format(_fromDate);
@@ -362,8 +349,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           _headerRow(periodHeader),
           for (final group in breakdown.groups) ...[
             if (group.bills.isNotEmpty) ...[
-              _periodHeaderRow(group.label),
-              ...group.bills.map(_dataRow),
+              _periodHeaderRow(group, breakdown.granularity),
               _periodTotalRow(group.subtotal, breakdown.periodTotalLabel),
             ],
           ],
@@ -393,39 +379,65 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     );
   }
 
-  Widget _periodHeaderRow(String label) {
-    return Container(
-      color: AppColors.headerBand,
-      child: Row(
-        children: [
-          _cell(label, flex: 27, bold: true),
-          _cell('', flex: 6, bold: true),
-          _cell('', flex: 6, bold: true),
-          _cell('', flex: 6, bold: true),
-          _cell('', flex: 5, bold: true),
-          _cell('', flex: 6, bold: true),
-          _cell('', flex: 7, bold: true),
-        ],
+  Future<void> _openPeriod(
+    ReportPeriodGroup group,
+    ReportGranularity granularity,
+  ) async {
+    if (granularity == ReportGranularity.day) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AdminDayBillsScreen(
+            day: group.sortKey,
+            title: group.label,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final parts = group.sortKey.split('-');
+    if (parts.length != 2) {
+      return;
+    }
+
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AdminMonthDaysScreen(
+          title: group.label,
+          year: year,
+          month: month,
+        ),
       ),
     );
   }
 
-  Widget _dataRow(ReportBillRow row) {
-    return Row(
-      children: [
-        _cell('${row.billNo}', flex: 5),
-        _cell(_formatDate(row.date), flex: 6),
-        _cell(row.customerName, flex: 9),
-        _cell(row.mobile.isEmpty ? '—' : row.mobile, flex: 7),
-        _cell(_paymentColumnAmount(row, cash: true),
-            flex: 6, alignRight: true),
-        _cell(_paymentColumnAmount(row, cash: false),
-            flex: 6, alignRight: true),
-        _cell(_formatMoney(row.total), flex: 6, alignRight: true),
-        _cell(_formatMoney(row.cgst), flex: 5, alignRight: true),
-        _cell(_formatMoney(row.sgstIgst), flex: 6, alignRight: true),
-        _cell(_formatMoney(row.grandTotal), flex: 7, alignRight: true),
-      ],
+  Widget _periodHeaderRow(
+    ReportPeriodGroup group,
+    ReportGranularity granularity,
+  ) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openPeriod(group, granularity),
+      child: Container(
+        color: AppColors.headerBand,
+        child: Row(
+          children: [
+            _cell(group.label, flex: 27, bold: true),
+            _cell('', flex: 6, bold: true),
+            _cell('', flex: 6, bold: true),
+            _cell('', flex: 6, bold: true),
+            _cell('', flex: 5, bold: true),
+            _cell('', flex: 6, bold: true),
+            _cell('›', flex: 7, bold: true, alignRight: true),
+          ],
+        ),
+      ),
     );
   }
 

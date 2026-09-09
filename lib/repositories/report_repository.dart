@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/db/location_database.dart';
+import 'package:sales/services/location_bill_detail_seed_service.dart';
 import 'package:sales/services/location_seed_service.dart';
 
 enum ReportGranularity { day, month }
@@ -140,6 +141,7 @@ class ReportRepository {
 
     for (final code in allLocationCodes) {
       await LocationSeedService.ensureLocationSeeded(code);
+      await LocationBillDetailSeedService.ensureLocationSeeded(code);
       final entries = await LocationDatabase.getLedgerEntries(
         location: displayNameForLocationCode(code),
         from: fromKey,
@@ -209,7 +211,7 @@ class ReportRepository {
         ));
         cursor = cursor.add(const Duration(days: 1));
       }
-      return periods;
+      return periods.reversed.toList(growable: false);
     }
 
     final periods = <({String label, String sortKey})>[];
@@ -232,7 +234,7 @@ class ReportRepository {
       }
     }
 
-    return periods;
+    return periods.reversed.toList(growable: false);
   }
 
   static String _bucketKeyForBillDate(

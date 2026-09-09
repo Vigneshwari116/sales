@@ -48,6 +48,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   final _qtyCtrl = TextEditingController();
   final _customerNameCtrl = TextEditingController();
   final _mobileCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _gstCtrl = TextEditingController();
+  final _grandTotalCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -56,6 +59,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     _items = widget.bill.items.map((e) => e.copyWith()).toList();
     _customerNameCtrl.text = _bill.customerName;
     _mobileCtrl.text = _bill.mobile;
+    _amountCtrl.text = _format(_bill.totalAmount);
+    _gstCtrl.text = _format(_bill.totalCgst + _bill.totalSgst + _bill.totalIgst);
+    _grandTotalCtrl.text = _format(_bill.grandTotal);
     if (widget.adminFullEdit) {
       _editUnlocked = true;
     }
@@ -68,6 +74,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     _qtyCtrl.dispose();
     _customerNameCtrl.dispose();
     _mobileCtrl.dispose();
+    _amountCtrl.dispose();
+    _gstCtrl.dispose();
+    _grandTotalCtrl.dispose();
     super.dispose();
   }
 
@@ -156,6 +165,20 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
 
     setState(() => _saving = true);
 
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    final gst = double.tryParse(_gstCtrl.text.trim());
+    final grandTotal = double.tryParse(_grandTotalCtrl.text.trim());
+
+    if (widget.adminFullEdit &&
+        _items.isEmpty &&
+        (amount == null || gst == null || grandTotal == null)) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid amount, GST, and grand total')),
+      );
+      return;
+    }
+
     final updated = SaleBill(
       billNo: _bill.billNo,
       location: _bill.location,
@@ -166,12 +189,20 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           : _bill.customerName,
       mobile: widget.adminFullEdit ? _mobileCtrl.text.trim() : _bill.mobile,
       items: _items,
-      totalQty: _totalQty,
-      totalAmount: _totalAmount,
-      totalCgst: _totalCgst,
-      totalSgst: _totalSgst,
-      totalIgst: _totalIgst,
-      grandTotal: _grandTotal,
+      totalQty: _items.isEmpty ? _bill.totalQty : _totalQty,
+      totalAmount: widget.adminFullEdit && _items.isEmpty
+          ? amount ?? _bill.totalAmount
+          : _totalAmount,
+      totalCgst: widget.adminFullEdit && _items.isEmpty
+          ? (gst ?? 0) / 2
+          : _totalCgst,
+      totalSgst: widget.adminFullEdit && _items.isEmpty
+          ? (gst ?? 0) / 2
+          : _totalSgst,
+      totalIgst: widget.adminFullEdit && _items.isEmpty ? 0 : _totalIgst,
+      grandTotal: widget.adminFullEdit && _items.isEmpty
+          ? grandTotal ?? _bill.grandTotal
+          : _grandTotal,
     );
 
     final result = await BillRepository.saveBill(
@@ -199,6 +230,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       backgroundColor: AppColors.background,
       appBar: sectionHeaderAppBar(
         'BILL ${_bill.billNo}',
+        automaticallyImplyLeading: true,
         actions: [
           if (_editUnlocked)
             TextButton(
@@ -213,6 +245,8 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildBillHeader(),
+            const SizedBox(height: 8),
+            _buildTotalsSummary(),
             const SizedBox(height: 8),
             _buildCustomerSection(),
             const SizedBox(height: 8),
@@ -300,6 +334,75 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           color: isPending ? AppColors.warningFg : AppColors.success,
         ),
       ),
+    );
+  }
+
+  Widget _buildTotalsSummary() {
+    final gstTotal = _bill.totalCgst + _bill.totalSgst + _bill.totalIgst;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        color: Colors.white,
+      ),
+      padding: const EdgeInsets.all(8),
+      child: widget.adminFullEdit && _editUnlocked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Bill totals',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _editableTotalField('Amount', _amountCtrl)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _editableTotalField('GST', _gstCtrl)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _editableTotalField('Grand Total', _grandTotalCtrl),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          : CompactAbstractSummary(
+              amountValue: _format(_bill.totalAmount),
+              gstValue: _format(gstTotal),
+              grandTotalValue: _format(_bill.grandTotal),
+              cardWidth: 120,
+            ),
+    );
+  }
+
+  Widget _editableTotalField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            color: AppColors.mutedBlue,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: const InputDecoration(
+            isDense: true,
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          ),
+        ),
+      ],
     );
   }
 

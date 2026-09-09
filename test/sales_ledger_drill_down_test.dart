@@ -15,6 +15,7 @@ LocalLedgerEntry _sampleLedgerEntry() {
   return LocalLedgerEntry(
     localId: _localId,
     billNo: 7,
+    location: 'Win1',
     date: '2026-08-31',
     customerName: 'Drill Down Customer',
     mobile: '9999999999',

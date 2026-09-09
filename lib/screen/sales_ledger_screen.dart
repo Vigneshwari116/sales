@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/repositories/day_drill_down_repository.dart';
 import 'package:sales/repositories/ledger_repository.dart';
+import 'package:sales/screen/admin_day_bills_screen.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/services/ledger_pdf_service.dart';
 import 'package:sales/services/sync_service.dart';
@@ -50,6 +52,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   bool _pulling = false;
   bool _exportingPdf = false;
   List<LocalLedgerEntry> _entries = [];
+  List<DaySummaryRow> _daySummaries = const [];
   LedgerSummary? _summary;
   DateTime _fromDate = DateTime.now();
   DateTime _toDate = DateTime.now();
@@ -82,8 +85,33 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         '${date.day.toString().padLeft(2, '0')}';
   }
 
+  bool get _isMultiDayRange {
+    if (!_customRange) {
+      return false;
+    }
+    return _fromKey != _toKey;
+  }
+
   Future<void> _loadLedger() async {
     setState(() => _loading = true);
+
+    if (_isMultiDayRange) {
+      final days = await DayDrillDownRepository.getDaySummaries(
+        fromDate: _fromDate,
+        toDate: _toDate,
+        location: widget.location,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _daySummaries = days;
+        _entries = const [];
+        _summary = null;
+        _loading = false;
+      });
+      return;
+    }
 
     final ({
       List<LocalLedgerEntry> entries,
@@ -105,8 +133,26 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     setState(() {
       _entries = result.entries;
       _summary = result.summary;
+      _daySummaries = const [];
       _loading = false;
     });
+  }
+
+  Future<void> _openDay(DaySummaryRow row) async {
+    if (!row.hasLineItemDetail) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AdminDayBillsScreen(
+          day: row.day,
+          title: row.label,
+          location: widget.location,
+          adminFullEdit: widget.adminFullEdit,
+        ),
+      ),
+    );
   }
 
   Future<void> _pullInBackground({bool showFeedback = false}) async {
@@ -181,7 +227,10 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Future<void> _viewBill(LocalLedgerEntry entry) async {
     final bill = widget.loadBillOverride != null
         ? await widget.loadBillOverride!(entry.localId)
-        : await LedgerRepository.getBillByLocalId(entry.localId);
+        : await LedgerRepository.getBillByLocalId(
+            location: widget.location,
+            localId: entry.localId,
+          );
 
     if (!mounted) return;
 
@@ -344,9 +393,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                 ),
                 const SizedBox(height: 8),
                 Expanded(
-                  child: _entries.isEmpty
-                      ? _buildEmptyState()
-                      : CenteredContent(
+                  child: _isMultiDayRange
+                      ? _buildDaySummaryList()
+                      : _entries.isEmpty
+                          ? _buildEmptyState()
+                          : CenteredContent(
                           maxWidth: 1100,
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                           child: LayoutBuilder(
@@ -374,6 +425,81 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildDaySummaryList() {
+    if (_daySummaries.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      itemCount: _daySummaries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final row = _daySummaries[index];
+        final canDrill = row.hasLineItemDetail;
+
+        return Material(
+          color: AppColors.cardWhite,
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            onTap: canDrill ? () => _openDay(row) : null,
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.label,
+                          style: const TextStyle(
+                            fontSize: AppTextSizes.listTitle,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.navy,
+                          ),
+                        ),
+                        if (!canDrill)
+                          const Text(
+                            'Grand total only',
+                            style: TextStyle(
+                              fontSize: AppTextSizes.listSubtitle,
+                              color: AppColors.mutedBlue,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    _formatMoney(row.grandTotal),
+                    style: const TextStyle(
+                      fontSize: AppTextSizes.listTitle,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navy,
+                    ),
+                  ),
+                  if (canDrill) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: AppColors.mutedBlue,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
