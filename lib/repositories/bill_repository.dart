@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/daily_total_service.dart';
 import 'package:sales/services/summary_update_service.dart';
 
 class BillRepository {
@@ -43,6 +44,7 @@ class BillRepository {
       );
 
       await SummaryUpdateService.onBillSaved(previous: previous, current: bill);
+      DailyTotalService.pushBillDelta(current: bill, previous: previous);
       return SalesApiResult.success(bill.billNo);
     } catch (_) {
       if (apiResult.ok) {

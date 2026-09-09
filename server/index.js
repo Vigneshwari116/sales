@@ -57,6 +57,17 @@ async function initDatabase() {
       version TEXT NOT NULL DEFAULT '1',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS daily_totals (
+      location TEXT NOT NULL,
+      bill_date DATE NOT NULL,
+      amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (location, bill_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_daily_totals_bill_date
+      ON daily_totals (bill_date);
   `);
 
   await pool.query(`
@@ -499,6 +510,96 @@ app.get('/api/ledger', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Could not load ledger' });
+  }
+});
+
+const ACTIVE_LOCATION_CODES = ['win1', 'win2', 'win3'];
+
+function normalizeLocationCode(location) {
+  const code = String(location ?? '').trim().toLowerCase();
+  if (!ACTIVE_LOCATION_CODES.includes(code)) {
+    return null;
+  }
+  return code;
+}
+
+function normalizeBillDate(value) {
+  const raw = String(value ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return null;
+  }
+  const parsed = new Date(`${raw}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return raw;
+}
+
+app.post('/api/daily-total', async (req, res) => {
+  const location = normalizeLocationCode(req.body?.location);
+  const date = normalizeBillDate(req.body?.date);
+  const amount = Number(req.body?.amount);
+
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'Invalid location' });
+  }
+  if (!date) {
+    return res.status(400).json({ ok: false, error: 'Invalid date' });
+  }
+  if (!Number.isFinite(amount) || amount === 0) {
+    return res.status(400).json({ ok: false, error: 'Invalid amount' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO daily_totals (location, bill_date, amount)
+       VALUES ($1, $2::date, $3)
+       ON CONFLICT (location, bill_date)
+       DO UPDATE SET
+         amount = daily_totals.amount + EXCLUDED.amount,
+         updated_at = NOW()
+       RETURNING amount`,
+      [location, date, amount]
+    );
+
+    res.json({
+      ok: true,
+      location,
+      date,
+      amount: Number(result.rows[0].amount),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not update daily total' });
+  }
+});
+
+app.get('/api/daily-totals', async (req, res) => {
+  const date = normalizeBillDate(req.query.date);
+  if (!date) {
+    return res.status(400).json({ ok: false, error: 'date query parameter is required (YYYY-MM-DD)' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT location, amount
+       FROM daily_totals
+       WHERE bill_date = $1::date`,
+      [date]
+    );
+
+    const totals = { win1: 0, win2: 0, win3: 0 };
+    for (const row of result.rows) {
+      const code = normalizeLocationCode(row.location);
+      if (code) {
+        totals[code] = Number(row.amount);
+      }
+    }
+
+    res.json({ ok: true, date, totals });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'Could not load daily totals' });
   }
 });
 
