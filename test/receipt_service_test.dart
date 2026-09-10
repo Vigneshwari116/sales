@@ -50,7 +50,7 @@ void main() {
     expect(text, contains('KUDULU MAIN ROAD'));
     expect(text, contains('BILL NO:23258'));
     expect(text, contains('DATE:04/09/2026'));
-    expect(text, contains('CGST% 2.5SGST% 2.5'));
+    expect(text, contains('CGST% 2.5 SGST% 2.5'));
     expect(text, contains('GRAND TOTAL'));
     expect(text.split('-----').length, greaterThan(4));
     _expectLinesWithinThermalWidth(text);
@@ -91,7 +91,7 @@ void main() {
     final lines = text.split('\n');
 
     expect(text, contains('KUDULU MAIN ROAD'));
-    expect(lines.where((line) => line.contains('CGST% 2.5SGST% 2.5')).length, 3);
+    expect(lines.where((line) => line.contains('CGST% 2.5 SGST% 2.5')).length, 3);
     expect(text, contains('30.00'));
     expect(text, contains('100.00'));
     expect(text, contains('350.00'));
@@ -135,6 +135,61 @@ void main() {
     expect(totalLine, contains('3440.00'));
     expect(totalLine, isNot(contains('16.00')));
 
+    _expectLinesWithinThermalWidth(lines.join('\n'));
+  });
+
+  test('bill no and date stay on one line', () {
+    final bill = SaleBill(
+      billNo: 18134,
+      location: 'Win2',
+      billDate: DateTime(2024, 6, 10),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 2, rate: 200)],
+      totalQty: 2,
+      totalAmount: 400,
+      totalCgst: 10,
+      totalSgst: 10,
+      totalIgst: 0,
+      grandTotal: 400,
+    );
+
+    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final billDateLine = lines.firstWhere((line) => line.contains('BILL NO:'));
+
+    expect(billDateLine, contains('DATE:10/06/2024'));
+    expect(billDateLine.length, lessThanOrEqualTo(48));
+    expect(lines.where((line) => line.contains('DATE:')).length, 1);
+  });
+
+  test('item lines include serial number in SNO column', () {
+    final bill = SaleBill(
+      billNo: 18134,
+      location: 'Win2',
+      billDate: DateTime(2024, 6, 10),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [
+        BillItem(qty: 2, rate: 200),
+        BillItem(qty: 1, rate: 100),
+      ],
+      totalQty: 3,
+      totalAmount: 500,
+      totalCgst: 12,
+      totalSgst: 12,
+      totalIgst: 0,
+      grandTotal: 500,
+    );
+
+    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final firstItem = lines.firstWhere(
+      (line) => line.contains('200') && line.contains('400.00'),
+    );
+
+    expect(firstItem.trimLeft(), startsWith('1'));
+    expect(firstItem, contains('2'));
     _expectLinesWithinThermalWidth(lines.join('\n'));
   });
 

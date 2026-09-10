@@ -18,11 +18,10 @@ class BillPrintService {
       (thermalPageWidthMm - thermalPrintableWidthMm) / 2;
 
   /// RP3200 Font A (12×24 dots): 48 columns, 1.50×3.00mm per character.
-  static const double thermalFontSizePt = 7.0;
+  /// PDF Courier runs wider than native Font A — FittedBox scales each line down.
+  static const double thermalFontSizePt = 6.0;
   static const double thermalCharWidthMm = 1.50;
   static const double thermalLineSpacingMm = 4.25;
-  static const double _thermalLineHeightFactor =
-      (thermalLineSpacingMm * PdfPageFormat.mm) / thermalFontSizePt;
 
   static Future<String> saveReceiptToDesktop(SaleBill bill) async {
     final text = ReceiptService.buildReceiptText(bill);
@@ -116,8 +115,7 @@ class BillPrintService {
         type == PrinterType.thermal ? thermalFontSizePt : 7.0;
     final lineHeightMm =
         type == PrinterType.thermal ? thermalLineSpacingMm : 4.25;
-    final lineHeightFactor =
-        type == PrinterType.thermal ? _thermalLineHeightFactor : 1.72;
+    const lineHeightFactor = 1.0;
     const verticalMarginMm = 2.0;
     const bottomBufferMm = 4.0;
 
@@ -142,10 +140,11 @@ class BillPrintService {
     );
 
     return _ReceiptPdfLayout(
-      text: text,
+      lines: lines,
       pageFormat: pageFormat,
       printableWidthMm: printableWidthMm,
       fontSize: fontSize,
+      lineHeightMm: lineHeightMm,
       lineHeightFactor: lineHeightFactor,
     );
   }
@@ -165,13 +164,26 @@ class BillPrintService {
     doc.addPage(
       pw.Page(
         pageFormat: layout.pageFormat,
-        build: (context) => pw.SizedBox(
-          width: layout.printableWidthMm * PdfPageFormat.mm,
-          child: pw.Text(
-            layout.text,
-            style: style,
-            softWrap: false,
-          ),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            for (final line in layout.lines)
+              pw.SizedBox(
+                width: layout.printableWidthMm * PdfPageFormat.mm,
+                height: layout.lineHeightMm * PdfPageFormat.mm,
+                child: pw.FittedBox(
+                  fit: pw.BoxFit.scaleDown,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Text(
+                    line.isEmpty ? ' ' : line,
+                    style: style,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -237,17 +249,19 @@ class BillPrintService {
 }
 
 class _ReceiptPdfLayout {
-  final String text;
+  final List<String> lines;
   final PdfPageFormat pageFormat;
   final double printableWidthMm;
   final double fontSize;
+  final double lineHeightMm;
   final double lineHeightFactor;
 
   const _ReceiptPdfLayout({
-    required this.text,
+    required this.lines,
     required this.pageFormat,
     required this.printableWidthMm,
     required this.fontSize,
+    required this.lineHeightMm,
     required this.lineHeightFactor,
   });
 }
