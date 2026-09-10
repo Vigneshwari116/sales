@@ -17,6 +17,12 @@ class EscPosReceiptService {
   /// ESC a 0 — left align (receipt text is pre-formatted).
   static const List<int> _alignLeft = [0x1B, 0x61, 0x00];
 
+  /// ESC ! 0 — normal width/height (clear double-size modes).
+  static const List<int> _normalSize = [0x1B, 0x21, 0x00];
+
+  /// ESC E 1 — bold/emphasized on for darker thermal print.
+  static const List<int> _boldOn = [0x1B, 0x45, 0x01];
+
   /// ESC d n — feed n lines before cut.
   static const List<int> _feedBeforeCut = [0x1B, 0x64, 0x03];
 
@@ -32,6 +38,8 @@ class EscPosReceiptService {
     final bytes = <int>[
       ..._init,
       ..._fontA,
+      ..._normalSize,
+      ..._boldOn,
       ..._defaultLineSpacing,
       ..._alignLeft,
     ];
@@ -49,12 +57,13 @@ class EscPosReceiptService {
   }
 
   static List<int> _encodeLine(String line) {
-    final trimmed = line.length > columnsPerLine
-        ? line.substring(0, columnsPerLine)
-        : line;
+    final normalized = line.replaceAll('\r', '');
+    final padded = normalized.length > columnsPerLine
+        ? normalized.substring(0, columnsPerLine)
+        : normalized.padRight(columnsPerLine);
 
     final encoded = <int>[];
-    for (final unit in trimmed.codeUnits) {
+    for (final unit in padded.codeUnits) {
       if (unit >= 0x20 && unit <= 0x7E) {
         encoded.add(unit);
       } else if (unit == 0x09) {

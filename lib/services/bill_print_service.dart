@@ -7,8 +7,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/esc_pos_receipt_service.dart';
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
+import 'package:sales/services/thermal_raw_printer.dart';
 
 class BillPrintService {
   /// TVS RP3200: 80mm roll; 70mm content area keeps left/right data visible.
@@ -67,6 +69,14 @@ class BillPrintService {
 
     if (printer == null) {
       throw Exception('Printer "$printerName" not found');
+    }
+
+    if (type == PrinterType.thermal && !kIsWeb && Platform.isWindows) {
+      final escPosBytes = EscPosReceiptService.buildReceiptBytes(bill);
+      return printRawEscPos(
+        printerName: printerName,
+        data: escPosBytes,
+      );
     }
 
     final layout = _computePageLayout(

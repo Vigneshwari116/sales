@@ -26,7 +26,7 @@ SaleBill _sampleBill() {
 }
 
 void main() {
-  test('esc pos bytes start with init and font A commands', () {
+  test('esc pos bytes start with init, font A, and bold commands', () {
     final bytes = EscPosReceiptService.buildReceiptBytes(_sampleBill());
 
     expect(bytes.length, greaterThan(20));
@@ -34,6 +34,7 @@ void main() {
     expect(bytes[1], 0x40);
     expect(bytes, contains(0x4D)); // Font select
     expect(bytes, contains(0x32)); // Default line spacing
+    expect(bytes, containsAll([0x1B, 0x45, 0x01])); // bold on
     expect(bytes.sublist(bytes.length - 3), [0x1D, 0x56, 0x01]); // partial cut
   });
 
@@ -56,13 +57,22 @@ void main() {
     expect(_containsEscPosCommand(bytes, 0x57), isFalse); // GS W print width
   });
 
-  test('esc pos lines are capped at 48 characters', () {
+  test('esc pos lines are padded to exactly 48 characters', () {
+    final bytes = EscPosReceiptService.buildReceiptBytesFromText('HELLO');
+    final helloIndex = bytes.indexOf('H'.codeUnitAt(0));
+    final lineEnd = bytes.indexOf(0x0A, helloIndex);
+
+    expect(lineEnd, helloIndex + 48);
+    expect(
+      String.fromCharCodes(bytes.sublist(helloIndex, helloIndex + 5)),
+      'HELLO',
+    );
+
     final longLine = 'X' * 60;
-    final bytes = EscPosReceiptService.buildReceiptBytesFromText(longLine);
-    final xCode = 'X'.codeUnitAt(0);
-    final xStart = bytes.indexOf(xCode);
+    final longBytes = EscPosReceiptService.buildReceiptBytesFromText(longLine);
+    final xStart = longBytes.indexOf('X'.codeUnitAt(0));
     var xRun = 0;
-    for (var i = xStart; i < bytes.length && bytes[i] == xCode; i++) {
+    for (var i = xStart; i < longBytes.length && longBytes[i] == 'X'.codeUnitAt(0); i++) {
       xRun++;
     }
 
