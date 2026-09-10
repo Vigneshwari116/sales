@@ -11,15 +11,14 @@ import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
-  /// TVS RP3200: 80mm roll, 72mm max printable width (576 dots @ 8 dots/mm).
+  /// TVS RP3200: 80mm roll; 70mm content area keeps left/right data visible.
   static const double thermalPageWidthMm = 80.0;
-  static const double thermalPrintableWidthMm = 72.0;
+  static const double thermalPrintableWidthMm = 70.0;
   static const double _thermalMarginMm =
       (thermalPageWidthMm - thermalPrintableWidthMm) / 2;
 
   /// RP3200 Font A (12×24 dots): 48 columns, 1.50×3.00mm per character.
-  /// 7.5pt prints slightly larger/darker than 7pt native while staying in 72mm.
-  static const double thermalFontSizePt = 7.5;
+  static const double thermalFontSizePt = 8.0;
   static const double thermalCharWidthMm = 1.50;
   static const double thermalLineSpacingMm = 4.25;
 
@@ -169,18 +168,11 @@ class BillPrintService {
           mainAxisSize: pw.MainAxisSize.min,
           children: [
             for (final line in layout.lines)
-              pw.SizedBox(
-                width: layout.printableWidthMm * PdfPageFormat.mm,
-                height: layout.lineHeightMm * PdfPageFormat.mm,
-                child: pw.Align(
-                  alignment: pw.Alignment.centerLeft,
-                  child: pw.Text(
-                    line.isEmpty ? ' ' : line,
-                    style: style,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                ),
+              _thermalLineWidget(
+                line: line,
+                style: style,
+                printableWidthMm: layout.printableWidthMm,
+                lineHeightMm: layout.lineHeightMm,
               ),
           ],
         ),
@@ -188,6 +180,39 @@ class BillPrintService {
     );
 
     return await doc.save();
+  }
+
+  static pw.Widget _thermalLineWidget({
+    required String line,
+    required pw.TextStyle style,
+    required double printableWidthMm,
+    required double lineHeightMm,
+  }) {
+    final text = line.isEmpty ? ' ' : line;
+    pw.Widget receiptText() => pw.Text(
+          text,
+          style: style,
+          maxLines: 1,
+          softWrap: false,
+        );
+
+    return pw.SizedBox(
+      width: printableWidthMm * PdfPageFormat.mm,
+      height: lineHeightMm * PdfPageFormat.mm,
+      child: pw.FittedBox(
+        fit: pw.BoxFit.scaleDown,
+        alignment: pw.Alignment.centerLeft,
+        child: pw.Stack(
+          children: [
+            receiptText(),
+            pw.Transform.translate(
+              offset: const PdfPoint(0.4, 0),
+              child: receiptText(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   static Future<Uint8List> _buildPdfBytes(

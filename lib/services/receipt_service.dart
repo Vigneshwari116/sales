@@ -9,11 +9,9 @@ class ReceiptService {
 
   /// 3-inch (80mm) thermal paper — ~48 monospace chars (TVS RP3200).
   static const int _width = 48;
-  static const int _snoW = 4;
-  static const int _rateW = 10;
-  static const int _qtyW = 8;
-  static const int _amountW = _width - _snoW - _rateW - _qtyW;
-  static const int _labelW = _width - _amountW;
+  /// Four equal columns so SNO/RATE/QTY/AMOUNT are evenly spaced.
+  static const int _colW = 12;
+  static const int _labelW = _width - _colW;
 
   static String buildReceiptText(SaleBill bill) {
     final code = locationCodeFromDisplayName(bill.location);
@@ -88,17 +86,17 @@ class ReceiptService {
   }
 
   static String _itemHeader() {
-    return '${_padRight('SNO', _snoW)}'
-        '${_padRight('RATE', _rateW)}'
-        '${_padRight('QTY', _qtyW)}'
-        '${_padLeft('AMOUNT', _amountW)}';
+    return '${_padRight('SNO', _colW)}'
+        '${_padRight('RATE', _colW)}'
+        '${_padRight('QTY', _colW)}'
+        '${_padLeft('AMOUNT', _colW)}';
   }
 
   static String _itemLine(BillItem item, {required int sno}) {
-    return '${_padRight(sno.toString(), _snoW)}'
-        '${_padRight(_rate(item.rate), _rateW)}'
-        '${_padRight(_qty(item.qty), _qtyW)}'
-        '${_padLeft(_amount(item.grossAmt), _amountW)}';
+    return '${_padRight(sno.toString(), _colW)}'
+        '${_padRight(_rate(item.rate), _colW)}'
+        '${_padRight(_qty(item.qty), _colW)}'
+        '${_padLeft(_amount(item.grossAmt), _colW)}';
   }
 
   static String _itemGstLine(BillItem item) {
@@ -107,15 +105,15 @@ class ReceiptService {
   }
 
   static String _totalLine(double qty, double grandTotal) {
-    final left = _padRight('TOTAL', _snoW + _rateW);
-    final qtyPart = _padRight(_qty(qty), _qtyW);
-    final amountPart = _padLeft(_amount(grandTotal), _amountW);
+    final left = _padRight('TOTAL', _colW * 2);
+    final qtyPart = _padRight(_qty(qty), _colW);
+    final amountPart = _padLeft(_amount(grandTotal), _colW);
     return '$left$qtyPart$amountPart';
   }
 
   static String _rightAmountLine(String label, double amount) {
     final labelPart = _padRight(label, _labelW);
-    return '$labelPart${_padLeft(_amount(amount), _amountW)}';
+    return '$labelPart${_padLeft(_amount(amount), _colW)}';
   }
 
   static String _fieldLine(String label, String value) {
@@ -124,19 +122,10 @@ class ReceiptService {
   }
 
   static String _billDateLine(int billNo, String dateText) {
+    const halfWidth = _width ~/ 2;
     final left = 'BILL NO:$billNo';
     final right = 'DATE:$dateText';
-    final gap = _width - left.length - right.length;
-    if (gap < 1) {
-      // Keep bill no and date on one line; trim bill no if needed.
-      final maxLeft = _width - right.length - 1;
-      final trimmedLeft = left.length > maxLeft
-          ? left.substring(0, maxLeft)
-          : left;
-      final adjustedGap = _width - trimmedLeft.length - right.length;
-      return '$trimmedLeft${' ' * adjustedGap}$right';
-    }
-    return '$left${' ' * gap}$right';
+    return '${_padRight(left, halfWidth)}${_padLeft(right, halfWidth)}';
   }
 
   static String _center(String text) {
