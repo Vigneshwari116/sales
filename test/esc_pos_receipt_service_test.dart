@@ -49,6 +49,13 @@ void main() {
     expect(payload, contains('THANK YOU VISIT AGAIN'));
   });
 
+  test('esc pos does not set GS L/GS W print area that wraps columns early', () {
+    final bytes = EscPosReceiptService.buildReceiptBytes(_sampleBill());
+
+    expect(_containsEscPosCommand(bytes, 0x4C), isFalse); // GS L left margin
+    expect(_containsEscPosCommand(bytes, 0x57), isFalse); // GS W print width
+  });
+
   test('esc pos lines are capped at 48 characters', () {
     final longLine = 'X' * 60;
     final bytes = EscPosReceiptService.buildReceiptBytesFromText(longLine);
@@ -61,4 +68,13 @@ void main() {
 
     expect(xRun, 48);
   });
+}
+
+bool _containsEscPosCommand(List<int> bytes, int commandByte) {
+  for (var index = 0; index < bytes.length - 1; index++) {
+    if (bytes[index] == 0x1D && bytes[index + 1] == commandByte) {
+      return true;
+    }
+  }
+  return false;
 }
