@@ -18,8 +18,8 @@ class BillPrintService {
       (thermalPageWidthMm - thermalPrintableWidthMm) / 2;
 
   /// RP3200 Font A (12×24 dots): 48 columns, 1.50×3.00mm per character.
-  /// PDF Courier runs wider than native Font A — FittedBox scales each line down.
-  static const double thermalFontSizePt = 6.0;
+  /// 7.5pt prints slightly larger/darker than 7pt native while staying in 72mm.
+  static const double thermalFontSizePt = 7.5;
   static const double thermalCharWidthMm = 1.50;
   static const double thermalLineSpacingMm = 4.25;
 
@@ -172,8 +172,7 @@ class BillPrintService {
               pw.SizedBox(
                 width: layout.printableWidthMm * PdfPageFormat.mm,
                 height: layout.lineHeightMm * PdfPageFormat.mm,
-                child: pw.FittedBox(
-                  fit: pw.BoxFit.scaleDown,
+                child: pw.Align(
                   alignment: pw.Alignment.centerLeft,
                   child: pw.Text(
                     line.isEmpty ? ' ' : line,
