@@ -17,12 +17,6 @@ class EscPosReceiptService {
   /// ESC a 0 — left align (receipt text is pre-formatted).
   static const List<int> _alignLeft = [0x1B, 0x61, 0x00];
 
-  /// GS L — 4mm left margin (32 dots @ 8 dots/mm).
-  static const List<int> _leftMargin = [0x1D, 0x4C, 0x20, 0x00];
-
-  /// GS W — 72mm print width (576 dots), matching RP3200 printable area.
-  static const List<int> _printAreaWidth = [0x1D, 0x57, 0x40, 0x02];
-
   /// ESC d n — feed n lines before cut.
   static const List<int> _feedBeforeCut = [0x1B, 0x64, 0x03];
 
@@ -39,8 +33,6 @@ class EscPosReceiptService {
       ..._init,
       ..._fontA,
       ..._defaultLineSpacing,
-      ..._leftMargin,
-      ..._printAreaWidth,
       ..._alignLeft,
     ];
 
