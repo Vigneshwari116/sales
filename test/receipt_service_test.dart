@@ -138,6 +138,39 @@ void main() {
     _expectLinesWithinThermalWidth(lines.join('\n'));
   });
 
+  test('item table uses four equal-width columns', () {
+    final bill = SaleBill(
+      billNo: 5167,
+      location: 'Win1',
+      billDate: DateTime(2026, 9, 10),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 5, rate: 560)],
+      totalQty: 5,
+      totalAmount: 2800,
+      totalCgst: 67,
+      totalSgst: 67,
+      totalIgst: 0,
+      grandTotal: 2800,
+    );
+
+    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final header = lines.firstWhere((line) => line.contains('SNO'));
+    final item = lines.firstWhere(
+      (line) => line.contains('560') && line.contains('2800.00'),
+    );
+
+    expect(header.length, 48);
+    expect(item.length, 48);
+    expect(header.substring(0, 12).trim(), 'SNO');
+    expect(header.substring(12, 24).trim(), 'RATE');
+    expect(header.substring(24, 36).trim(), 'QTY');
+    expect(header.substring(36).trim(), 'AMOUNT');
+    expect(item.substring(36).trim(), '2800.00');
+    _expectLinesWithinThermalWidth(lines.join('\n'));
+  });
+
   test('bill no and date stay on one line', () {
     final bill = SaleBill(
       billNo: 18134,
@@ -159,7 +192,9 @@ void main() {
     final billDateLine = lines.firstWhere((line) => line.contains('BILL NO:'));
 
     expect(billDateLine, contains('DATE:10/06/2024'));
-    expect(billDateLine.length, lessThanOrEqualTo(48));
+    expect(billDateLine, contains('BILL NO:18134'));
+    expect(billDateLine.length, 48);
+    expect(billDateLine.indexOf('DATE:'), greaterThan(20));
     expect(lines.where((line) => line.contains('DATE:')).length, 1);
   });
 
