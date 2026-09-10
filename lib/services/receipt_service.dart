@@ -37,10 +37,10 @@ class ReceiptService {
     buffer.writeln(_itemHeader());
     buffer.writeln(line);
 
-    for (final item in bill.items) {
-      buffer.writeln(_itemLine(item));
+    for (var i = 0; i < bill.items.length; i++) {
+      buffer.writeln(_itemLine(bill.items[i], sno: i + 1));
       buffer.writeln(line);
-      buffer.writeln(_itemGstLine(item));
+      buffer.writeln(_itemGstLine(bill.items[i]));
       buffer.writeln(line);
     }
 
@@ -94,8 +94,8 @@ class ReceiptService {
         '${_padLeft('AMOUNT', _amountW)}';
   }
 
-  static String _itemLine(BillItem item) {
-    return '${_padRight('', _snoW)}'
+  static String _itemLine(BillItem item, {required int sno}) {
+    return '${_padRight(sno.toString(), _snoW)}'
         '${_padRight(_rate(item.rate), _rateW)}'
         '${_padRight(_qty(item.qty), _qtyW)}'
         '${_padLeft(_amount(item.grossAmt), _amountW)}';
@@ -103,7 +103,7 @@ class ReceiptService {
 
   static String _itemGstLine(BillItem item) {
     return 'CGST% ${_formatPct(item.cgstPct)}'
-        'SGST% ${_formatPct(item.sgstPct)}';
+        ' SGST% ${_formatPct(item.sgstPct)}';
   }
 
   static String _totalLine(double qty, double grandTotal) {
@@ -126,10 +126,16 @@ class ReceiptService {
   static String _billDateLine(int billNo, String dateText) {
     final left = 'BILL NO:$billNo';
     final right = 'DATE:$dateText';
-    if (left.length + right.length + 1 > _width) {
-      return '$left\n${_padLeft(right, _width)}';
-    }
     final gap = _width - left.length - right.length;
+    if (gap < 1) {
+      // Keep bill no and date on one line; trim bill no if needed.
+      final maxLeft = _width - right.length - 1;
+      final trimmedLeft = left.length > maxLeft
+          ? left.substring(0, maxLeft)
+          : left;
+      final adjustedGap = _width - trimmedLeft.length - right.length;
+      return '$trimmedLeft${' ' * adjustedGap}$right';
+    }
     return '$left${' ' * gap}$right';
   }
 
