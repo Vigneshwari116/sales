@@ -38,11 +38,42 @@ class AdminDayBillsScreen extends StatefulWidget {
 class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
   bool _loading = true;
   List<DayBillRow> _bills = const [];
+  final TextEditingController _minAmountController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadBills();
+    _minAmountController.addListener(_onMinAmountChanged);
+  }
+
+  @override
+  void dispose() {
+    _minAmountController.removeListener(_onMinAmountChanged);
+    _minAmountController.dispose();
+    super.dispose();
+  }
+
+  void _onMinAmountChanged() {
+    setState(() {});
+  }
+
+  double? get _minAmountFilter {
+    final text = _minAmountController.text.trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    return double.tryParse(text);
+  }
+
+  List<DayBillRow> get _filteredBills {
+    final minAmount = _minAmountFilter;
+    if (minAmount == null) {
+      return _bills;
+    }
+    return _bills
+        .where((bill) => bill.grandTotal >= minAmount)
+        .toList(growable: false);
   }
 
   Future<void> _loadBills() async {
@@ -110,11 +141,12 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredBills = _filteredBills;
     final compact = DayDrillDownRepository.shouldUseCompactBillList(
-      _bills.length,
+      filteredBills.length,
     );
     final fullDetail = DayDrillDownRepository.shouldShowFullBillDetails(
-      _bills.length,
+      filteredBills.length,
     );
 
     return Scaffold(
@@ -135,9 +167,10 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    _buildAmountFilterBar(),
                     if (compact)
                       const Padding(
-                        padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
                         child: Text(
                           'Showing bill number and amount only for performance.',
                           style: TextStyle(
@@ -147,24 +180,83 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
                         ),
                       ),
                     Expanded(
-                      child: compact
-                          ? _buildCompactList()
-                          : fullDetail
-                              ? _buildFullList()
-                              : _buildFullList(),
+                      child: filteredBills.isEmpty
+                          ? Center(
+                              child: Text(
+                                _minAmountFilter == null
+                                    ? 'No bills for this day'
+                                    : 'No bills with amount '
+                                        '${_formatMoney(_minAmountFilter!)} or above',
+                                style: const TextStyle(
+                                  color: AppColors.mutedBlue,
+                                ),
+                              ),
+                            )
+                          : compact
+                              ? _buildCompactList(filteredBills)
+                              : fullDetail
+                                  ? _buildFullList(filteredBills)
+                                  : _buildFullList(filteredBills),
                     ),
                   ],
                 ),
     );
   }
 
-  Widget _buildCompactList() {
+  Widget _buildAmountFilterBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Row(
+        children: [
+          const Text(
+            'Min amount:',
+            style: TextStyle(
+              fontSize: AppTextSizes.fieldLabel,
+              fontWeight: FontWeight.w600,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _minAmountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                hintText: 'e.g. 2000',
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+              style: const TextStyle(fontSize: AppTextSizes.fieldText),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _minAmountFilter == null
+                  ? 'Showing all ${_bills.length} bills'
+                  : 'Showing ${_filteredBills.length} of ${_bills.length} bills '
+                      '(>= ${_formatMoney(_minAmountFilter!)})',
+              style: const TextStyle(
+                fontSize: AppTextSizes.listSubtitle,
+                color: AppColors.mutedBlue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactList(List<DayBillRow> bills) {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
-      itemCount: _bills.length,
+      itemCount: bills.length,
       separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
-        final bill = _bills[index];
+        final bill = bills[index];
         return _BillListTile(
           title: 'Bill ${bill.billNo}',
           subtitle: branchLabelForDisplayName(bill.location),
@@ -175,13 +267,13 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
     );
   }
 
-  Widget _buildFullList() {
+  Widget _buildFullList(List<DayBillRow> bills) {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
-      itemCount: _bills.length,
+      itemCount: bills.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final bill = _bills[index];
+        final bill = bills[index];
         return Material(
           color: AppColors.cardWhite,
           borderRadius: BorderRadius.circular(6),
