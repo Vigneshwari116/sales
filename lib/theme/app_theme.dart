@@ -6,14 +6,17 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const background = Color(0xFFEEF1F4);
-  static const headerBand = Color(0xFFE4E9EF);
-  static const navy = Color(0xFF2C3E50);
-  static const mutedBlue = Color(0xFF5B7A8E);
-  static const tableHeader = Color(0xFFD9DFE6);
-  static const border = Color(0xFFD3D9E0);
+  /// Pale mint green — matches the legacy billing screen.
+  static const background = Color(0xFFB8DDB8);
+  static const headerBand = Color(0xFFA8D4A8);
+  static const navy = Color(0xFF1A1A1A);
+  static const mutedBlue = Color(0xFF3D5A3D);
+  static const tableHeader = Color(0xFFC5E0C5);
+  static const border = Color(0xFF8FB88F);
   static const cardWhite = Colors.white;
   static const accentBlue = Color(0xFF1E4E76);
+  /// Maroon action buttons — matches the legacy billing screen.
+  static const actionButton = Color(0xFF8B2323);
   static const drawerNavy = Color(0xFF1B2A38);
   static const drawerActive = Color(0xFF3D6A8A);
   static const tabActive = Color(0xFF3D5A73);
@@ -46,10 +49,10 @@ class AppTheme {
   static ThemeData get theme {
     return ThemeData(
       scaffoldBackgroundColor: AppColors.background,
-      primaryColor: AppColors.navy,
+      primaryColor: AppColors.actionButton,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.navy,
-        primary: AppColors.navy,
+        seedColor: AppColors.actionButton,
+        primary: AppColors.actionButton,
         background: AppColors.background,
       ),
       appBarTheme: const AppBarTheme(
@@ -94,21 +97,21 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.navy,
+          backgroundColor: AppColors.actionButton,
           foregroundColor: Colors.white,
           textStyle: const TextStyle(
               fontSize: AppTextSizes.buttonText, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.navy,
+          foregroundColor: AppColors.actionButton,
           textStyle: const TextStyle(fontSize: AppTextSizes.buttonText),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
       ),

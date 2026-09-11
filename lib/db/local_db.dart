@@ -206,6 +206,27 @@ class LocalDb {
     return _rowToStoredBill(rows.first);
   }
 
+  /// Returns the bill with the lowest bill_no strictly greater than [afterBillNo].
+  Future<StoredBill?> getNextBill({
+    required String location,
+    required int afterBillNo,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'bills',
+      where: 'location = ? AND bill_no > ?',
+      whereArgs: [location, afterBillNo],
+      orderBy: 'bill_no ASC',
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return _rowToStoredBill(rows.first);
+  }
+
   Future<List<LocalLedgerEntry>> getLedgerEntries(
     String location, {
     String? from,

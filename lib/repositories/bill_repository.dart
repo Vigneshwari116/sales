@@ -15,6 +15,39 @@ class BillRepository {
     return LocalDb.instance.getNextBillNumber(location);
   }
 
+  static Future<SaleBill?> getBillByNumber({
+    required String location,
+    required int billNo,
+  }) async {
+    final stored = await LocalDb.instance.getBillByNumber(
+      location: location,
+      billNo: billNo,
+    );
+    return stored?.bill;
+  }
+
+  static Future<SaleBill?> getPreviousBill({
+    required String location,
+    required int beforeBillNo,
+  }) async {
+    final stored = await LocalDb.instance.getPreviousBill(
+      location: location,
+      beforeBillNo: beforeBillNo,
+    );
+    return stored?.bill;
+  }
+
+  static Future<SaleBill?> getNextBill({
+    required String location,
+    required int afterBillNo,
+  }) async {
+    final stored = await LocalDb.instance.getNextBill(
+      location: location,
+      afterBillNo: afterBillNo,
+    );
+    return stored?.bill;
+  }
+
   static Future<SalesApiResult<int>> saveBill(
     SaleBill bill, {
     String? updateLocalId,
