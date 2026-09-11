@@ -346,6 +346,112 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
   }
 
+  Future<void> _populateFromSavedBill(SaleBill bill) async {
+    String? localId;
+    try {
+      localId = await LocalDb.instance.findLocalIdByBillNo(
+        location: bill.location,
+        billNo: bill.billNo,
+      );
+    } catch (_) {
+      // Best-effort lookup for edit/save tracking.
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _billNo = bill.billNo;
+      _billDate = bill.billDate;
+      _paymentMode = bill.paymentMode;
+      _customerNameController.text = bill.customerName;
+      _mobileController.text = bill.mobile;
+      _items
+        ..clear()
+        ..addAll(bill.items.map((item) => item.copyWith()));
+      _selectedIndex = null;
+      _editUnlocked = false;
+      _showPasswordField = false;
+      _passwordError = null;
+      _editingIndex = null;
+      _billSaved = true;
+      _currentBillLocalId = localId;
+      _rateController.text = '0';
+      _qtyController.text = '0';
+    });
+
+    await _persistSession();
+  }
+
+  Future<void> _goToPreviousBill() async {
+    if (_busy) return;
+
+    final previous = await BillRepository.getPreviousBill(
+      location: _selectedLocation,
+      beforeBillNo: _billNo,
+    );
+
+    if (!mounted) return;
+
+    if (previous == null) {
+      _showMessage('No previous bill');
+      return;
+    }
+
+    await _populateFromSavedBill(previous);
+  }
+
+  Future<void> _goToNextBill() async {
+    if (_busy) return;
+
+    final next = await BillRepository.getNextBill(
+      location: _selectedLocation,
+      afterBillNo: _billNo,
+    );
+
+    if (!mounted) return;
+
+    if (next != null) {
+      await _populateFromSavedBill(next);
+      return;
+    }
+
+    final nextBillNo =
+        await BillRepository.getNextBillNumber(_selectedLocation);
+    if (!mounted) return;
+
+    if (_billNo >= nextBillNo) {
+      _showMessage('No next bill');
+      return;
+    }
+
+    setState(() {
+      _billNo = nextBillNo;
+      _clearCurrentBill();
+    });
+    await _persistSession();
+  }
+
+  Widget _buildBillNavButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      height: 29,
+      child: ElevatedButton(
+        onPressed: _busy ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.actionButton,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: const Size(0, 29),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
   // ============================================================
   // FOCUS RATE
   // ============================================================
@@ -1004,7 +1110,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -1115,7 +1221,22 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           child: _buildBillDetails(),
         ),
         const SizedBox(width: 8),
-        _buildCustomerDetails(),
+        Expanded(child: _buildCustomerDetails()),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildBillNavButton(
+              label: 'PREVIOUS',
+              onPressed: _goToPreviousBill,
+            ),
+            const SizedBox(height: 4),
+            _buildBillNavButton(
+              label: 'NEXT',
+              onPressed: _goToNextBill,
+            ),
+          ],
+        ),
       ],
     );
   }

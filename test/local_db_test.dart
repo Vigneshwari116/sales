@@ -224,6 +224,25 @@ void main() {
       expect(previous!.bill.billNo, 3);
     });
 
+    test('getNextBill returns lowest bill above given number', () async {
+      final db = LocalDb.instance;
+      await db.initialize();
+
+      for (final billNo in [1, 3, 7]) {
+        await db.insertBill(
+          SaleBill.fromJson(_sampleBillJson(billNo: billNo)),
+        );
+      }
+
+      final next = await db.getNextBill(
+        location: _testLocationName,
+        afterBillNo: 3,
+      );
+
+      expect(next, isNotNull);
+      expect(next!.bill.billNo, 7);
+    });
+
     test('getLedgerEntries filters by date range', () async {
       final db = LocalDb.instance;
       await db.initialize();
