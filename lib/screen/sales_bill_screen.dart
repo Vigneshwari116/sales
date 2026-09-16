@@ -988,6 +988,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     if (widget.embeddedInDashboard) {
       return Scaffold(
         backgroundColor: AppColors.background,
+        appBar: sectionHeaderAppBar('SALES BILL'),
         body: _buildLockedBody(body),
       );
     }
@@ -1213,31 +1214,49 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   Widget _buildTopArea() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 300,
-          child: _buildBillDetails(),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: _buildCustomerDetails()),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Do not use Expanded/Flexible here — this row lives inside a
+    // SingleChildScrollView, which can pass unbounded width and blank the bill UI.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const billWidth = 300.0;
+        const navWidth = 92.0;
+        const gaps = 16.0;
+        final customerWidth = (constraints.maxWidth - billWidth - navWidth - gaps)
+            .clamp(160.0, constraints.maxWidth);
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildBillNavButton(
-              label: 'PREVIOUS',
-              onPressed: _goToPreviousBill,
+            SizedBox(
+              width: billWidth,
+              child: _buildBillDetails(),
             ),
-            const SizedBox(height: 4),
-            _buildBillNavButton(
-              label: 'NEXT',
-              onPressed: _goToNextBill,
+            const SizedBox(width: 8),
+            SizedBox(
+              width: customerWidth,
+              child: _buildCustomerDetails(),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: navWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildBillNavButton(
+                    label: 'PREVIOUS',
+                    onPressed: _goToPreviousBill,
+                  ),
+                  const SizedBox(height: 4),
+                  _buildBillNavButton(
+                    label: 'NEXT',
+                    onPressed: _goToNextBill,
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
