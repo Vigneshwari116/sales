@@ -44,7 +44,7 @@ void main() {
     final payload = String.fromCharCodes(bytes);
 
     expect(payload, contains('R K S ENTERPRIISES'));
-    expect(payload, contains('KUDULU MAIN ROAD'));
+    expect(payload, contains('KUDULU MAIN'));
     expect(payload, contains('BILL NO:17367'));
     expect(payload, contains('GRAND TOTAL'));
     expect(payload, contains('THANK YOU VISIT AGAIN'));

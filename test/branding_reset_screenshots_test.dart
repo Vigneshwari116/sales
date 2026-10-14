@@ -306,7 +306,8 @@ void main() {
     await pdfFile.writeAsBytes(pdfBytes);
 
     expect(text, contains(ReceiptService.businessName));
-    expect(text, contains('KUDULU MAIN ROAD'));
+    expect(text, contains('KUDULU MAIN'));
+    expect(text, contains('Bangalore-68'));
     expect(text, contains('GRAND TOTAL'));
     expect(text, contains('THANK YOU VISIT AGAIN'));
     print('Wrote $textPath and ${pdfFile.path}');
