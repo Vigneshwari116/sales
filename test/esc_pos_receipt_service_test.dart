@@ -57,12 +57,13 @@ void main() {
     expect(_containsEscPosCommand(bytes, 0x57), isFalse); // GS W print width
   });
 
-  test('esc pos lines are padded to exactly 48 characters', () {
+  test('esc pos lines are padded to receipt column width', () {
+    final width = ReceiptService.thermalContentColumns;
     final bytes = EscPosReceiptService.buildReceiptBytesFromText('HELLO');
     final helloIndex = bytes.indexOf('H'.codeUnitAt(0));
     final lineEnd = bytes.indexOf(0x0A, helloIndex);
 
-    expect(lineEnd, helloIndex + 48);
+    expect(lineEnd, helloIndex + width);
     expect(
       String.fromCharCodes(bytes.sublist(helloIndex, helloIndex + 5)),
       'HELLO',
@@ -76,7 +77,7 @@ void main() {
       xRun++;
     }
 
-    expect(xRun, 48);
+    expect(xRun, ReceiptService.thermalContentColumns);
   });
 }
 

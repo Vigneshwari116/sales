@@ -1,9 +1,9 @@
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/receipt_service.dart';
 
-/// Builds native ESC/POS bytes for TVS RP3200 (Font A, 80mm, 48 columns).
+/// Legacy ESC/POS helper (bills print via PDF in [BillPrintService]).
 class EscPosReceiptService {
-  static const int columnsPerLine = 48;
+  static int get columnsPerLine => ReceiptService.thermalContentColumns;
 
   /// ESC @ — reset printer.
   static const List<int> _init = [0x1B, 0x40];

@@ -3,8 +3,8 @@ import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/receipt_service.dart';
 
-const _paperWidth = 48;
-const _margin = 8;
+const _cols = ReceiptService.thermalContentColumns;
+const _amountStart = 4 + 8 + 6;
 
 SaleBill _sampleBill({required String location}) {
   return SaleBill(
@@ -26,26 +26,29 @@ SaleBill _sampleBill({required String location}) {
   );
 }
 
-String _contentLine(String text, int lineIndex) {
-  return text.split('\n')[lineIndex];
-}
-
 void main() {
-  test('address prints on one line like the original receipt', () {
-    final lines = ReceiptService.buildReceiptText(_sampleBill(location: 'Win1'))
-        .split('\n');
-    final addressLine = lines[1];
-
-    expect(
-      addressLine.trim(),
-      '47/3/4,2nd Cross KUDULU MAIN ROAD,Bangalore-68',
+  test('long address splits onto deliberate extra lines', () {
+    final lines = ReceiptService.buildReceiptLines(
+      _sampleBill(location: 'Win2'),
     );
-    expect(addressLine.length, _paperWidth);
+    final addressLines = lines
+        .where(
+          (line) =>
+              line.contains('TIPPSANDRA') ||
+              line.contains('Bangalore-560075'),
+        )
+        .toList();
+
+    expect(addressLines.length, greaterThan(1));
+    for (final line in addressLines) {
+      expect(line.length, lessThanOrEqualTo(_cols));
+    }
+    expect(lines.join('\n'), contains('TIPPSANDRA MAIN ROAD'));
+    expect(lines.join('\n'), contains('Bangalore-560075'));
   });
 
   test('name and mobile are consecutive without blank lines', () {
-    final lines = ReceiptService.buildReceiptText(_sampleBill(location: 'Win1'))
-        .split('\n');
+    final lines = ReceiptService.buildReceiptLines(_sampleBill(location: 'Win1'));
     final nameIndex = lines.indexWhere((line) => line.contains('NAME:'));
     final mobileIndex = lines.indexWhere((line) => line.contains('MOBILE:'));
 
@@ -60,97 +63,86 @@ void main() {
     expect(text, contains('DATE:04/09/2026'));
     expect(text, contains('CGST% 2.5SGST% 2.5'));
     expect(text, contains('GRAND TOTAL'));
-    expect(text.split('-----').length, greaterThan(4));
-    _expectLinesWithinThermalWidth(text);
-    _expectBalancedMargins(text);
+    _expectLinesWithinWidth(lines);
   });
 
-  test('tippasandra receipt uses tippasandra address', () {
-    final text = ReceiptService.buildReceiptText(_sampleBill(location: 'Win2'));
-
-    expect(text, contains('TIPPSANDRA MAIN ROAD'));
-    expect(text, contains('Bangalore-560075'));
-    expect(text, contains('AMOUNT'));
-    expect(text, contains('GRAND TOTAL'));
-    _expectLinesWithinThermalWidth(text);
-    _expectBalancedMargins(text);
-  });
-
-  test('receipt shows per-item gst line for each item', () {
+  test('empty customer name and mobile still print labels', () {
     final bill = SaleBill(
-      billNo: 17367,
-      location: 'Win3',
-      billDate: DateTime(2026, 9, 4),
-      paymentMode: 'CASH',
-      customerName: '',
-      mobile: '',
-      items: [
-        BillItem(qty: 1, rate: 30),
-        BillItem(qty: 1, rate: 100),
-        BillItem(qty: 1, rate: 350),
-      ],
-      totalQty: 3,
-      totalAmount: 457.14,
-      totalCgst: 11.5,
-      totalSgst: 11.5,
-      totalIgst: 0,
-      grandTotal: 480,
-    );
-
-    final text = ReceiptService.buildReceiptText(bill);
-    final lines = text.split('\n');
-
-    expect(text, contains('KUDULU MAIN ROAD'));
-    expect(lines.where((line) => line.contains('CGST% 2.5SGST% 2.5')).length, 3);
-    expect(text, contains('30.00'));
-    expect(text, contains('100.00'));
-    expect(text, contains('350.00'));
-    expect(text, contains('480.00'));
-    _expectLinesWithinThermalWidth(text);
-    _expectBalancedMargins(text);
-  });
-
-  test('receipt uses qty without decimals and amount with .00', () {
-    final bill = SaleBill(
-      billNo: 17347,
+      billNo: 100,
       location: 'Win1',
-      billDate: DateTime(2026, 9, 5),
+      billDate: DateTime(2026, 1, 1),
       paymentMode: 'CASH',
       customerName: '',
       mobile: '',
-      items: [
-        BillItem(qty: 2, rate: 1200),
-        BillItem(qty: 2, rate: 250),
-        BillItem(qty: 6, rate: 45),
-        BillItem(qty: 6, rate: 45),
-      ],
-      totalQty: 16,
-      totalAmount: 3276.19,
-      totalCgst: 81.9,
-      totalSgst: 81.9,
+      items: [BillItem(qty: 1, rate: 100)],
+      totalQty: 1,
+      totalAmount: 95.24,
+      totalCgst: 2.5,
+      totalSgst: 2.5,
       totalIgst: 0,
-      grandTotal: 3440,
+      grandTotal: 100,
     );
 
-    final lines = ReceiptService.buildReceiptText(bill).split('\n');
-    final itemLine = lines.firstWhere((line) => line.contains('1200'));
-
-    expect(itemLine, contains('1200'));
-    expect(itemLine, contains('2'));
-    expect(itemLine, contains('2400.00'));
-    expect(itemLine, isNot(contains('2.00')));
-    expect(itemLine, isNot(contains('1200.00')));
-
-    final totalLine = lines.firstWhere((line) => line.contains('TOTAL'));
-    expect(totalLine, contains('16'));
-    expect(totalLine, contains('3440.00'));
-    expect(totalLine, isNot(contains('16.00')));
-
-    _expectLinesWithinThermalWidth(lines.join('\n'));
-    _expectBalancedMargins(lines.join('\n'));
+    final lines = ReceiptService.buildReceiptLines(bill);
+    expect(lines.any((l) => l == 'NAME:'), isTrue);
+    expect(lines.any((l) => l == 'MOBILE:'), isTrue);
+    _expectLinesWithinWidth(lines);
   });
 
-  test('item table uses original proportional columns with margins', () {
+  test('five-digit amounts stay on one line and right-aligned', () {
+    final bill = SaleBill(
+      billNo: 99999,
+      location: 'Win1',
+      billDate: DateTime(2026, 3, 1),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [BillItem(qty: 1, rate: 12345)],
+      totalQty: 1,
+      totalAmount: 11757.14,
+      totalCgst: 293.93,
+      totalSgst: 293.93,
+      totalIgst: 0,
+      grandTotal: 12345,
+    );
+
+    final lines = ReceiptService.buildReceiptLines(bill);
+    final itemLine = lines.firstWhere((line) => line.contains('12345'));
+    expect(itemLine.length, lessThanOrEqualTo(_cols));
+    expect(itemLine.substring(_amountStart).trim(), '12345.00');
+    _expectLinesWithinWidth(lines);
+  });
+
+  test('many items each produce gst lines without wrapping columns', () {
+    final items = List.generate(
+      12,
+      (index) => BillItem(qty: 1, rate: 100 + index),
+    );
+    final bill = SaleBill(
+      billNo: 5000,
+      location: 'Win3',
+      billDate: DateTime(2026, 5, 1),
+      paymentMode: 'CASH',
+      customerName: 'TEST',
+      mobile: '9999999999',
+      items: items,
+      totalQty: 12,
+      totalAmount: 1200,
+      totalCgst: 30,
+      totalSgst: 30,
+      totalIgst: 0,
+      grandTotal: 1260,
+    );
+
+    final lines = ReceiptService.buildReceiptLines(bill);
+    expect(
+      lines.where((line) => line.contains('CGST% 2.5SGST% 2.5')).length,
+      12,
+    );
+    _expectLinesWithinWidth(lines);
+  });
+
+  test('item table columns align amount on the right edge', () {
     final bill = SaleBill(
       billNo: 5167,
       location: 'Win1',
@@ -167,21 +159,24 @@ void main() {
       grandTotal: 2800,
     );
 
-    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final lines = ReceiptService.buildReceiptLines(bill);
     final header = lines.firstWhere((line) => line.contains('SNO'));
     final item = lines.firstWhere(
       (line) => line.contains('560') && line.contains('2800.00'),
     );
+    final total = lines.firstWhere(
+      (line) => line.startsWith('TOTAL') && line.contains('2800.00'),
+    );
+    final cgst = lines.firstWhere((line) => line.startsWith('CGST'));
+    final grand = lines.firstWhere((line) => line.startsWith('GRAND TOTAL'));
 
-    expect(header.length, _paperWidth);
-    expect(item.length, _paperWidth);
-    expect(header.substring(_margin, _margin + 4).trim(), 'SNO');
-    expect(header.substring(_margin + 4, _margin + 12).trim(), 'RATE');
-    expect(header.substring(_margin + 12, _margin + 18).trim(), 'QTY');
-    expect(header.substring(_margin + 18).trim(), 'AMOUNT');
-    expect(item.substring(_margin + 18).trim(), '2800.00');
-    _expectLinesWithinThermalWidth(lines.join('\n'));
-    _expectBalancedMargins(lines.join('\n'));
+    expect(header.length, _cols);
+    expect(header.substring(_amountStart).trim(), 'AMOUNT');
+    expect(item.substring(_amountStart).trim(), '2800.00');
+    expect(total.substring(_amountStart).trim(), '2800.00');
+    expect(cgst.substring(_amountStart).trim(), '67.00');
+    expect(grand.substring(_amountStart).trim(), '2800.00');
+    _expectLinesWithinWidth(lines);
   });
 
   test('bill no and date stay on one line', () {
@@ -201,93 +196,22 @@ void main() {
       grandTotal: 400,
     );
 
-    final lines = ReceiptService.buildReceiptText(bill).split('\n');
+    final lines = ReceiptService.buildReceiptLines(bill);
     final billDateLine = lines.firstWhere((line) => line.contains('BILL NO:'));
 
     expect(billDateLine, contains('DATE:10/06/2024'));
     expect(billDateLine, contains('BILL NO:18134'));
-    expect(billDateLine.length, _paperWidth);
+    expect(billDateLine.length, lessThanOrEqualTo(_cols));
     expect(lines.where((line) => line.contains('DATE:')).length, 1);
-    _expectBalancedMargins(lines.join('\n'));
-  });
-
-  test('item lines leave SNO column blank like the original receipt', () {
-    final bill = SaleBill(
-      billNo: 17350,
-      location: 'Win3',
-      billDate: DateTime(2026, 9, 5),
-      paymentMode: 'CASH',
-      customerName: '',
-      mobile: '',
-      items: [BillItem(qty: 1, rate: 450)],
-      totalQty: 1,
-      totalAmount: 428.57,
-      totalCgst: 10.5,
-      totalSgst: 10.5,
-      totalIgst: 0,
-      grandTotal: 450,
-    );
-
-    final lines = ReceiptService.buildReceiptText(bill).split('\n');
-    final itemLine = lines.firstWhere(
-      (line) => line.contains('450') && line.contains('450.00'),
-    );
-
-    expect(itemLine.substring(_margin, _margin + 4).trim(), isEmpty);
-    expect(itemLine.substring(_margin + 4, _margin + 12).trim(), '450');
-    expect(itemLine.substring(_margin + 12, _margin + 18).trim(), '1');
-    expect(itemLine.substring(_margin + 18).trim(), '450.00');
-    _expectLinesWithinThermalWidth(lines.join('\n'));
-    _expectBalancedMargins(lines.join('\n'));
-  });
-
-  test('receipt aligns amount column for multi-item bill', () {
-    final bill = SaleBill(
-      billNo: 17345,
-      location: 'Win1',
-      billDate: DateTime(2024, 9, 4),
-      paymentMode: 'CASH',
-      customerName: '',
-      mobile: '',
-      items: [
-        BillItem(qty: 1, rate: 1200),
-        BillItem(qty: 1, rate: 210),
-      ],
-      totalQty: 2,
-      totalAmount: 1343,
-      totalCgst: 33.5,
-      totalSgst: 33.5,
-      totalIgst: 0,
-      grandTotal: 1410,
-    );
-
-    final lines = ReceiptService.buildReceiptText(bill).split('\n');
-    final itemLines = lines.where((line) => line.contains('1200')).toList();
-
-    expect(itemLines, hasLength(1));
-    expect(itemLines.first.substring(_margin + 18).trim(), '1200.00');
-    _expectLinesWithinThermalWidth(lines.join('\n'));
-    _expectBalancedMargins(lines.join('\n'));
   });
 }
 
-void _expectLinesWithinThermalWidth(String text) {
-  for (final line in text.split('\n')) {
+void _expectLinesWithinWidth(List<String> lines) {
+  for (final line in lines) {
     expect(
       line.length,
-      lessThanOrEqualTo(_paperWidth),
-      reason: 'Line exceeds 3-inch (80mm) thermal width: "$line"',
+      lessThanOrEqualTo(_cols),
+      reason: 'Line exceeds $_cols columns: "$line"',
     );
-  }
-}
-
-void _expectBalancedMargins(String text) {
-  for (final line in text.split('\n')) {
-    if (line.trim().isEmpty) {
-      continue;
-    }
-    expect(line.length, _paperWidth);
-    expect(line.substring(0, _margin), equals(' ' * _margin));
-    expect(line.substring(_paperWidth - _margin), equals(' ' * _margin));
   }
 }

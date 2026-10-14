@@ -7,12 +7,10 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// TVS RP3200 Font A — 48 columns on 80mm paper.
-  static const int _paperWidth = 48;
+  /// Monospace line width for bill text (fits 78 mm PDF printable area).
+  static const int thermalContentColumns = 42;
 
-  /// Content width with equal left/right margins on the roll.
-  static const int _contentWidth = 32;
-  static const int _margin = (_paperWidth - _contentWidth) ~/ 2;
+  static const int _contentWidth = thermalContentColumns;
 
   static const int _snoW = 4;
   static const int _rateW = 8;
@@ -21,49 +19,56 @@ class ReceiptService {
   static const int _labelW = _contentWidth - _amountW;
 
   static String buildReceiptText(SaleBill bill) {
+    return buildReceiptLines(bill).join('\n');
+  }
+
+  static List<String> buildReceiptLines(SaleBill bill) {
     final code = locationCodeFromDisplayName(bill.location);
-    return _buildOriginalFormat(bill, code).trimRight();
+    return _buildOriginalFormat(bill, code);
   }
 
   /// Original thermal layout — dashed separators, per-item CGST/SGST lines.
-  static String _buildOriginalFormat(SaleBill bill, String locationCode) {
-    final buffer = StringBuffer();
+  static List<String> _buildOriginalFormat(
+    SaleBill bill,
+    String locationCode,
+  ) {
+    final lines = <String>[];
     final dateText = DateFormat('dd/MM/yyyy').format(bill.billDate);
     final profile = _locationProfile(locationCode);
-    final line = _formatLeft('-' * _contentWidth);
+    final separator = '-' * _contentWidth;
 
-    buffer.writeln(_formatCentered(_center(businessName)));
-    buffer.writeln(_formatLeft(_singleLineAddress(profile.addressLine)));
-    buffer.writeln(_formatCentered(_center('GSTIN:$gstin')));
-    buffer.writeln(_formatLeft(_billDateLine(bill.billNo, dateText)));
-    buffer.writeln(_formatLeft(_fieldLine('NAME', bill.customerName)));
-    buffer.writeln(_formatLeft(_fieldLine('MOBILE', bill.mobile)));
-    buffer.writeln(line);
-    buffer.writeln(_formatLeft(_itemHeader()));
-    buffer.writeln(line);
+    lines.add(_lineCentered(businessName));
+    for (final addressLine in _wrapToWidth(profile.addressLine, _contentWidth)) {
+      lines.add(_line(addressLine));
+    }
+    for (final gstinLine in _wrapToWidth('GSTIN:$gstin', _contentWidth)) {
+      lines.add(_lineCentered(gstinLine));
+    }
+    lines.add(_line(_billDateLine(bill.billNo, dateText)));
+    lines.add(_line(_fieldLine('NAME', bill.customerName)));
+    lines.add(_line(_fieldLine('MOBILE', bill.mobile)));
+    lines.add(separator);
+    lines.add(_line(_itemHeader()));
+    lines.add(separator);
 
     for (final item in bill.items) {
-      buffer.writeln(_formatLeft(_itemLine(item)));
-      buffer.writeln(line);
-      buffer.writeln(_formatLeft(_itemGstLine(item)));
-      buffer.writeln(line);
+      lines.add(_line(_itemLine(item)));
+      lines.add(separator);
+      lines.add(_line(_itemGstLine(item)));
+      lines.add(separator);
     }
 
-    buffer.writeln(_formatLeft(_totalLine(bill.totalQty, bill.grandTotal)));
-    buffer.writeln(_formatLeft(_rightAmountLine('CGST', bill.totalCgst)));
-    buffer.writeln(_formatLeft(_rightAmountLine('SGST', bill.totalSgst)));
-    buffer.writeln(line);
-    buffer.writeln(_formatLeft(_rightAmountLine('GRAND TOTAL', bill.grandTotal)));
-    buffer.writeln(line);
-    _writeFooter(buffer);
-    return buffer.toString();
-  }
-
-  static void _writeFooter(StringBuffer buffer) {
-    buffer.writeln(_formatLeft('TERMS AND CONDITION'));
-    buffer.writeln(_formatLeft('EXCHANGE ONLY 3 DAYS'));
-    buffer.writeln(_formatLeft('AMOUNT NOT REFUND'));
-    buffer.writeln(_formatCentered(_center('THANK YOU VISIT AGAIN')));
+    lines.add(_line(_totalLine(bill.totalQty, bill.grandTotal)));
+    lines.add(_line(_rightAmountLine('CGST', bill.totalCgst)));
+    lines.add(_line(_rightAmountLine('SGST', bill.totalSgst)));
+    lines.add(separator);
+    lines.add(_line(_rightAmountLine('GRAND TOTAL', bill.grandTotal)));
+    lines.add(separator);
+    lines.add(_line('TERMS AND CONDITION'));
+    lines.add(_line('EXCHANGE ONLY 3 DAYS'));
+    lines.add(_line('AMOUNT NOT REFUND'));
+    lines.add(_lineCentered('THANK YOU VISIT AGAIN'));
+    return lines;
   }
 
   static _LocationReceiptProfile _locationProfile(String locationCode) {
@@ -84,12 +89,49 @@ class ReceiptService {
     }
   }
 
-  static String _singleLineAddress(String address) {
-    final trimmed = address.trim();
-    if (trimmed.length <= _contentWidth) {
-      return trimmed;
+  static List<String> _wrapToWidth(String text, int width) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return const [];
     }
-    return trimmed.substring(0, _contentWidth);
+    if (trimmed.length <= width) {
+      return [trimmed];
+    }
+
+    final normalized = trimmed.replaceAll(',', ', ');
+    final tokens = normalized.split(RegExp(r'\s+'));
+    final lines = <String>[];
+    var current = '';
+
+    for (final token in tokens) {
+      if (token.isEmpty) {
+        continue;
+      }
+      final candidate = current.isEmpty ? token : '$current $token';
+      if (candidate.length <= width) {
+        current = candidate;
+        continue;
+      }
+      if (current.isNotEmpty) {
+        lines.add(current);
+        current = '';
+      }
+      if (token.length <= width) {
+        current = token;
+      } else {
+        var remaining = token;
+        while (remaining.length > width) {
+          lines.add(remaining.substring(0, width));
+          remaining = remaining.substring(width);
+        }
+        current = remaining;
+      }
+    }
+
+    if (current.isNotEmpty) {
+      lines.add(current);
+    }
+    return lines;
   }
 
   static String _itemHeader() {
@@ -125,7 +167,8 @@ class ReceiptService {
 
   static String _fieldLine(String label, String value) {
     final text = value.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
-    return text.isEmpty ? '$label:' : '$label:$text';
+    final line = text.isEmpty ? '$label:' : '$label:$text';
+    return _line(line);
   }
 
   static String _billDateLine(int billNo, String dateText) {
@@ -142,30 +185,16 @@ class ReceiptService {
     return '$left${' ' * gap}$right';
   }
 
-  /// Left-aligns [content] within the printable area with equal side margins.
-  static String _formatLeft(String content) {
+  static String _line(String content) {
     final trimmed = content.trimRight();
-    if (trimmed.length > _contentWidth) {
-      return '${' ' * _margin}${trimmed.substring(0, _contentWidth)}'
-          '${' ' * _margin}';
+    if (trimmed.length <= _contentWidth) {
+      return trimmed;
     }
-    final rightPad = _paperWidth - _margin - trimmed.length;
-    return '${' ' * _margin}$trimmed${' ' * rightPad}';
+    return trimmed.substring(0, _contentWidth);
   }
 
-  /// Centers [content] within the printable area and pads to [_paperWidth].
-  static String _formatCentered(String content) {
-    final trimmed = content.trimRight();
-    if (trimmed.isEmpty) {
-      return ' ' * _paperWidth;
-    }
-    if (trimmed.length > _contentWidth) {
-      return '${' ' * _margin}${trimmed.substring(0, _contentWidth)}'
-          '${' ' * _margin}';
-    }
-    final leftPad = _margin + ((_contentWidth - trimmed.length) / 2).floor();
-    final rightPad = _paperWidth - leftPad - trimmed.length;
-    return '${' ' * leftPad}$trimmed${' ' * rightPad}';
+  static String _lineCentered(String content) {
+    return _center(_line(content));
   }
 
   static String _center(String text) {
