@@ -39,7 +39,7 @@ Printer _printer({
 }
 
 void main() {
-  test('thermal pdf uses 70mm page width and dynamic height', () async {
+  test('thermal pdf uses 66mm page width and dynamic height', () async {
     final bill = _sampleBill();
     final lineCount = ReceiptService.buildReceiptLines(bill).length;
     final bytes = await BillPrintService.buildPdfBytes(bill);

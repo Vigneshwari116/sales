@@ -12,7 +12,7 @@ import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
   /// Thermal PDF tuning (3-inch / RP3200 roll) — adjust here only.
-  static const double thermalPdfPageWidthMm = 70.0;
+  static const double thermalPdfPageWidthMm = 66.0;
   static const double thermalPdfMarginRightMm = 6.0;
 
   static const double thermalPdfMarginLeftMm = 2.0;

@@ -4,7 +4,7 @@ import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/receipt_service.dart';
 
 const _cols = ReceiptService.thermalContentColumns;
-const _amountStart = 4 + 7 + 5;
+const _amountStart = 3 + 6 + 5;
 
 SaleBill _sampleBill({required String location}) {
   return SaleBill(
@@ -81,6 +81,7 @@ void main() {
     expect(text, contains('Bangalore-68'));
     expect(text, contains('BILL NO:23258'));
     expect(text, contains('04/09/2026'));
+    expect(text, isNot(contains('DATE:')));
     expect(text, contains('CGST% 2.5  SGST% 2.5'));
     expect(text, contains('GRAND TOTAL'));
     expect(text, contains('1000.00'));
@@ -119,6 +120,43 @@ void main() {
     _expectLinesWithinWidth(lines);
   });
 
+  test('item rows print serial number in SNO column', () {
+    final bill = SaleBill(
+      billNo: 100,
+      location: 'Win1',
+      billDate: DateTime(2026, 1, 1),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [
+        BillItem(qty: 1, rate: 100),
+        BillItem(qty: 2, rate: 200),
+        BillItem(qty: 1, rate: 300),
+      ],
+      totalQty: 4,
+      totalAmount: 800,
+      totalCgst: 20,
+      totalSgst: 20,
+      totalIgst: 0,
+      grandTotal: 840,
+    );
+
+    final lines = ReceiptService.buildReceiptLines(bill);
+    final itemRows = lines
+        .where(
+          (line) =>
+              RegExp(r'^\s*\d+\s+\d').hasMatch(line) &&
+              RegExp(r'\d+\.\d{2}$').hasMatch(line.trimRight()),
+        )
+        .toList();
+
+    expect(itemRows.length, 3);
+    expect(itemRows[0].substring(0, 3).trim(), '1');
+    expect(itemRows[1].substring(0, 3).trim(), '2');
+    expect(itemRows[2].substring(0, 3).trim(), '3');
+    _expectLinesWithinWidth(lines);
+  });
+
   test('five-digit amounts stay on one line and right-aligned', () {
     final bill = SaleBill(
       billNo: 99999,
@@ -141,6 +179,41 @@ void main() {
     expect(itemLine.length, _cols);
     expect(itemLine.substring(_amountStart).trim(), '12345.00');
     expect(lines.join('\n'), contains('12345.00'));
+    _expectLinesWithinWidth(lines);
+  });
+
+  test('amount column fits values like 1640.00 and 99999.00', () {
+    final bill = SaleBill(
+      billNo: 42,
+      location: 'Win1',
+      billDate: DateTime(2026, 6, 15),
+      paymentMode: 'CASH',
+      customerName: '',
+      mobile: '',
+      items: [
+        BillItem(qty: 1, rate: 1640),
+        BillItem(qty: 1, rate: 99999),
+      ],
+      totalQty: 2,
+      totalAmount: 100000,
+      totalCgst: 2500,
+      totalSgst: 2500,
+      totalIgst: 0,
+      grandTotal: 101639,
+    );
+
+    final lines = ReceiptService.buildReceiptLines(bill);
+    final text = lines.join('\n');
+    expect(text, contains('1640.00'));
+    expect(text, contains('99999.00'));
+    expect(
+      lines.firstWhere((l) => l.contains('1640.00')).substring(_amountStart).trim(),
+      '1640.00',
+    );
+    expect(
+      lines.firstWhere((l) => l.contains('99999.00')).substring(_amountStart).trim(),
+      '99999.00',
+    );
     _expectLinesWithinWidth(lines);
   });
 
@@ -193,7 +266,7 @@ void main() {
     final lines = ReceiptService.buildReceiptLines(bill);
     final header = lines.firstWhere((line) => line.contains('SNO'));
     final item = lines.firstWhere(
-      (line) => line.contains('560') && line.contains('2800.00'),
+      (line) => line.trimLeft().startsWith('1') && line.contains('2800.00'),
     );
     final total = lines.firstWhere(
       (line) => line.startsWith('TOTAL') && line.contains('2800.00'),
@@ -234,7 +307,8 @@ void main() {
 
     expect(billDateLine, contains('10/06/2024'));
     expect(billDateLine, contains('BILL NO:18134'));
-    expect(billDateLine.length, _cols);
+    expect(billDateLine.length, lessThanOrEqualTo(_cols));
+    expect(billDateLine.trim().length, lessThanOrEqualTo(30));
     expect(
       lines.where((line) => line.contains('10/06/2024')).length,
       1,
