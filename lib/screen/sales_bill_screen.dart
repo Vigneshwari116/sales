@@ -744,25 +744,19 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
       final int savedBillNo = _billNo;
 
-      final defaultPrinter = await PrinterSettingsService.getDefaultPrinter(
-        PrinterType.thermal,
-      );
+      final defaultPrinter =
+          await PrinterSettingsService.getDefaultPrinter(PrinterType.thermal) ??
+              '';
 
-      if (defaultPrinter == null || defaultPrinter.isEmpty) {
-        _showMessage(
-          'No printer selected. Please choose one in Printer Settings.',
+      try {
+        await BillPrintService.printReceipt(
+          bill,
+          printerName: defaultPrinter,
+          type: PrinterType.thermal,
         );
-      } else {
-        try {
-          await BillPrintService.printReceipt(
-            bill,
-            printerName: defaultPrinter,
-            type: PrinterType.thermal,
-          );
-          _showMessage('Bill $savedBillNo saved and printed');
-        } catch (e) {
-          _showMessage('Bill $savedBillNo saved (print failed: $e)');
-        }
+        _showMessage('Bill $savedBillNo saved and printed');
+      } catch (e) {
+        _showMessage('Bill $savedBillNo saved (print failed: $e)');
       }
 
       if (!mounted) return;
