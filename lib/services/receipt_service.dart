@@ -7,13 +7,16 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// Monospace columns for bill text (~70 mm PDF printable area).
-  static const int thermalContentColumns = 34;
+  /// Monospace columns for bill text (~66 mm PDF printable area).
+  static const int thermalContentColumns = 32;
 
   static const int _contentWidth = thermalContentColumns;
 
-  static const int _snoW = 4;
-  static const int _rateW = 7;
+  /// Bill no + date line uses 30 cols (2 spare vs printable width).
+  static const int _billDateLineMaxChars = 30;
+
+  static const int _snoW = 3;
+  static const int _rateW = 6;
   static const int _qtyW = 5;
   static const int _amountW = _contentWidth - _snoW - _rateW - _qtyW;
   static const int _labelW = _contentWidth - _amountW;
@@ -33,7 +36,6 @@ class ReceiptService {
     String locationCode,
   ) {
     final lines = <String>[];
-    final dateText = DateFormat('dd/MM/yyyy').format(bill.billDate);
     final profile = _locationProfile(locationCode);
     final separator = _separatorLine();
 
@@ -44,15 +46,16 @@ class ReceiptService {
     for (final gstinLine in _wrapToWidth('GSTIN:$gstin', _contentWidth)) {
       lines.add(_lineCentered(gstinLine));
     }
-    lines.add(_line(_billDateLine(bill.billNo, dateText)));
+    lines.add(_line(_billDateLine(bill.billNo, bill.billDate)));
     lines.add(_line(_fieldLine('NAME', bill.customerName)));
     lines.add(_line(_fieldLine('MOBILE', bill.mobile)));
     lines.add(separator);
     lines.add(_line(_itemHeader()));
     lines.add(separator);
 
-    for (final item in bill.items) {
-      lines.add(_line(_itemLine(item)));
+    for (var index = 0; index < bill.items.length; index++) {
+      final item = bill.items[index];
+      lines.add(_line(_itemLine(item, index + 1)));
       lines.add(separator);
       lines.addAll(_itemGstLines(item));
       lines.add(separator);
@@ -143,8 +146,8 @@ class ReceiptService {
         '${_padLeft('AMOUNT', _amountW)}';
   }
 
-  static String _itemLine(BillItem item) {
-    return '${_padRight('', _snoW)}'
+  static String _itemLine(BillItem item, int serialNo) {
+    return '${_padRight('$serialNo', _snoW)}'
         '${_padRight(_rate(item.rate), _rateW)}'
         '${_padRight(_qty(item.qty), _qtyW)}'
         '${_padLeft(_amount(item.grossAmt), _amountW)}';
@@ -177,22 +180,27 @@ class ReceiptService {
     return text.isEmpty ? '$label:' : '$label:$text';
   }
 
-  static String _billDateLine(int billNo, String dateText) {
+  static String _billDateLine(int billNo, DateTime billDate) {
     final left = 'BILL NO:$billNo';
-    for (final dateLabel in ['DATE:', 'DT:']) {
-      final right = '$dateLabel$dateText';
-      final gap = _contentWidth - left.length - right.length;
+    final dateFormats = [
+      DateFormat('dd/MM/yyyy'),
+      DateFormat('dd/MM/yy'),
+    ];
+
+    for (final format in dateFormats) {
+      final dateText = format.format(billDate);
+      final gap = _billDateLineMaxChars - left.length - dateText.length;
       if (gap >= 1) {
-        return '$left${' ' * gap}$right';
+        return '$left${' ' * gap}$dateText';
       }
     }
 
-    final right = 'DT:$dateText';
-    final maxLeft = _contentWidth - right.length - 1;
+    final dateText = DateFormat('dd/MM/yy').format(billDate);
+    final maxLeft = _billDateLineMaxChars - dateText.length - 1;
     final trimmedLeft =
         left.length > maxLeft ? left.substring(0, maxLeft) : left;
-    final gap = _contentWidth - trimmedLeft.length - right.length;
-    return '$trimmedLeft${' ' * gap}$right';
+    final gap = _billDateLineMaxChars - trimmedLeft.length - dateText.length;
+    return '$trimmedLeft${' ' * gap}$dateText';
   }
 
   static String _line(String content) {
