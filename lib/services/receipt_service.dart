@@ -7,14 +7,14 @@ class ReceiptService {
   static const String businessName = 'R K S ENTERPRIISES';
   static const String gstin = '29FNIPS8082N1ZS';
 
-  /// Monospace line width for bill text (fits 78 mm PDF printable area).
-  static const int thermalContentColumns = 42;
+  /// Monospace columns for bill text (~70 mm PDF printable area).
+  static const int thermalContentColumns = 34;
 
   static const int _contentWidth = thermalContentColumns;
 
   static const int _snoW = 4;
-  static const int _rateW = 8;
-  static const int _qtyW = 6;
+  static const int _rateW = 7;
+  static const int _qtyW = 5;
   static const int _amountW = _contentWidth - _snoW - _rateW - _qtyW;
   static const int _labelW = _contentWidth - _amountW;
 
@@ -35,11 +35,11 @@ class ReceiptService {
     final lines = <String>[];
     final dateText = DateFormat('dd/MM/yyyy').format(bill.billDate);
     final profile = _locationProfile(locationCode);
-    final separator = '-' * _contentWidth;
+    final separator = _separatorLine();
 
     lines.add(_lineCentered(businessName));
     for (final addressLine in _wrapToWidth(profile.addressLine, _contentWidth)) {
-      lines.add(_line(addressLine));
+      lines.add(_lineCentered(addressLine));
     }
     for (final gstinLine in _wrapToWidth('GSTIN:$gstin', _contentWidth)) {
       lines.add(_lineCentered(gstinLine));
@@ -54,7 +54,7 @@ class ReceiptService {
     for (final item in bill.items) {
       lines.add(_line(_itemLine(item)));
       lines.add(separator);
-      lines.add(_line(_itemGstLine(item)));
+      lines.addAll(_itemGstLines(item));
       lines.add(separator);
     }
 
@@ -70,6 +70,8 @@ class ReceiptService {
     lines.add(_lineCentered('THANK YOU VISIT AGAIN'));
     return lines;
   }
+
+  static String _separatorLine() => '-' * _contentWidth;
 
   static _LocationReceiptProfile _locationProfile(String locationCode) {
     switch (locationCode) {
@@ -148,9 +150,14 @@ class ReceiptService {
         '${_padLeft(_amount(item.grossAmt), _amountW)}';
   }
 
-  static String _itemGstLine(BillItem item) {
-    return 'CGST% ${_formatPct(item.cgstPct)}'
-        'SGST% ${_formatPct(item.sgstPct)}';
+  static List<String> _itemGstLines(BillItem item) {
+    final cgstPart = 'CGST% ${_formatPct(item.cgstPct)}';
+    final sgstPart = 'SGST% ${_formatPct(item.sgstPct)}';
+    final combined = '$cgstPart  $sgstPart';
+    if (combined.length <= _contentWidth) {
+      return [_line(combined)];
+    }
+    return [_line(cgstPart), _line(sgstPart)];
   }
 
   static String _totalLine(double qty, double grandTotal) {
@@ -167,22 +174,25 @@ class ReceiptService {
 
   static String _fieldLine(String label, String value) {
     final text = value.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
-    final line = text.isEmpty ? '$label:' : '$label:$text';
-    return _line(line);
+    return text.isEmpty ? '$label:' : '$label:$text';
   }
 
   static String _billDateLine(int billNo, String dateText) {
     final left = 'BILL NO:$billNo';
-    final right = 'DATE:$dateText';
-    final gap = _contentWidth - left.length - right.length;
-    if (gap < 1) {
-      final maxLeft = _contentWidth - right.length - 1;
-      final trimmedLeft =
-          left.length > maxLeft ? left.substring(0, maxLeft) : left;
-      final adjustedGap = _contentWidth - trimmedLeft.length - right.length;
-      return '$trimmedLeft${' ' * adjustedGap}$right';
+    for (final dateLabel in ['DATE:', 'DT:']) {
+      final right = '$dateLabel$dateText';
+      final gap = _contentWidth - left.length - right.length;
+      if (gap >= 1) {
+        return '$left${' ' * gap}$right';
+      }
     }
-    return '$left${' ' * gap}$right';
+
+    final right = 'DT:$dateText';
+    final maxLeft = _contentWidth - right.length - 1;
+    final trimmedLeft =
+        left.length > maxLeft ? left.substring(0, maxLeft) : left;
+    final gap = _contentWidth - trimmedLeft.length - right.length;
+    return '$trimmedLeft${' ' * gap}$right';
   }
 
   static String _line(String content) {
@@ -194,19 +204,17 @@ class ReceiptService {
   }
 
   static String _lineCentered(String content) {
-    return _center(_line(content));
-  }
-
-  static String _center(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      return '';
+    final clipped = _line(content);
+    if (clipped.isEmpty) {
+      return ' ' * _contentWidth;
     }
-    if (trimmed.length >= _contentWidth) {
-      return trimmed.substring(0, _contentWidth);
+    if (clipped.length >= _contentWidth) {
+      return clipped.substring(0, _contentWidth);
     }
-    final pad = ((_contentWidth - trimmed.length) / 2).floor();
-    return '${' ' * pad}$trimmed';
+    final pad = _contentWidth - clipped.length;
+    final left = pad ~/ 2;
+    final right = pad - left;
+    return '${' ' * left}$clipped${' ' * right}';
   }
 
   static String _padRight(String text, int width) {

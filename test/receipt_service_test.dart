@@ -4,7 +4,7 @@ import 'package:sales/screen/bill_item.dart';
 import 'package:sales/services/receipt_service.dart';
 
 const _cols = ReceiptService.thermalContentColumns;
-const _amountStart = 4 + 8 + 6;
+const _amountStart = 4 + 7 + 5;
 
 SaleBill _sampleBill({required String location}) {
   return SaleBill(
@@ -27,7 +27,7 @@ SaleBill _sampleBill({required String location}) {
 }
 
 void main() {
-  test('long address splits onto deliberate extra lines', () {
+  test('long address splits and each wrapped line is centered', () {
     final lines = ReceiptService.buildReceiptLines(
       _sampleBill(location: 'Win2'),
     );
@@ -41,10 +41,29 @@ void main() {
 
     expect(addressLines.length, greaterThan(1));
     for (final line in addressLines) {
-      expect(line.length, lessThanOrEqualTo(_cols));
+      expect(line.length, _cols);
+      _expectCentered(line);
     }
-    expect(lines.join('\n'), contains('TIPPSANDRA MAIN ROAD'));
-    expect(lines.join('\n'), contains('Bangalore-560075'));
+  });
+
+  test('second address line Bangalore-68 is centered under first', () {
+    final lines = ReceiptService.buildReceiptLines(_sampleBill(location: 'Win1'));
+    final bangaloreLine = lines.firstWhere((line) => line.contains('Bangalore-68'));
+
+    expect(bangaloreLine.length, _cols);
+    _expectCentered(bangaloreLine);
+    _expectLinesWithinWidth(lines);
+  });
+
+  test('header block is centered within content width', () {
+    final lines = ReceiptService.buildReceiptLines(_sampleBill(location: 'Win1'));
+    final title = lines.first;
+    final gstinLine = lines.firstWhere((line) => line.contains('GSTIN:'));
+
+    expect(title.length, _cols);
+    expect(gstinLine.length, _cols);
+    _expectCentered(title);
+    _expectCentered(gstinLine);
   });
 
   test('name and mobile are consecutive without blank lines', () {
@@ -58,12 +77,23 @@ void main() {
     final text = lines.join('\n');
 
     expect(text, contains('R K S ENTERPRIISES'));
-    expect(text, contains('KUDULU MAIN ROAD'));
+    expect(text, contains('KUDULU MAIN'));
+    expect(text, contains('Bangalore-68'));
     expect(text, contains('BILL NO:23258'));
-    expect(text, contains('DATE:04/09/2026'));
-    expect(text, contains('CGST% 2.5SGST% 2.5'));
+    expect(text, contains('04/09/2026'));
+    expect(text, contains('CGST% 2.5  SGST% 2.5'));
     expect(text, contains('GRAND TOTAL'));
+    expect(text, contains('1000.00'));
     _expectLinesWithinWidth(lines);
+  });
+
+  test('separator lines are exactly content width', () {
+    final lines = ReceiptService.buildReceiptLines(_sampleBill(location: 'Win1'));
+    final dashes = lines.where((line) => line == '-' * _cols).toList();
+    expect(dashes, isNotEmpty);
+    for (final line in dashes) {
+      expect(line.length, _cols);
+    }
   });
 
   test('empty customer name and mobile still print labels', () {
@@ -84,8 +114,8 @@ void main() {
     );
 
     final lines = ReceiptService.buildReceiptLines(bill);
-    expect(lines.any((l) => l == 'NAME:'), isTrue);
-    expect(lines.any((l) => l == 'MOBILE:'), isTrue);
+    expect(lines.any((l) => l.startsWith('NAME:')), isTrue);
+    expect(lines.any((l) => l.startsWith('MOBILE:')), isTrue);
     _expectLinesWithinWidth(lines);
   });
 
@@ -108,15 +138,16 @@ void main() {
 
     final lines = ReceiptService.buildReceiptLines(bill);
     final itemLine = lines.firstWhere((line) => line.contains('12345'));
-    expect(itemLine.length, lessThanOrEqualTo(_cols));
+    expect(itemLine.length, _cols);
     expect(itemLine.substring(_amountStart).trim(), '12345.00');
+    expect(lines.join('\n'), contains('12345.00'));
     _expectLinesWithinWidth(lines);
   });
 
-  test('many items each produce gst lines without wrapping columns', () {
+  test('many items each produce spaced cgst/sgst line', () {
     final items = List.generate(
       12,
-      (index) => BillItem(qty: 1, rate: 100 + index),
+      (index) => BillItem(qty: 1, rate: 100.0 + index),
     );
     final bill = SaleBill(
       billNo: 5000,
@@ -136,7 +167,7 @@ void main() {
 
     final lines = ReceiptService.buildReceiptLines(bill);
     expect(
-      lines.where((line) => line.contains('CGST% 2.5SGST% 2.5')).length,
+      lines.where((line) => line.contains('CGST% 2.5  SGST% 2.5')).length,
       12,
     );
     _expectLinesWithinWidth(lines);
@@ -167,7 +198,9 @@ void main() {
     final total = lines.firstWhere(
       (line) => line.startsWith('TOTAL') && line.contains('2800.00'),
     );
-    final cgst = lines.firstWhere((line) => line.startsWith('CGST'));
+    final cgst = lines.firstWhere(
+      (line) => line.startsWith('CGST') && line.contains('67.00'),
+    );
     final grand = lines.firstWhere((line) => line.startsWith('GRAND TOTAL'));
 
     expect(header.length, _cols);
@@ -179,7 +212,7 @@ void main() {
     _expectLinesWithinWidth(lines);
   });
 
-  test('bill no and date stay on one line', () {
+  test('bill no and full date stay on one line', () {
     final bill = SaleBill(
       billNo: 18134,
       location: 'Win2',
@@ -199,10 +232,13 @@ void main() {
     final lines = ReceiptService.buildReceiptLines(bill);
     final billDateLine = lines.firstWhere((line) => line.contains('BILL NO:'));
 
-    expect(billDateLine, contains('DATE:10/06/2024'));
+    expect(billDateLine, contains('10/06/2024'));
     expect(billDateLine, contains('BILL NO:18134'));
-    expect(billDateLine.length, lessThanOrEqualTo(_cols));
-    expect(lines.where((line) => line.contains('DATE:')).length, 1);
+    expect(billDateLine.length, _cols);
+    expect(
+      lines.where((line) => line.contains('10/06/2024')).length,
+      1,
+    );
   });
 }
 
@@ -214,4 +250,20 @@ void _expectLinesWithinWidth(List<String> lines) {
       reason: 'Line exceeds $_cols columns: "$line"',
     );
   }
+}
+
+void _expectCentered(String line) {
+  final trimmed = line.trim();
+  if (trimmed.isEmpty) {
+    return;
+  }
+  final start = line.indexOf(trimmed);
+  final end = start + trimmed.length;
+  final leftPad = start;
+  final rightPad = line.length - end;
+  expect(
+    (leftPad - rightPad).abs(),
+    lessThanOrEqualTo(1),
+    reason: 'Expected centered line: "$line"',
+  );
 }

@@ -11,10 +11,11 @@ import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
-  /// 78 mm roll width (bar/restaurant-style PDF thermal path).
-  static const double thermalPdfPageWidthMm = 78.0;
-  static const double thermalPdfMarginLeftMm = 1.5;
+  /// Thermal PDF tuning (3-inch / RP3200 roll) — adjust here only.
+  static const double thermalPdfPageWidthMm = 70.0;
   static const double thermalPdfMarginRightMm = 6.0;
+
+  static const double thermalPdfMarginLeftMm = 2.0;
   static const double thermalPdfMarginTopMm = 2.5;
   static const double thermalPdfMarginBottomMm = 4.0;
   static const double thermalPrintableWidthMm = thermalPdfPageWidthMm -
