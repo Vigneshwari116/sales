@@ -7,7 +7,12 @@ import 'package:sales/widgets/compact_layout.dart';
 
 /// Admin abstract with per-location filter (or all locations combined).
 class AdminCrossAbstractScreen extends StatefulWidget {
-  const AdminCrossAbstractScreen({super.key});
+  final int refreshGeneration;
+
+  const AdminCrossAbstractScreen({
+    super.key,
+    this.refreshGeneration = 0,
+  });
 
   @override
   State<AdminCrossAbstractScreen> createState() =>
@@ -28,6 +33,14 @@ class _AdminCrossAbstractScreenState extends State<AdminCrossAbstractScreen> {
   void initState() {
     super.initState();
     _loadSummary();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminCrossAbstractScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadSummary();
+    }
   }
 
   bool get _isDateRangeValid {

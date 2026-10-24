@@ -135,6 +135,88 @@ class LocationDatabase {
     return updated;
   }
 
+  /// Whether a saved bill for [locationDisplayName] can be updated on this device.
+  static Future<bool> canPersistSavedBill(String locationDisplayName) async {
+    final locationCode = _locationCodeFromDisplayName(locationDisplayName);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      try {
+        await LocalDb.instance.initialize();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    return File(path).exists();
+  }
+
+  /// Updates an existing bill row in the correct per-location database file.
+  static Future<void> persistSavedBill({
+    required SaleBill bill,
+    required String localId,
+    required String syncStatus,
+  }) async {
+    final locationCode = _locationCodeFromDisplayName(bill.location);
+    final updatePayload = _billUpdatePayload(bill, syncStatus);
+
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      await LocalDb.instance.updateSavedBill(
+        localId,
+        bill,
+        syncStatus: syncStatus,
+      );
+      return;
+    }
+
+    final path = await dbPathForLocationCode(locationCode);
+    final db = await _openWritableDatabase(path);
+
+    try {
+      final rowsUpdated = await db.update(
+        'bills',
+        updatePayload,
+        where: 'local_id = ?',
+        whereArgs: [localId],
+      );
+      if (rowsUpdated == 0) {
+        throw StateError('Bill $localId not found for ${bill.location}');
+      }
+    } finally {
+      await db.close();
+    }
+  }
+
+  static String _formatBillDate(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  static Map<String, Object?> _billUpdatePayload(
+    SaleBill bill,
+    String syncStatus,
+  ) {
+    return {
+      'bill_no': bill.billNo,
+      'location': bill.location,
+      'bill_date': _formatBillDate(bill.billDate),
+      'payment_mode': bill.paymentMode,
+      'customer_name': bill.customerName,
+      'mobile': bill.mobile,
+      'items_json': jsonEncode(bill.items.map((e) => e.toJson()).toList()),
+      'total_qty': bill.totalQty,
+      'total_amount': bill.totalAmount,
+      'total_cgst': bill.totalCgst,
+      'total_sgst': bill.totalSgst,
+      'total_igst': bill.totalIgst,
+      'grand_total': bill.grandTotal,
+      'sync_status': syncStatus,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
   static Future<SaleBill?> getBillByLocalId({
     required String locationCode,
     required String localId,

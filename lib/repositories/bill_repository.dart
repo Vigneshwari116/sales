@@ -1,9 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/app_config.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
+import 'package:sales/db/location_database.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/daily_total_service.dart';
 import 'package:sales/services/summary_update_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 
 class BillRepository {
   /// When set (tests only), replaces [SalesApi.saveBill] for faster, offline saves.
@@ -48,6 +52,10 @@ class BillRepository {
     return stored?.bill;
   }
 
+  static Future<bool> canUpdateBillOnDevice(String locationDisplayName) {
+    return LocationDatabase.canPersistSavedBill(locationDisplayName);
+  }
+
   static Future<SalesApiResult<int>> saveBill(
     SaleBill bill, {
     String? updateLocalId,
@@ -58,26 +66,32 @@ class BillRepository {
 
     SaleBill? previous;
     try {
+      previous = await _loadPreviousBill(bill, updateLocalId);
+
       if (updateLocalId != null) {
-        previous = await LocalDb.instance.getBillByLocalId(updateLocalId);
-      } else {
-        final existingId = await LocalDb.instance.findLocalIdByBillNo(
-          location: bill.location,
-          billNo: bill.billNo,
+        await LocationDatabase.persistSavedBill(
+          bill: bill,
+          localId: updateLocalId,
+          syncStatus: syncStatus,
         );
-        if (existingId != null) {
-          previous = await LocalDb.instance.getBillByLocalId(existingId);
+      } else {
+        final locationCode = locationCodeFromDisplayName(bill.location);
+        if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+          await LocalDb.instance.persistBill(
+            bill,
+            updateLocalId: updateLocalId,
+            syncStatus: syncStatus,
+          );
+        } else {
+          return SalesApiResult.failure(
+            'Cannot insert bill outside the active location database.',
+          );
         }
       }
 
-      await LocalDb.instance.persistBill(
-        bill,
-        updateLocalId: updateLocalId,
-        syncStatus: syncStatus,
-      );
-
       await SummaryUpdateService.onBillSaved(previous: previous, current: bill);
       DailyTotalService.pushBillDelta(current: bill, previous: previous);
+      UiRefreshService.notifyBillSaved();
       return SalesApiResult.success(bill.billNo);
     } catch (_) {
       if (apiResult.ok) {
@@ -85,5 +99,24 @@ class BillRepository {
       }
       return SalesApiResult.failure('Could not save bill locally.');
     }
+  }
+
+  static Future<SaleBill?> _loadPreviousBill(
+    SaleBill bill,
+    String? updateLocalId,
+  ) async {
+    if (updateLocalId == null) {
+      return null;
+    }
+
+    final locationCode = locationCodeFromDisplayName(bill.location);
+    if (AppConfig.isLocationSet && AppConfig.locationCode == locationCode) {
+      return LocalDb.instance.getBillByLocalId(updateLocalId);
+    }
+
+    return LocationDatabase.getBillByLocalId(
+      locationCode: locationCode,
+      localId: updateLocalId,
+    );
   }
 }

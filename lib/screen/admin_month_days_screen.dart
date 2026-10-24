@@ -76,6 +76,9 @@ class _AdminMonthDaysScreenState extends State<AdminMonthDaysScreen> {
         ),
       ),
     );
+
+    if (!mounted) return;
+    await _loadDays();
   }
 
   @override

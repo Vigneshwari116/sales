@@ -27,7 +27,6 @@ class DayBillRow {
   final String customerName;
   final String mobile;
   final String paymentMode;
-  final double totalQty;
   final double total;
   final double gst;
   final double grandTotal;
@@ -41,7 +40,6 @@ class DayBillRow {
     required this.customerName,
     required this.mobile,
     required this.paymentMode,
-    required this.totalQty,
     required this.total,
     required this.gst,
     required this.grandTotal,
@@ -159,7 +157,6 @@ class DayDrillDownRepository {
             customerName: entry.customerName,
             mobile: entry.mobile,
             paymentMode: entry.paymentMode,
-            totalQty: entry.totalQty,
             total: entry.totalAmount,
             gst: entry.totalCgst + entry.totalSgst + entry.totalIgst,
             grandTotal: entry.grandTotal,
