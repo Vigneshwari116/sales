@@ -249,8 +249,9 @@ void main() {
 
     await _pumpBillScreen(tester);
 
-    expect(find.text('S.no'), findsNothing);
-    expect(find.text('Grand Total'), findsNothing);
+    expect(find.text('S.NO'), findsOneWidget);
+    expect(find.text('GRAND'), findsOneWidget);
+    expect(find.text('CGST %'), findsNothing);
 
     await _savePng(
       tester,
@@ -279,9 +280,10 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
-    expect(find.text('CGST %'), findsOneWidget);
-    expect(find.text('Total'), findsOneWidget);
-    expect(find.text('Grand Total'), findsOneWidget);
+    expect(find.text('CGST %'), findsNothing);
+    expect(find.text('Total'), findsWidgets);
+    expect(find.text('GRAND'), findsOneWidget);
+    expect(find.textContaining('(total pcs)'), findsOneWidget);
 
     await _savePng(
       tester,

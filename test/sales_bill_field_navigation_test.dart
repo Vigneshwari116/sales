@@ -125,7 +125,6 @@ void main() {
     await tester.enterText(qtyField, '2');
     await tester.pump(const Duration(milliseconds: 800));
 
-    expect(find.byIcon(Icons.close), findsNothing);
     await tearDownBillScreen(tester);
   });
 
@@ -140,8 +139,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
-    expect(find.byIcon(Icons.close), findsNothing);
-
     await tearDownBillScreen(tester);
   });
 
@@ -156,7 +153,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Add items before printing'), findsOneWidget);
-    expect(find.byIcon(Icons.close), findsNothing);
 
     await tearDownBillScreen(tester);
   });
@@ -172,7 +168,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byKey(const Key('bill_table_row_0')), findsOneWidget);
 
     await tearDownBillScreen(tester);
   });
@@ -197,12 +193,12 @@ void main() {
 
     for (var i = 0; i < 80; i++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+      if (find.byKey(const Key('bill_table_row_0')).evaluate().isNotEmpty) {
         break;
       }
     }
 
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byKey(const Key('bill_table_row_0')), findsOneWidget);
 
     final mobileField = find.byKey(const Key('bill_mobile_field'));
     await tester.tap(mobileField);
@@ -241,7 +237,7 @@ void main() {
 
     for (var i = 0; i < 80; i++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (find.byIcon(Icons.close).evaluate().isNotEmpty) {
+      if (find.byKey(const Key('bill_table_row_0')).evaluate().isNotEmpty) {
         break;
       }
     }
@@ -253,7 +249,7 @@ void main() {
 
     expect(printTriggered, isTrue);
     expect(tester.widget<TextField>(rateField).controller?.text, '0');
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byKey(const Key('bill_table_row_0')), findsOneWidget);
 
     await tearDownBillScreen(tester);
   });
