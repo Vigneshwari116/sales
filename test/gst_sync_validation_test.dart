@@ -1,9 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sales/config/app_config.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     await AppConfig.setLocation('win1');
   });
 

@@ -298,7 +298,7 @@ void main() {
       expect(inserted!.syncStatus, 'synced');
     });
 
-    test('applyPulledBills does not overwrite pending local bills', () async {
+    test('applyPulledBills overwrites pending local bills (admin wins)', () async {
       final db = LocalDb.instance;
       await db.initialize();
 
@@ -315,14 +315,14 @@ void main() {
 
       final applied = await db.applyPulledBills([pulled]);
 
-      expect(applied, 0);
+      expect(applied, 1);
 
       final stored = await db.getBillByNumber(
         location: _testLocationName,
         billNo: 5,
       );
-      expect(stored!.bill.customerName, 'Local Pending');
-      expect(stored.syncStatus, 'pending');
+      expect(stored!.bill.customerName, 'Server Version');
+      expect(stored.syncStatus, 'synced');
     });
 
     test('applyPulledBills applies server-side soft delete', () async {

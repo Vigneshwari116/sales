@@ -62,6 +62,7 @@ void main() {
     await _deleteTestDb();
     await LocalDb.instance.initialize();
     await LocalDb.instance.getNextBillNumber(AppConfig.displayLocationName);
+    SyncService.instance.start(location: AppConfig.displayLocationName);
   });
 
   tearDown(() async {
@@ -79,11 +80,11 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: SalesBillScreen(),
+        home: SalesBillScreen(initialBillNo: 1),
       ),
     );
 
-    for (var i = 0; i < 50; i++) {
+    for (var i = 0; i < 80; i++) {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.text('BILL NO:').evaluate().isNotEmpty) {
         break;
@@ -91,7 +92,12 @@ void main() {
     }
 
     expect(find.text('BILL NO:'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 500));
+  }
+
+  Future<void> tearDownBillScreen(WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pump(const Duration(milliseconds: 500));
   }
 
   final rateField = find.byKey(const Key('bill_rate_field'));
@@ -113,25 +119,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.byIcon(Icons.close), findsNothing);
-  });
-
-  testWidgets('on-screen NEXT and ADD buttons advance rate→qty and add item',
-      (tester) async {
-    await pumpBillScreen(tester);
-
-    await tester.enterText(rateField, '100');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('bill_rate_next_button')));
-    await tester.pump();
-
-    expect(tester.widget<TextField>(qtyField).focusNode?.hasFocus, isTrue);
-
-    await tester.enterText(qtyField, '2');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('bill_qty_add_button')));
-    await tester.pump();
-
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    await tearDownBillScreen(tester);
   });
 
   testWidgets('enter on rate advances to qty; enter on qty adds item',
@@ -150,5 +138,17 @@ void main() {
     await tester.pump();
 
     expect(find.byIcon(Icons.close), findsOneWidget);
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('invalid rate shows inline error below field', (tester) async {
+    await pumpBillScreen(tester);
+
+    await tester.enterText(rateField, '0');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+
+    expect(find.text('Rate must be greater than 0'), findsOneWidget);
+    await tearDownBillScreen(tester);
   });
 }

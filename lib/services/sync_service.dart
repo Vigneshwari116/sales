@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 
 import 'package:meta/meta.dart';
 import 'package:sales/api/sales_api.dart';
+import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 
@@ -44,19 +45,15 @@ class ManualPushResult {
 class SyncService with WidgetsBindingObserver {
   static SyncService? _instance;
 
-  Timer? _periodicTimer;
-  bool _inForeground = true;
   bool _started = false;
   bool _autoPullInProgress = false;
   String? _location;
 
   final ValueNotifier<bool> manualPushInProgress = ValueNotifier(false);
 
-  /// When set, replaces [SalesApi.saveBill] (for tests only).
   @visibleForTesting
   Future<SalesApiResult<int>> Function(SaleBill bill)? saveBillOverride;
 
-  /// When set, replaces connectivity check (for tests only).
   @visibleForTesting
   Future<bool> Function()? isOnlineOverride;
 
@@ -79,6 +76,7 @@ class SyncService with WidgetsBindingObserver {
     _instance = null;
   }
 
+  /// Registers the active staff location — no periodic sync (event-driven only).
   void start({required String location}) {
     if (_started) {
       return;
@@ -87,10 +85,6 @@ class SyncService with WidgetsBindingObserver {
     _started = true;
     _location = location;
     WidgetsBinding.instance.addObserver(this);
-
-    autoPull(location);
-
-    _startPeriodicTimer();
   }
 
   void stop() {
@@ -101,42 +95,15 @@ class SyncService with WidgetsBindingObserver {
     _started = false;
     _location = null;
     WidgetsBinding.instance.removeObserver(this);
-    _periodicTimer?.cancel();
-    _periodicTimer = null;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _inForeground = state == AppLifecycleState.resumed;
-
-    if (_inForeground) {
-      _startPeriodicTimer();
-      final location = _location;
-      if (location != null) {
-        autoPull(location);
-      }
-    } else {
-      _periodicTimer?.cancel();
-      _periodicTimer = null;
-    }
+    // Event-driven sync only — no background pulls.
   }
 
-  void _startPeriodicTimer() {
-    _periodicTimer?.cancel();
-
-    if (!_inForeground || _location == null) {
-      return;
-    }
-
-    final location = _location!;
-    _periodicTimer = Timer.periodic(
-      const Duration(minutes: 2),
-      (_) => autoPull(location),
-    );
-  }
-
-  /// Silent, non-locking pull of admin edits from the server.
-  Future<void> autoPull(String location) async {
+  /// Pull admin edits from the server (admin always wins on conflict).
+  Future<void> pullAdminUpdates(String location) async {
     if (_autoPullInProgress) {
       return;
     }
@@ -148,7 +115,8 @@ class SyncService with WidgetsBindingObserver {
     _autoPullInProgress = true;
     try {
       final lastPull = await LocalDb.instance.getLastPullAt(location);
-      final since = lastPull ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      final since =
+          lastPull ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
       final result = await SalesApi.getBillUpdatesSince(
         location: location,
@@ -166,13 +134,73 @@ class SyncService with WidgetsBindingObserver {
 
       await LocalDb.instance.setLastPullAt(location, result.data!.serverTime);
     } catch (_) {
-      // Auto-pull is best-effort and must not interrupt bill entry.
+      // Best-effort pull.
     } finally {
       _autoPullInProgress = false;
     }
   }
 
-  /// Button-triggered push of pending local bills. Locks the UI while running.
+  /// Password-gated manual sync: push pending bills, pull admin bill edits + GST.
+  Future<ManualPushResult> manualSync(String location) async {
+    if (manualPushInProgress.value) {
+      return const ManualPushResult(
+        ok: false,
+        syncedCount: 0,
+        failedCount: 0,
+        error: 'Sync already in progress',
+      );
+    }
+
+    if (!await (isOnlineOverride?.call() ?? _isOnline())) {
+      return const ManualPushResult(
+        ok: false,
+        syncedCount: 0,
+        failedCount: 0,
+        error: 'No internet connection',
+      );
+    }
+
+    manualPushInProgress.value = true;
+    var syncedCount = 0;
+    var failedCount = 0;
+
+    try {
+      final pushResult = await manualPush(location);
+      syncedCount = pushResult.syncedCount;
+      failedCount = pushResult.failedCount;
+
+      await pullAdminUpdates(location);
+
+      final locationCode = _locationCodeFromDisplayName(location);
+      await SalesApi.pullGstMasterData(locationCode);
+
+      if (failedCount > 0) {
+        return ManualPushResult(
+          ok: false,
+          syncedCount: syncedCount,
+          failedCount: failedCount,
+          error: pushResult.error,
+        );
+      }
+
+      return ManualPushResult(
+        ok: true,
+        syncedCount: syncedCount,
+        failedCount: failedCount,
+      );
+    } catch (_) {
+      return ManualPushResult(
+        ok: false,
+        syncedCount: syncedCount,
+        failedCount: failedCount,
+        error: 'Could not sync',
+      );
+    } finally {
+      manualPushInProgress.value = false;
+    }
+  }
+
+  /// Push pending local bills only.
   Future<ManualPushResult> manualPush(String location) async {
     if (manualPushInProgress.value) {
       return const ManualPushResult(
@@ -230,6 +258,21 @@ class SyncService with WidgetsBindingObserver {
       );
     } finally {
       manualPushInProgress.value = false;
+    }
+  }
+
+  String _locationCodeFromDisplayName(String location) {
+    switch (location) {
+      case 'Win1':
+        return 'win1';
+      case 'Win2':
+        return 'win2';
+      case 'Win3':
+        return 'win3';
+      case 'Win4':
+        return 'win4';
+      default:
+        return AppConfig.locationCode;
     }
   }
 

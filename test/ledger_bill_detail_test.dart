@@ -36,6 +36,7 @@ void main() {
       MaterialApp(
         home: LedgerBillDetailScreen(
           bill: bill,
+          localId: 'detail-test-id',
           syncStatus: 'synced',
         ),
       ),
@@ -51,6 +52,30 @@ void main() {
     expect(find.text('1'), findsWidgets);
     expect(find.text('2'), findsWidgets);
     expect(find.text('Grand Total'), findsOneWidget);
+  });
+
+  testWidgets('double-tapping mobile shows compact password field', (tester) async {
+    final bill = _sampleBill();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LedgerBillDetailScreen(
+          bill: bill,
+          localId: 'detail-test-id',
+          syncStatus: 'synced',
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('9876543210'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Password'), findsNothing);
+
+    await tester.tap(find.text('9876543210'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
   });
 
   testWidgets('shows empty items message when bill has no line items', (tester) async {
@@ -72,7 +97,11 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: LedgerBillDetailScreen(bill: bill, syncStatus: 'pending'),
+        home: LedgerBillDetailScreen(
+          bill: bill,
+          localId: 'empty-bill-id',
+          syncStatus: 'pending',
+        ),
       ),
     );
 

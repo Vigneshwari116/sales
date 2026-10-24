@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sales/config/app_config.dart';
-import 'package:sales/services/credential_service.dart';
+import 'package:sales/config/local_credentials.dart';
 import 'package:sales/screen/admin_login_screen.dart';
+import 'package:sales/screen/staff_dashboard_screen.dart';
 import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
-import 'sales_bill_screen.dart';
 
-/// Local login gate — credentials checked offline; location picked separately.
+/// Local login gate — username determines location (win1–win4).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -23,15 +23,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   String? _error;
 
-  final List<String> _locationCodes = const [
-    'win1',
-    'win2',
-    'win3',
-    'win4',
-  ];
-
-  String _selectedLocationCode = 'win1';
-
   @override
   void dispose() {
     _userCtrl.dispose();
@@ -42,25 +33,27 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    var username = _userCtrl.text.trim();
-    var password = _passCtrl.text.trim();
+    final username = _userCtrl.text.trim();
+    final password = _passCtrl.text.trim();
 
-    if (!await CredentialService.verifyStaff(username, password)) {
+    if (!verifyStaffLogin(username, password)) {
       setState(() => _error = 'Incorrect username or password.');
       return;
     }
 
     setState(() => _error = null);
 
+    final locationCode = staffLocationCodeForUsername(username);
+
     await SessionService.clearBillSession();
-    await AppConfig.setLocation(_selectedLocationCode);
+    await AppConfig.setLocation(locationCode);
     await AppSessionService.onLoginComplete();
     await SessionService.saveLogin(username, role: SessionRole.staff);
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const SalesBillScreen()),
+      MaterialPageRoute(builder: (_) => const StaffDashboardScreen()),
     );
   }
 
@@ -110,28 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLocationCode,
-                      decoration: const InputDecoration(
-                        labelText: 'Location',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on_outlined),
-                      ),
-                      items: _locationCodes.map((code) {
-                        return DropdownMenuItem<String>(
-                          value: code,
-                          child: Text(
-                            AppConfig.displayLocationNameFor(code),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _selectedLocationCode = value);
-                      },
-                    ),
-                    const SizedBox(height: 14),
                     TextFormField(
                       controller: _userCtrl,
                       autocorrect: false,
@@ -164,7 +135,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _login(),
                     ),
@@ -196,10 +168,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: _openAdminLogin,
-                      child: const Text('Admin login'),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        tooltip: 'Switch login',
+                        onPressed: _openAdminLogin,
+                        icon: const Icon(Icons.swap_horiz, size: 20),
+                      ),
                     ),
                   ],
                 ),

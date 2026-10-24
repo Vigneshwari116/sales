@@ -4,10 +4,12 @@ import 'package:sales/repositories/abstract_repository.dart';
 
 class SalesAbstractScreen extends StatefulWidget {
   final String location;
+  final int refreshGeneration;
 
   const SalesAbstractScreen({
     super.key,
     required this.location,
+    this.refreshGeneration = 0,
   });
 
   @override
@@ -28,6 +30,15 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
   void initState() {
     super.initState();
     _loadSummary();
+  }
+
+  @override
+  void didUpdateWidget(covariant SalesAbstractScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.location != oldWidget.location ||
+        widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadSummary();
+    }
   }
 
   bool get _isDateRangeValid {
@@ -174,19 +185,13 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                   ],
                   const SizedBox(height: 20),
                   _summaryRow(
-                    'Total Sale Amount',
+                    'Total sales',
                     _formatMoney(_summary?.totalSaleAmount ?? 0),
                   ),
                   const SizedBox(height: 10),
                   _summaryRow(
                     'Total GST',
                     _formatMoney(_summary?.totalGst ?? 0),
-                  ),
-                  const SizedBox(height: 10),
-                  _summaryRow(
-                    'Grand Total',
-                    _formatMoney(_summary?.grandTotal ?? 0),
-                    bold: true,
                   ),
                 ],
               ),

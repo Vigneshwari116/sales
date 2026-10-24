@@ -15,16 +15,25 @@ import 'package:sales/screen/number%20to%20words.dart';
 import 'login_screen.dart';
 import 'sales_ledger_screen.dart';
 import 'package:sales/services/printer_settings_service.dart';
+import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/services/sync_service.dart';
-import 'package:sales/services/owner_delete_service.dart';
 
 class SalesBillScreen extends StatefulWidget {
+  /// When true, navigation is provided by [StaffDashboardScreen].
+  final bool embeddedInDashboard;
+
   /// When set (tests only), replaces the default [SalesLedgerScreen] route.
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
 
+  /// When set (tests only), skips async local DB bill-number load on open.
+  @visibleForTesting
+  final int? initialBillNo;
+
   const SalesBillScreen({
     super.key,
+    this.embeddedInDashboard = false,
+    this.initialBillNo,
     this.ledgerScreenBuilder,
   });
 
@@ -64,9 +73,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   bool _busy = false;
   bool _manualPushInProgress = false;
-  bool _showOwnerPasswordField = false;
-  String? _ownerPasswordError;
   String? _currentBillLocalId;
+  String? _rateError;
+  String? _qtyError;
+  double _cgstPct = GstConfigService.defaultCgstPct;
+  double _sgstPct = GstConfigService.defaultSgstPct;
 
   // ============================================================
   // BILL DATE
@@ -95,9 +106,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   final TextEditingController _mobileController =
   TextEditingController();
-
-  final TextEditingController _ownerPasswordController =
-      TextEditingController();
 
   // ============================================================
   // RATE / QTY
@@ -143,11 +151,20 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _manualPushInProgress = SyncService.instance.manualPushInProgress.value;
     SyncService.instance.manualPushInProgress.addListener(_onManualPushChanged);
 
-    _restoreSessionOrLoadBill().then((_) {
-      if (mounted) {
-        _focusRate();
-      }
-    });
+    _loadGstRates();
+
+    if (widget.initialBillNo != null) {
+      _billNo = widget.initialBillNo!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusRate();
+      });
+    } else {
+      _restoreSessionOrLoadBill().then((_) {
+        if (mounted) {
+          _focusRate();
+        }
+      });
+    }
   }
 
   void _onManualPushChanged() {
@@ -159,6 +176,16 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   bool get _isEntryLocked => _busy || _manualPushInProgress;
+
+  Future<void> _loadGstRates() async {
+    final cgst = await GstConfigService.cgstPct();
+    final sgst = await GstConfigService.sgstPct();
+    if (!mounted) return;
+    setState(() {
+      _cgstPct = cgst;
+      _sgstPct = sgst;
+    });
+  }
 
   Future<void> _syncNow() async {
     final result =
@@ -200,6 +227,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     });
 
     await _loadBillNumber();
+    if (!mounted) return;
   }
 
   Future<void> _persistSession() async {
@@ -265,15 +293,46 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   void _rateChanged(String value) {
-    setState(() {});
+    setState(() {
+      if (_rateError != null) {
+        _rateError = null;
+      }
+    });
   }
 
-  // ============================================================
-  // QTY CHANGED — updates live amount display only (no auto-add).
-  // ============================================================
-
   void _qtyChanged(String value) {
-    setState(() {});
+    setState(() {
+      if (_qtyError != null) {
+        _qtyError = null;
+      }
+    });
+  }
+
+  void _clearEntryErrors() {
+    _rateError = null;
+    _qtyError = null;
+  }
+
+  bool _validateRate({bool focusOnError = true}) {
+    final rate = double.tryParse(_rateController.text);
+    if (rate == null || rate <= 0) {
+      setState(() => _rateError = 'Rate must be greater than 0');
+      if (focusOnError) _focusRate();
+      return false;
+    }
+    setState(() => _rateError = null);
+    return true;
+  }
+
+  bool _validateQty({bool focusOnError = true}) {
+    final qty = double.tryParse(_qtyController.text);
+    if (qty == null || qty <= 0) {
+      setState(() => _qtyError = 'Quantity must be greater than 0');
+      if (focusOnError) _focusQty();
+      return false;
+    }
+    setState(() => _qtyError = null);
+    return true;
   }
 
   // ============================================================
@@ -281,76 +340,37 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   void _rateSubmitted() {
-    final double? rate =
-    double.tryParse(_rateController.text);
-
-    if (rate == null || rate <= 0) {
-      _showMessage('Rate must be greater than 0');
-      _focusRate();
+    if (!_validateRate()) {
       return;
     }
 
     _focusQty();
   }
 
-  // ============================================================
-  // QTY ENTER
-  // ============================================================
-
   void _qtySubmitted() {
-    final double? rate =
-    double.tryParse(_rateController.text);
-
-    final double? qty =
-    double.tryParse(_qtyController.text);
-
-    if (rate == null || rate <= 0) {
-      _showMessage('Rate must be greater than 0');
-      _focusRate();
-      return;
-    }
-
-    if (qty == null || qty <= 0) {
-      _showMessage('Quantity must be greater than 0');
-      _focusQty();
+    if (!_validateRate() || !_validateQty()) {
       return;
     }
 
     _addItem();
   }
 
-  // ============================================================
-  // ADD ITEM
-  // ============================================================
-
   void _addItem() {
-    final double? rate =
-    double.tryParse(_rateController.text);
-
-    final double? qty =
-    double.tryParse(_qtyController.text);
-
-    if (rate == null || rate <= 0) {
-      _showMessage('Rate must be greater than 0');
-      _focusRate();
+    if (!_validateRate() || !_validateQty()) {
       return;
     }
 
-    if (qty == null || qty <= 0) {
-      _showMessage('Quantity must be greater than 0');
-      _focusQty();
-      return;
-    }
+    final rate = double.parse(_rateController.text);
+    final qty = double.parse(_qtyController.text);
 
     setState(() {
+      _clearEntryErrors();
       _items.add(
         BillItem(
           qty: qty,
           rate: rate,
-
-          // Legacy GST
-          cgstPct: 2.5,
-          sgstPct: 2.5,
+          cgstPct: _cgstPct,
+          sgstPct: _sgstPct,
           igstPct: 0,
         ),
       );
@@ -408,41 +428,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _selectedIndex = null;
 
     _billSaved = false;
-    _showOwnerPasswordField = false;
-    _ownerPasswordError = null;
-    _ownerPasswordController.clear();
     _currentBillLocalId = null;
-  }
-
-  void _onOwnerUnlockDoubleTap() {
-    if (OwnerDeleteService.instance.isDeleteEnabled) {
-      return;
-    }
-
-    setState(() {
-      _showOwnerPasswordField = true;
-      _ownerPasswordError = null;
-      _ownerPasswordController.clear();
-    });
-  }
-
-  Future<void> _tryUnlockOwnerDelete() async {
-    final unlocked = await OwnerDeleteService.instance.tryUnlockWithPin(
-      _ownerPasswordController.text,
-    );
-
-    if (!mounted) return;
-
-    if (!unlocked) {
-      setState(() => _ownerPasswordError = 'Incorrect password');
-      return;
-    }
-
-    setState(() {
-      _showOwnerPasswordField = false;
-      _ownerPasswordError = null;
-      _ownerPasswordController.clear();
-    });
   }
 
   // ============================================================
@@ -715,7 +701,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _updateAmountDisplay();
 
     final width = MediaQuery.sizeOf(context).width;
-    final useSidebarLayout = width > _sidebarBreakpoint;
+    final useSidebarLayout =
+        !widget.embeddedInDashboard && width > _sidebarBreakpoint;
     final mobileBillLayout = width < _desktopBreakpoint;
 
     return _buildRootScaffold(
@@ -733,6 +720,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     final body = mobileBillLayout
         ? _buildMobileBody(context)
         : _buildDesktopBody();
+
+    if (widget.embeddedInDashboard) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        body: _buildLockedBody(body),
+      );
+    }
 
     if (useSidebarLayout) {
       return Scaffold(
@@ -1216,12 +1210,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onDoubleTap: _onOwnerUnlockDoubleTap,
-            child: const Text(
-              'Customer Details',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-            ),
+          const Text(
+            'Customer Details',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 5),
           Row(
@@ -1267,58 +1258,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             ],
           ),
 
-          if (_showOwnerPasswordField &&
-              !OwnerDeleteService.instance.isDeleteEnabled) ...[
-            const SizedBox(height: 5),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(
-                  width: 45,
-                  child: Text(
-                    'Password',
-                    style: TextStyle(fontSize: 10),
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        height: 27,
-                        child: TextField(
-                          controller: _ownerPasswordController,
-                          obscureText: true,
-                          autofocus: true,
-                          onSubmitted: (_) => _tryUnlockOwnerDelete(),
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 0,
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ),
-                      if (_ownerPasswordError != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _ownerPasswordError!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1529,52 +1468,26 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           mobile ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
       children: [
         fields,
-        const SizedBox(height: 6),
-        _buildRateQtyActionButtons(mobile: mobile),
-      ],
-    );
-  }
-
-  /// Touch/tablet fallback: iOS decimal pads ignore [TextInputAction] and
-  /// often have no submit key; Android numeric keyboards are inconsistent.
-  Widget _buildRateQtyActionButtons({required bool mobile}) {
-    final buttonStyle = ElevatedButton.styleFrom(
-      backgroundColor: buttonColor,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-    );
-
-    final nextButton = ElevatedButton(
-      key: const Key('bill_rate_next_button'),
-      style: buttonStyle,
-      onPressed: _isEntryLocked ? null : _rateSubmitted,
-      child: const Text('NEXT'),
-    );
-
-    final addButton = ElevatedButton(
-      key: const Key('bill_qty_add_button'),
-      style: buttonStyle,
-      onPressed: _isEntryLocked ? null : _qtySubmitted,
-      child: const Text('ADD'),
-    );
-
-    if (mobile) {
-      return Row(
-        children: [
-          Expanded(child: nextButton),
-          const SizedBox(width: 8),
-          Expanded(child: addButton),
+        if (_rateError != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _rateError!,
+              style: const TextStyle(color: Colors.red, fontSize: 10),
+            ),
+          ),
         ],
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(width: 100, child: nextButton),
-        const SizedBox(width: 12),
-        SizedBox(width: 100, child: addButton),
+        if (_qtyError != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _qtyError!,
+              style: const TextStyle(color: Colors.red, fontSize: 10),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2020,8 +1933,6 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _customerNameController.dispose();
 
     _mobileController.dispose();
-
-    _ownerPasswordController.dispose();
 
     _rateController.dispose();
 

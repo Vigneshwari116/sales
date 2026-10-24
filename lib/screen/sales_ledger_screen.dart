@@ -4,14 +4,16 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/ledger_repository.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
-import 'package:sales/services/owner_delete_service.dart';
+import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
 
 class SalesLedgerScreen extends StatefulWidget {
   final String location;
   final bool autoRefreshOnOpen;
+  final bool embeddedInDashboard;
+  final bool readOnly;
+  final int refreshGeneration;
 
-  /// When set (tests only), bypasses [LedgerRepository.getLedger].
   @visibleForTesting
   final Future<
       ({
@@ -19,21 +21,18 @@ class SalesLedgerScreen extends StatefulWidget {
         LedgerSummary summary,
       })>? Function()? loadLedgerOverride;
 
-  /// When set (tests only), bypasses [LedgerRepository.getBillByLocalId].
   @visibleForTesting
   final Future<SaleBill?> Function(String localId)? loadBillOverride;
-
-  /// When set (tests only), bypasses [LedgerRepository.softDeleteBill].
-  @visibleForTesting
-  final Future<void> Function(String localId)? softDeleteBillOverride;
 
   const SalesLedgerScreen({
     super.key,
     required this.location,
     this.autoRefreshOnOpen = true,
+    this.embeddedInDashboard = false,
+    this.readOnly = false,
+    this.refreshGeneration = 0,
     this.loadLedgerOverride,
     this.loadBillOverride,
-    this.softDeleteBillOverride,
   });
 
   @override
@@ -44,21 +43,18 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   static const Color _background = Color(0xFFC5F6C5);
   static const Color _header = Color(0xFFFFF5C5);
   static const Color _border = Color(0xFF888888);
+  static const Color _navSurface = Color(0xFFE8F5E8);
+  static const double _tableMinWidth = 980;
 
   bool _loading = true;
   bool _pulling = false;
   bool _pushing = false;
-  bool _showOwnerPasswordField = false;
-  String? _ownerPasswordError;
   List<LocalLedgerEntry> _entries = [];
   LedgerSummary? _summary;
-
-  final TextEditingController _ownerPasswordController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    OwnerDeleteService.instance.addListener(_onOwnerDeleteChanged);
     _loadLedger();
     if (widget.autoRefreshOnOpen) {
       _pullInBackground();
@@ -66,16 +62,11 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   @override
-  void dispose() {
-    OwnerDeleteService.instance.removeListener(_onOwnerDeleteChanged);
-    OwnerDeleteService.instance.disable();
-    _ownerPasswordController.dispose();
-    super.dispose();
-  }
-
-  void _onOwnerDeleteChanged() {
-    if (mounted) {
-      setState(() {});
+  void didUpdateWidget(covariant SalesLedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.location != oldWidget.location ||
+        widget.refreshGeneration != oldWidget.refreshGeneration) {
+      _loadLedger();
     }
   }
 
@@ -109,7 +100,7 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   Future<void> _pullInBackground() async {
     setState(() => _pulling = true);
 
-    await LedgerRepository.refreshFromServer(location: widget.location);
+    await SyncService.instance.pullAdminUpdates(widget.location);
 
     if (!mounted) return;
 
@@ -118,9 +109,12 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
   }
 
   Future<void> _syncNow() async {
+    final allowed = await SyncGateService.confirmSync(context);
+    if (!allowed || !mounted) return;
+
     setState(() => _pushing = true);
 
-    final result = await SyncService.instance.manualPush(widget.location);
+    final result = await SyncService.instance.manualSync(widget.location);
 
     if (!mounted) return;
 
@@ -138,46 +132,6 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     await _pullInBackground();
   }
 
-  void _onOwnerUnlockDoubleTap() {
-    if (OwnerDeleteService.instance.isDeleteEnabled) {
-      return;
-    }
-
-    setState(() {
-      _showOwnerPasswordField = true;
-      _ownerPasswordError = null;
-      _ownerPasswordController.clear();
-    });
-  }
-
-  Future<void> _tryUnlockOwnerDelete() async {
-    final unlocked = await OwnerDeleteService.instance.tryUnlockWithPin(
-      _ownerPasswordController.text,
-    );
-
-    if (!mounted) return;
-
-    if (!unlocked) {
-      setState(() => _ownerPasswordError = 'Incorrect password');
-      return;
-    }
-
-    setState(() {
-      _showOwnerPasswordField = false;
-      _ownerPasswordError = null;
-      _ownerPasswordController.clear();
-    });
-  }
-
-  Future<void> _deleteBill(LocalLedgerEntry entry) async {
-    if (widget.softDeleteBillOverride != null) {
-      await widget.softDeleteBillOverride!(entry.localId);
-    } else {
-      await LedgerRepository.softDeleteBill(entry.localId);
-    }
-    await _loadLedger();
-  }
-
   Future<void> _viewBill(LocalLedgerEntry entry) async {
     final bill = widget.loadBillOverride != null
         ? await widget.loadBillOverride!(entry.localId)
@@ -192,14 +146,20 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       return;
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => LedgerBillDetailScreen(
           bill: bill,
+          localId: entry.localId,
           syncStatus: entry.syncStatus,
+          readOnly: widget.readOnly,
         ),
       ),
     );
+
+    if (updated == true) {
+      await _loadLedger();
+    }
   }
 
   String _formatMoney(double value) {
@@ -217,48 +177,28 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final deleteEnabled = OwnerDeleteService.instance.isDeleteEnabled;
-
     return Scaffold(
       backgroundColor: _background,
-      appBar: AppBar(
-        title: GestureDetector(
-          onDoubleTap: _onOwnerUnlockDoubleTap,
-          child: const Text(
-            'SALES LEDGER',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ),
-        backgroundColor: const Color(0xFFD5D8D5),
-        foregroundColor: Colors.black,
-        actions: [
-          if (_pulling)
-            const Padding(
-              padding: EdgeInsets.only(right: 4),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      appBar: widget.embeddedInDashboard
+          ? AppBar(
+              title: const Text(
+                'SALES LEDGER',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
+              backgroundColor: _navSurface,
+              foregroundColor: Colors.black,
+              automaticallyImplyLeading: false,
+              actions: _buildAppBarActions(),
+            )
+          : AppBar(
+              title: const Text(
+                'SALES LEDGER',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              backgroundColor: const Color(0xFFD5D8D5),
+              foregroundColor: Colors.black,
+              actions: _buildAppBarActions(),
             ),
-          TextButton.icon(
-            onPressed: _pushing ? null : _syncNow,
-            icon: _pushing
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.cloud_upload_outlined, size: 18),
-            label: const Text('Sync Now'),
-          ),
-          IconButton(
-            onPressed: _refreshLedger,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -266,15 +206,20 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_showOwnerPasswordField && !deleteEnabled)
-                    _buildOwnerPasswordPrompt(),
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
+                        final tableWidth = constraints.maxWidth > _tableMinWidth
+                            ? constraints.maxWidth
+                            : _tableMinWidth;
+
                         return SingleChildScrollView(
-                          child: SizedBox(
-                            width: constraints.maxWidth,
-                            child: _buildTable(deleteEnabled),
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: _buildTable(),
+                            ),
                           ),
                         );
                       },
@@ -286,57 +231,38 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
     );
   }
 
-  Widget _buildOwnerPasswordPrompt() {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Owner password',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _ownerPasswordController,
-                    obscureText: true,
-                    autofocus: true,
-                    onSubmitted: (_) => _tryUnlockOwnerDelete(),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _tryUnlockOwnerDelete,
-                  child: const Text('Unlock'),
-                ),
-              ],
-            ),
-            if (_ownerPasswordError != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                _ownerPasswordError!,
-                style: const TextStyle(color: Colors.red, fontSize: 11),
-              ),
-            ],
-          ],
+  List<Widget> _buildAppBarActions() {
+    return [
+      if (_pulling)
+        const Padding(
+          padding: EdgeInsets.only(right: 4),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
         ),
+      if (!widget.readOnly)
+        TextButton.icon(
+          onPressed: _pushing ? null : _syncNow,
+          icon: _pushing
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.cloud_upload_outlined, size: 18),
+          label: const Text('Sync Now'),
+        ),
+      IconButton(
+        onPressed: _refreshLedger,
+        icon: const Icon(Icons.refresh),
+        tooltip: 'Refresh',
       ),
-    );
+    ];
   }
 
-  Widget _buildTable(bool deleteEnabled) {
+  Widget _buildTable() {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -346,138 +272,89 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _headerRow(deleteEnabled),
-          ..._entries.map((entry) => _dataRow(entry, deleteEnabled)),
-          if (_summary != null) _summaryRow(deleteEnabled),
+          _headerRow(),
+          ..._entries.map(_dataRow),
+          if (_summary != null) _summaryRow(),
         ],
       ),
     );
   }
 
-  Widget _headerRow(bool deleteEnabled) {
+  Widget _headerRow() {
     return Container(
       color: _header,
       child: Row(
         children: [
-          _cell('BILLNO', 1, bold: true),
-          _cell('DATE', 1, bold: true),
-          _cell('NAME', 2, bold: true),
-          _cell('', 1, bold: true),
-          _cell('TOTAL', 1, bold: true, alignRight: true),
-          _cell('CGST', 1, bold: true, alignRight: true),
-          _cell('SGST', 1, bold: true, alignRight: true),
-          _cell('IGST', 1, bold: true, alignRight: true),
-          _cell('GRAND TOTAL', 1, bold: true, alignRight: true),
-          if (deleteEnabled) _deleteHeaderCell(),
+          _cell('BILLNO', 70, bold: true),
+          _cell('DATE', 80, bold: true),
+          _cell('NAME', 130, bold: true),
+          _cell('MOBILE', 110, bold: true),
+          _cell('PAY', 70, bold: true),
+          _cell('TOTAL', 80, bold: true, alignRight: true),
+          _cell('CGST', 70, bold: true, alignRight: true),
+          _cell('SGST', 70, bold: true, alignRight: true),
+          _cell('IGST', 70, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', 90, bold: true, alignRight: true),
         ],
       ),
     );
   }
 
-  Widget _dataRow(LocalLedgerEntry entry, bool deleteEnabled) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _viewBill(entry),
-            child: Row(
-              children: [
-                _cell('${entry.billNo}', 1),
-                _cell(_formatDate(entry.date), 1),
-                _cell(entry.customerName, 2),
-                _cell(entry.paymentMode, 1),
-                _cell(_formatMoney(entry.total), 1, alignRight: true),
-                _cell(_formatMoney(entry.cgst), 1, alignRight: true),
-                _cell(_formatMoney(entry.sgst), 1, alignRight: true),
-                _cell(_formatMoney(entry.igst), 1, alignRight: true),
-                _cell(_formatMoney(entry.grandTotal), 1, alignRight: true),
-              ],
-            ),
-          ),
-        ),
-        if (deleteEnabled) _deleteCell(entry),
-      ],
+  Widget _dataRow(LocalLedgerEntry entry) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _viewBill(entry),
+      child: Row(
+        children: [
+          _cell('${entry.billNo}', 70),
+          _cell(_formatDate(entry.date), 80),
+          _cell(entry.customerName, 130),
+          _cell(entry.mobile.isEmpty ? '—' : entry.mobile, 110),
+          _cell(entry.paymentMode, 70),
+          _cell(_formatMoney(entry.total), 80, alignRight: true),
+          _cell(_formatMoney(entry.cgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.sgst), 70, alignRight: true),
+          _cell(_formatMoney(entry.igst), 70, alignRight: true),
+          _cell(_formatMoney(entry.grandTotal), 90, alignRight: true),
+        ],
+      ),
     );
   }
 
-  Widget _summaryRow(bool deleteEnabled) {
+  Widget _summaryRow() {
     final summary = _summary!;
     return Container(
       color: const Color(0xFFE8F4E8),
       child: Row(
         children: [
-          _cell('', 1, bold: true),
-          _cell('', 1, bold: true),
-          _cell('', 2, bold: true),
-          _cell('', 1, bold: true),
-          _cell(_formatMoney(summary.total), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.cgst), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.sgst), 1, bold: true, alignRight: true),
-          _cell(_formatMoney(summary.igst), 1, bold: true, alignRight: true),
+          _cell('', 70, bold: true),
+          _cell('', 80, bold: true),
+          _cell('', 130, bold: true),
+          _cell('', 110, bold: true),
+          _cell('', 70, bold: true),
+          _cell(_formatMoney(summary.total), 80, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.cgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.sgst), 70, bold: true, alignRight: true),
+          _cell(_formatMoney(summary.igst), 70, bold: true, alignRight: true),
           _cell(
             _formatMoney(summary.grandTotal),
-            1,
+            90,
             bold: true,
             alignRight: true,
           ),
-          if (deleteEnabled) _deleteHeaderCell(),
         ],
-      ),
-    );
-  }
-
-  Widget _deleteHeaderCell() {
-    return SizedBox(
-      width: 34,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: _border, width: 0.6),
-            bottom: BorderSide(color: _border, width: 0.6),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _deleteCell(LocalLedgerEntry entry) {
-    return SizedBox(
-      width: 34,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: _border, width: 0.6),
-            bottom: BorderSide(color: _border, width: 0.6),
-          ),
-        ),
-        child: IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          icon: const Text(
-            'X',
-            style: TextStyle(
-              color: Colors.red,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          tooltip: 'Delete bill',
-          onPressed: () => _deleteBill(entry),
-        ),
       ),
     );
   }
 
   Widget _cell(
     String text,
-    int flex, {
+    double width, {
     bool bold = false,
     bool alignRight = false,
   }) {
-    return Expanded(
-      flex: flex,
+    return SizedBox(
+      width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
