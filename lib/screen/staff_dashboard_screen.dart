@@ -13,6 +13,7 @@ import 'package:sales/services/location_reset_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -44,6 +45,23 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   _StaffSection _selectedSection = _StaffSection.bill;
   bool _sidebarExpanded = false;
   int _refreshGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    UiRefreshService.generation.addListener(_onBillSavedRefresh);
+  }
+
+  @override
+  void dispose() {
+    UiRefreshService.generation.removeListener(_onBillSavedRefresh);
+    super.dispose();
+  }
+
+  void _onBillSavedRefresh() {
+    if (!mounted) return;
+    setState(() => _refreshGeneration++);
+  }
 
   String get _location => AppConfig.displayLocationName;
 

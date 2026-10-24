@@ -153,6 +153,9 @@ class _SalesLedgerScreenState extends State<SalesLedgerScreen> {
         ),
       ),
     );
+
+    if (!mounted) return;
+    await _loadLedger();
   }
 
   Future<void> _pullInBackground({bool showFeedback = false}) async {

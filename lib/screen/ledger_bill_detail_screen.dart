@@ -8,6 +8,7 @@ import 'package:sales/repositories/bill_repository.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/number%20to%20words.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/utils/bill_totals.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
 /// Drill-down for a saved bill — password-gated edit for staff.
@@ -29,6 +30,8 @@ class LedgerBillDetailScreen extends StatefulWidget {
 
   static const Color billNoColor = Color(0xFFFFE5A0);
 
+  static const List<String> paymentModes = ['CASH', 'CARD', 'UPI'];
+
   @override
   State<LedgerBillDetailScreen> createState() => _LedgerBillDetailScreenState();
 }
@@ -36,11 +39,13 @@ class LedgerBillDetailScreen extends StatefulWidget {
 class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
   late SaleBill _bill;
   late List<BillItem> _items;
+  late String _paymentMode;
+  String? _syncStatus;
 
   bool _editUnlocked = false;
-  bool _showPasswordField = false;
   bool _saving = false;
-  String? _passwordError;
+  bool _canPersistOnDevice = false;
+  bool _checkedPersist = false;
   int? _editingIndex;
 
   final _passwordCtrl = TextEditingController();
@@ -57,14 +62,12 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     super.initState();
     _bill = widget.bill;
     _items = widget.bill.items.map((e) => e.copyWith()).toList();
+    _paymentMode = _normalizePaymentMode(widget.bill.paymentMode);
+    _syncStatus = widget.syncStatus;
     _customerNameCtrl.text = _bill.customerName;
     _mobileCtrl.text = _bill.mobile;
-    _amountCtrl.text = _format(_bill.totalAmount);
-    _gstCtrl.text = _format(_bill.totalCgst + _bill.totalSgst + _bill.totalIgst);
-    _grandTotalCtrl.text = _format(_bill.grandTotal);
-    if (widget.adminFullEdit) {
-      _editUnlocked = true;
-    }
+    _syncSummaryFields();
+    _loadPersistEligibility();
   }
 
   @override
@@ -80,54 +83,80 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     super.dispose();
   }
 
+  String _normalizePaymentMode(String mode) {
+    final upper = mode.toUpperCase();
+    if (upper == 'CASH') {
+      return 'CASH';
+    }
+    if (upper == 'UPI') {
+      return 'UPI';
+    }
+    return 'CARD';
+  }
+
+  Future<void> _loadPersistEligibility() async {
+    final canPersist =
+        await BillRepository.canUpdateBillOnDevice(_bill.location);
+    if (!mounted) return;
+    setState(() {
+      _canPersistOnDevice = canPersist;
+      _checkedPersist = true;
+    });
+  }
+
   String _format(num value) => NumberFormat('#,##0.00').format(value);
 
   String _formatDate(DateTime date) => DateFormat('dd-MMM-yy').format(date);
 
-  double get _totalQty =>
-      _items.fold(0.0, (sum, item) => sum + item.qty);
-
-  double get _totalAmount =>
-      _items.fold(0.0, (sum, item) => sum + item.amount);
-
-  double get _totalCgst =>
-      _items.fold(0.0, (sum, item) => sum + item.cgst);
-
-  double get _totalSgst =>
-      _items.fold(0.0, (sum, item) => sum + item.sgst);
-
-  double get _totalIgst =>
-      _items.fold(0.0, (sum, item) => sum + item.igst);
-
-  double get _grandTotal =>
-      _items.fold(0.0, (sum, item) => sum + item.grossAmt);
-
-  void _onMobileDoubleTap() {
-    if (widget.adminFullEdit ||
-        widget.readOnly ||
-        _editUnlocked ||
-        _showPasswordField) {
-      return;
+  BillTotals _computedTotals() {
+    if (_items.isNotEmpty) {
+      return BillTotals.fromItems(_items);
     }
 
-    setState(() {
-      _showPasswordField = true;
-      _passwordError = null;
-      _passwordCtrl.clear();
-    });
+    return BillTotals(
+      totalQty: _bill.totalQty,
+      totalAmount: _bill.totalAmount,
+      totalCgst: _bill.totalCgst,
+      totalSgst: _bill.totalSgst,
+      totalIgst: _bill.totalIgst,
+      grandTotal: _bill.grandTotal,
+    );
   }
 
-  void _tryUnlockEdit() {
-    if (_passwordCtrl.text == billEditPassword) {
-      setState(() {
-        _editUnlocked = true;
-        _showPasswordField = false;
-        _passwordError = null;
-      });
+  void _syncSummaryFields() {
+    final totals = _computedTotals();
+    _amountCtrl.text = _format(totals.totalAmount);
+    _gstCtrl.text = _format(totals.totalGst);
+    _grandTotalCtrl.text = _format(totals.grandTotal);
+  }
+
+  Future<void> _onEditPressed() async {
+    if (widget.readOnly) {
       return;
     }
 
-    setState(() => _passwordError = 'Incorrect password');
+    if (!_canPersistOnDevice) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Edit this bill from its own location'),
+        ),
+      );
+      return;
+    }
+
+    if (widget.adminFullEdit) {
+      setState(() => _editUnlocked = true);
+      return;
+    }
+
+    final unlocked = await showDialog<bool>(
+      context: context,
+      builder: (context) => _PasswordDialog(controller: _passwordCtrl),
+    );
+
+    if (unlocked == true && mounted) {
+      setState(() => _editUnlocked = true);
+    }
   }
 
   void _startEditLine(int index) {
@@ -157,6 +186,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     setState(() {
       _items[index] = _items[index].copyWith(rate: rate, qty: qty);
       _editingIndex = null;
+      _syncSummaryFields();
     });
   }
 
@@ -179,30 +209,32 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       return;
     }
 
+    final totals = _computedTotals();
+
     final updated = SaleBill(
       billNo: _bill.billNo,
       location: _bill.location,
       billDate: _bill.billDate,
-      paymentMode: _bill.paymentMode,
+      paymentMode: _paymentMode,
       customerName: widget.adminFullEdit
           ? _customerNameCtrl.text.trim()
           : _bill.customerName,
       mobile: widget.adminFullEdit ? _mobileCtrl.text.trim() : _bill.mobile,
       items: _items,
-      totalQty: _items.isEmpty ? _bill.totalQty : _totalQty,
+      totalQty: _items.isEmpty ? _bill.totalQty : totals.totalQty,
       totalAmount: widget.adminFullEdit && _items.isEmpty
           ? amount ?? _bill.totalAmount
-          : _totalAmount,
+          : totals.totalAmount,
       totalCgst: widget.adminFullEdit && _items.isEmpty
           ? (gst ?? 0) / 2
-          : _totalCgst,
+          : totals.totalCgst,
       totalSgst: widget.adminFullEdit && _items.isEmpty
           ? (gst ?? 0) / 2
-          : _totalSgst,
-      totalIgst: widget.adminFullEdit && _items.isEmpty ? 0 : _totalIgst,
+          : totals.totalSgst,
+      totalIgst: widget.adminFullEdit && _items.isEmpty ? 0 : totals.totalIgst,
       grandTotal: widget.adminFullEdit && _items.isEmpty
           ? grandTotal ?? _bill.grandTotal
-          : _grandTotal,
+          : totals.grandTotal,
     );
 
     final result = await BillRepository.saveBill(
@@ -226,17 +258,25 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final totals = _computedTotals();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: sectionHeaderAppBar(
         'BILL ${_bill.billNo}',
         automaticallyImplyLeading: true,
         actions: [
-          if (_editUnlocked)
-            TextButton(
-              onPressed: _saving ? null : _saveBill,
-              child: Text(_saving ? 'SAVING...' : 'SAVE'),
-            ),
+          if (!widget.readOnly && _checkedPersist)
+            if (!_editUnlocked)
+              TextButton(
+                onPressed: _canPersistOnDevice ? _onEditPressed : _onEditPressed,
+                child: const Text('EDIT'),
+              )
+            else
+              TextButton(
+                onPressed: _saving ? null : _saveBill,
+                child: Text(_saving ? 'SAVING...' : 'SAVE'),
+              ),
         ],
       ),
       body: SingleChildScrollView(
@@ -246,13 +286,13 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           children: [
             _buildBillHeader(),
             const SizedBox(height: 8),
-            _buildTotalsSummary(),
+            _buildTotalsSummary(totals),
             const SizedBox(height: 8),
             _buildCustomerSection(),
             const SizedBox(height: 8),
             _buildItemTable(),
             const SizedBox(height: 8),
-            _buildTotals(),
+            _buildTotals(totals),
           ],
         ),
       ),
@@ -294,10 +334,27 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
               ),
               const Spacer(),
-              Text(
-                _bill.paymentMode,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-              ),
+              if (_editUnlocked)
+                DropdownButton<String>(
+                  value: _paymentMode,
+                  items: LedgerBillDetailScreen.paymentModes
+                      .map(
+                        (mode) => DropdownMenuItem(
+                          value: mode,
+                          child: Text(mode),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _paymentMode = value);
+                  },
+                )
+              else
+                Text(
+                  _paymentMode,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -307,9 +364,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
                 'Location: ${_bill.location}',
                 style: const TextStyle(fontSize: 10),
               ),
-              if (widget.syncStatus != null) ...[
+              if (_syncStatus != null) ...[
                 const Spacer(),
-                _syncBadge(widget.syncStatus!),
+                _syncBadge(_syncStatus!),
               ],
             ],
           ),
@@ -337,8 +394,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     );
   }
 
-  Widget _buildTotalsSummary() {
-    final gstTotal = _bill.totalCgst + _bill.totalSgst + _bill.totalIgst;
+  Widget _buildTotalsSummary(BillTotals totals) {
+    final useManualTotals =
+        widget.adminFullEdit && _editUnlocked && _items.isEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -346,7 +404,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
         color: Colors.white,
       ),
       padding: const EdgeInsets.all(8),
-      child: widget.adminFullEdit && _editUnlocked
+      child: useManualTotals
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -369,9 +427,9 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
               ],
             )
           : CompactAbstractSummary(
-              amountValue: _format(_bill.totalAmount),
-              gstValue: _format(gstTotal),
-              grandTotalValue: _format(_bill.grandTotal),
+              amountValue: _format(totals.totalAmount),
+              gstValue: _format(totals.totalGst),
+              grandTotalValue: _format(totals.grandTotal),
               cardWidth: 120,
             ),
     );
@@ -428,56 +486,14 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           ] else ...[
             _readOnlyField('Name', _bill.customerName),
             const SizedBox(height: 4),
-            GestureDetector(
-              onDoubleTap: _onMobileDoubleTap,
-              child: _readOnlyField('Mobile', _bill.mobile),
-            ),
-            if (_showPasswordField && !_editUnlocked) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 48,
-                    child: Text('Password', style: TextStyle(fontSize: 10)),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _passwordCtrl,
-                      obscureText: true,
-                      autofocus: true,
-                      onSubmitted: (_) => _tryUnlockEdit(),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _tryUnlockEdit,
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-              if (_passwordError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    _passwordError!,
-                    style: const TextStyle(
-                      color: AppColors.danger,
-                      fontSize: AppTextSizes.listSubtitle,
-                    ),
-                  ),
-                ),
-            ],
+            _readOnlyField('Mobile', _bill.mobile),
           ],
           if (_editUnlocked)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 widget.adminFullEdit
-                    ? 'Admin edit — update customer, line items, then SAVE.'
+                    ? 'Admin edit — update customer, payment, line items, then SAVE.'
                     : 'Edit mode — tap a line item to correct rate/qty, then SAVE.',
                 style: const TextStyle(
                   fontSize: AppTextSizes.listSubtitle,
@@ -647,7 +663,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
     );
   }
 
-  Widget _buildTotals() {
+  Widget _buildTotals(BillTotals totals) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
@@ -657,11 +673,11 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _totalRow('Total Qty', _format(_totalQty)),
-          _totalRow('Total Amt', _format(_totalAmount)),
-          _totalRow('CGST', _format(_totalCgst)),
-          _totalRow('SGST', _format(_totalSgst)),
-          _totalRow('IGST', _format(_totalIgst)),
+          _totalRow('Total Qty', _format(totals.totalQty)),
+          _totalRow('Total Amt', _format(totals.totalAmount)),
+          _totalRow('CGST', _format(totals.totalCgst)),
+          _totalRow('SGST', _format(totals.totalSgst)),
+          _totalRow('IGST', _format(totals.totalIgst)),
           const SizedBox(height: 8),
           const Text(
             'Grand Total',
@@ -671,7 +687,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              _format(_grandTotal),
+              _format(totals.grandTotal),
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
@@ -679,7 +695,7 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              amountInWords(_grandTotal),
+              amountInWords(totals.grandTotal),
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ),
@@ -706,6 +722,65 @@ class _LedgerBillDetailScreenState extends State<LedgerBillDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PasswordDialog extends StatefulWidget {
+  final TextEditingController controller;
+
+  const _PasswordDialog({required this.controller});
+
+  @override
+  State<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends State<_PasswordDialog> {
+  String? _error;
+
+  void _submit() {
+    if (widget.controller.text == billEditPassword) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    setState(() => _error = 'Incorrect password');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Enter edit password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: widget.controller,
+            obscureText: true,
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: AppColors.danger, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(onPressed: _submit, child: const Text('OK')),
+      ],
     );
   }
 }

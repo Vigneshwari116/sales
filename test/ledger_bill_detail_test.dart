@@ -1,9 +1,29 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:sales/config/app_config.dart';
+import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
 import 'package:sales/screen/ledger_bill_detail_screen.dart';
+
+class _FakePathProvider extends Fake
+    with MockPlatformInterfaceMixin
+    implements PathProviderPlatform {
+  final String root;
+
+  _FakePathProvider(this.root);
+
+  @override
+  Future<String?> getApplicationSupportPath() async => root;
+}
 
 SaleBill _sampleBill() {
   final items = [
@@ -29,6 +49,33 @@ SaleBill _sampleBill() {
 }
 
 void main() {
+  late Directory tempDir;
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    tempDir = await Directory.systemTemp.createTemp('ledger_detail_test_');
+    PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  tearDownAll(() async {
+    if (await tempDir.exists()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  setUp(() async {
+    await AppConfig.setLocation('win1');
+    await LocalDb.resetForTesting();
+  });
+
+  tearDown(() async {
+    await LocalDb.resetForTesting();
+    await AppConfig.clearLocation();
+  });
+
   testWidgets('shows bill header, customer, line items, and totals', (tester) async {
     final bill = _sampleBill();
 
@@ -54,7 +101,7 @@ void main() {
     expect(find.text('Grand Total'), findsOneWidget);
   });
 
-  testWidgets('double-tapping mobile shows compact password field', (tester) async {
+  testWidgets('staff EDIT asks for password before enabling save', (tester) async {
     final bill = _sampleBill();
 
     await tester.pumpWidget(
@@ -67,15 +114,13 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('9876543210'));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Password'), findsNothing);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('9876543210'));
+    await tester.tap(find.text('EDIT'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Password'), findsOneWidget);
-    expect(find.text('OK'), findsOneWidget);
+    expect(find.text('Enter edit password'), findsOneWidget);
   });
 
   testWidgets('shows empty items message when bill has no line items', (tester) async {

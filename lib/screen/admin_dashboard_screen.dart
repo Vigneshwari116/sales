@@ -9,6 +9,7 @@ import 'package:sales/services/app_session_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
@@ -41,6 +42,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _ledgerLocation = displayNameForLocationCode('win1');
   bool _sidebarExpanded = false;
   int _refreshGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    UiRefreshService.generation.addListener(_onBillSavedRefresh);
+  }
+
+  @override
+  void dispose() {
+    UiRefreshService.generation.removeListener(_onBillSavedRefresh);
+    super.dispose();
+  }
+
+  void _onBillSavedRefresh() {
+    if (!mounted) return;
+    setState(() => _refreshGeneration++);
+  }
 
   int get _selectedIndex => _selectedSection.index;
 
@@ -105,7 +123,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           refreshGeneration: _refreshGeneration,
         );
       case _AdminSection.abstract:
-        return const AdminCrossAbstractScreen();
+        return AdminCrossAbstractScreen(refreshGeneration: _refreshGeneration);
       case _AdminSection.report:
         return const AdminReportScreen();
       case _AdminSection.ledger:

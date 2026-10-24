@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:sales/config/location_codes.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/repositories/day_drill_down_repository.dart';
 import 'package:sales/repositories/ledger_repository.dart';
@@ -8,7 +7,7 @@ import 'package:sales/screen/ledger_bill_detail_screen.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
-/// Scrollable bill list for one day with compact mode for very large days.
+/// One day of bills shown as a ledger-style table (admin drill-down).
 class AdminDayBillsScreen extends StatefulWidget {
   final String day;
   final String title;
@@ -36,6 +35,8 @@ class AdminDayBillsScreen extends StatefulWidget {
 }
 
 class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
+  static const double _tableMinWidth = 860;
+
   bool _loading = true;
   List<DayBillRow> _bills = const [];
   final TextEditingController _minAmountController = TextEditingController();
@@ -96,6 +97,21 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
 
   String _formatMoney(double value) => NumberFormat('#,##0.00').format(value);
 
+  String _formatMoneyCell(double value) {
+    if (value == 0) {
+      return '';
+    }
+    return _formatMoney(value);
+  }
+
+  String _formatDate(String value) {
+    try {
+      return DateFormat('dd-MMM-yy').format(DateTime.parse(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
   bool _isCashPayment(String mode) => mode.toUpperCase() == 'CASH';
 
   String _paymentColumnAmount(DayBillRow bill, {required bool cash}) {
@@ -139,15 +155,31 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
     }
   }
 
+  ({double cash, double card, double total, double gst, double grand})
+      _totalsFor(List<DayBillRow> rows) {
+    var cash = 0.0;
+    var card = 0.0;
+    var total = 0.0;
+    var gst = 0.0;
+    var grand = 0.0;
+
+    for (final row in rows) {
+      if (_isCashPayment(row.paymentMode)) {
+        cash += row.grandTotal;
+      } else {
+        card += row.grandTotal;
+      }
+      total += row.total;
+      gst += row.gst;
+      grand += row.grandTotal;
+    }
+
+    return (cash: cash, card: card, total: total, gst: gst, grand: grand);
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredBills = _filteredBills;
-    final compact = DayDrillDownRepository.shouldUseCompactBillList(
-      filteredBills.length,
-    );
-    final fullDetail = DayDrillDownRepository.shouldShowFullBillDetails(
-      filteredBills.length,
-    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -168,17 +200,6 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildAmountFilterBar(),
-                    if (compact)
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
-                        child: Text(
-                          'Showing bill number and amount only for performance.',
-                          style: TextStyle(
-                            fontSize: AppTextSizes.listSubtitle,
-                            color: AppColors.mutedBlue,
-                          ),
-                        ),
-                      ),
                     Expanded(
                       child: filteredBills.isEmpty
                           ? Center(
@@ -192,11 +213,30 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
                                 ),
                               ),
                             )
-                          : compact
-                              ? _buildCompactList(filteredBills)
-                              : fullDetail
-                                  ? _buildFullList(filteredBills)
-                                  : _buildFullList(filteredBills),
+                          : CenteredContent(
+                              maxWidth: 1100,
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final needsHScroll =
+                                      constraints.maxWidth < _tableMinWidth;
+                                  final table = _buildTable(filteredBills);
+
+                                  if (!needsHScroll) {
+                                    return table;
+                                  }
+
+                                  return SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: _tableMinWidth,
+                                      height: constraints.maxHeight,
+                                      child: table,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -250,178 +290,130 @@ class _AdminDayBillsScreenState extends State<AdminDayBillsScreen> {
     );
   }
 
-  Widget _buildCompactList(List<DayBillRow> bills) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: bills.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
-      itemBuilder: (context, index) {
-        final bill = bills[index];
-        return _BillListTile(
-          title: 'Bill ${bill.billNo}',
-          subtitle: branchLabelForDisplayName(bill.location),
-          amount: _formatMoney(bill.grandTotal),
-          onTap: () => _openBill(bill),
-        );
-      },
-    );
-  }
+  Widget _buildTable(List<DayBillRow> rows) {
+    final totals = _totalsFor(rows);
 
-  Widget _buildFullList(List<DayBillRow> bills) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: bills.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final bill = bills[index];
-        return Material(
-          color: AppColors.cardWhite,
-          borderRadius: BorderRadius.circular(6),
-          child: InkWell(
-            onTap: () => _openBill(bill),
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              padding: const EdgeInsets.all(10),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _headerRow(),
+          Expanded(
+            child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Bill ${bill.billNo}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.navy,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _formatMoney(bill.grandTotal),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.navy,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    branchLabelForDisplayName(bill.location),
-                    style: const TextStyle(
-                      fontSize: AppTextSizes.listSubtitle,
-                      color: AppColors.mutedBlue,
-                    ),
-                  ),
-                  if (bill.customerName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      bill.customerName,
-                      style: const TextStyle(fontSize: AppTextSizes.listTitle),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      _metaChip('Cash', _paymentColumnAmount(bill, cash: true)),
-                      _metaChip(
-                        'Card/UPI',
-                        _paymentColumnAmount(bill, cash: false),
-                      ),
-                      _metaChip('Amount', _formatMoney(bill.total)),
-                      _metaChip('GST', _formatMoney(bill.gst)),
-                    ],
-                  ),
-                ],
+                children: rows.map(_dataRow).toList(growable: false),
               ),
             ),
           ),
-        );
-      },
+          _summaryRow(totals),
+        ],
+      ),
     );
   }
-}
 
-class _BillListTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String amount;
-  final VoidCallback onTap;
+  Widget _headerRow() {
+    return Container(
+      color: AppColors.tableHeader,
+      child: Row(
+        children: [
+          _cell('BILLNO', flex: 6, bold: true),
+          _cell('DATE', flex: 7, bold: true),
+          _cell('NAME', flex: 10, bold: true),
+          _cell('MOBILE', flex: 8, bold: true),
+          _cell('CASH', flex: 7, bold: true, alignRight: true),
+          _cell('CARD/UPI', flex: 7, bold: true, alignRight: true),
+          _cell('TOTAL', flex: 7, bold: true, alignRight: true),
+          _cell('GST', flex: 6, bold: true, alignRight: true),
+          _cell('GRAND TOTAL', flex: 8, bold: true, alignRight: true),
+        ],
+      ),
+    );
+  }
 
-  const _BillListTile({
-    required this.title,
-    required this.subtitle,
-    required this.amount,
-    required this.onTap,
-  });
+  Widget _dataRow(DayBillRow row) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openBill(row),
+      child: Row(
+        children: [
+          _cell('${row.billNo}', flex: 6),
+          _cell(_formatDate(row.date), flex: 7),
+          _cell(row.customerName, flex: 10),
+          _cell(row.mobile.isEmpty ? '—' : row.mobile, flex: 8),
+          _cell(_paymentColumnAmount(row, cash: true),
+              flex: 7, alignRight: true),
+          _cell(_paymentColumnAmount(row, cash: false),
+              flex: 7, alignRight: true),
+          _cell(_formatMoney(row.total), flex: 7, alignRight: true),
+          _cell(_formatMoney(row.gst), flex: 6, alignRight: true),
+          _cell(_formatMoney(row.grandTotal), flex: 8, alignRight: true),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.cardWhite,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(6),
+  Widget _summaryRow(
+    ({
+      double cash,
+      double card,
+      double total,
+      double gst,
+      double grand
+    }) totals,
+  ) {
+    return Container(
+      color: AppColors.headerBand,
+      child: Row(
+        children: [
+          _cell('', flex: 6, bold: true),
+          _cell('', flex: 7, bold: true),
+          _cell('', flex: 10, bold: true),
+          _cell('', flex: 8, bold: true),
+          _cell(_formatMoney(totals.cash), flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.card), flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.total), flex: 7, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.gst), flex: 6, bold: true, alignRight: true),
+          _cell(_formatMoney(totals.grand),
+              flex: 8, bold: true, alignRight: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(
+    String text, {
+    required int flex,
+    bool bold = false,
+    bool alignRight = false,
+  }) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        decoration: const BoxDecoration(
+          border: Border(
+            right: BorderSide(color: AppColors.border, width: 0.6),
+            bottom: BorderSide(color: AppColors.border, width: 0.6),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.navy,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: AppTextSizes.listSubtitle,
-                        color: AppColors.mutedBlue,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                amount,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.navy,
-                ),
-              ),
-            ],
+        ),
+        child: Text(
+          text,
+          textAlign: alignRight ? TextAlign.right : TextAlign.left,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+            color: AppColors.navy,
           ),
         ),
       ),
     );
   }
-}
-
-Widget _metaChip(String label, String value) {
-  if (value.isEmpty) {
-    return const SizedBox.shrink();
-  }
-
-  return Text(
-    '$label: $value',
-    style: const TextStyle(
-      fontSize: AppTextSizes.listSubtitle,
-      color: AppColors.navy,
-    ),
-  );
 }
