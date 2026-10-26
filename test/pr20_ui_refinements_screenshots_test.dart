@@ -249,8 +249,10 @@ void main() {
 
     await _pumpBillScreen(tester);
 
-    expect(find.text('S.no'), findsNothing);
-    expect(find.text('Grand Total'), findsNothing);
+    expect(find.text('S.NO'), findsOneWidget);
+    expect(find.text('GRAND TOTAL'), findsOneWidget);
+    expect(find.text('CGST %'), findsNothing);
+    expect(find.text('TODAY SALES'), findsNothing);
 
     await _savePng(
       tester,
@@ -280,8 +282,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('CGST %'), findsOneWidget);
-    expect(find.text('Total'), findsOneWidget);
-    expect(find.text('Grand Total'), findsOneWidget);
+    expect(find.text('TOTAL'), findsWidgets);
+    expect(find.text('GRAND TOTAL'), findsOneWidget);
+    expect(find.text('TODAY SALES'), findsNothing);
 
     await _savePng(
       tester,

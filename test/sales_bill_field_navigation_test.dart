@@ -258,14 +258,21 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('invalid rate shows inline error below field', (tester) async {
+  testWidgets('invalid rate shows beside amount and does not move the table',
+      (tester) async {
     await pumpBillScreen(tester);
 
+    final tableTop = tester.getTopLeft(find.text('S.NO')).dy;
     await tester.enterText(rateField, '0');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
     expect(find.text('Rate must be greater than 0'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('S.NO')).dy, tableTop);
+    final amount = tester.getRect(find.byKey(const Key('bill_amount_field')));
+    final message = tester.getRect(find.text('Rate must be greater than 0'));
+    expect(message.left, greaterThan(amount.right - 1));
+    expect((message.center.dy - amount.center.dy).abs(), lessThan(20));
     await tearDownBillScreen(tester);
   });
 }
