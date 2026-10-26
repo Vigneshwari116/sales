@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -67,8 +68,8 @@ void main() {
     await LocalDb.instance.initialize();
     await LocalDb.instance.getNextBillNumber(AppConfig.displayLocationName);
     SyncService.instance.start(location: AppConfig.displayLocationName);
-    BillRepository.saveBillApiOverride =
-        (bill) async => SalesApiResult.success(bill.billNo);
+    BillRepository.saveBillApiOverride = (bill) async =>
+        SalesApiResult.success(bill.billNo);
   });
 
   tearDown(() async {
@@ -79,16 +80,18 @@ void main() {
     await AppConfig.clearLocation();
   });
 
-  Future<void> pumpBillScreen(WidgetTester tester) async {
+  void useDesktopSurface(WidgetTester tester) {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
+  Future<void> pumpBillScreen(WidgetTester tester) async {
+    useDesktopSurface(tester);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: SalesBillScreen(initialBillNo: 1),
-      ),
+      const MaterialApp(home: SalesBillScreen(initialBillNo: 1)),
     );
 
     for (var i = 0; i < 80; i++) {
@@ -110,8 +113,72 @@ void main() {
   final rateField = find.byKey(const Key('bill_rate_field'));
   final qtyField = find.byKey(const Key('bill_qty_field'));
 
-  testWidgets('typing pause does not auto-advance rate or add line item',
-      (tester) async {
+  testWidgets('opens with focus on payment, then name, mobile, rate', (
+    tester,
+  ) async {
+    await pumpBillScreen(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('bill_payment_dropdown')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Focus && (widget.focusNode?.hasFocus ?? false),
+        ),
+      ),
+      findsWidgets,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('bill_name_field')))
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
+
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('bill_mobile_field')))
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
+
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('bill_rate_field')))
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
+
+    await tester.enterText(find.byKey(const Key('bill_rate_field')), '100');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('bill_qty_field')))
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
+
+    await tearDownBillScreen(tester);
+  });
+
+  testWidgets('typing pause does not auto-advance rate or add line item', (
+    tester,
+  ) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
@@ -128,8 +195,9 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate with normal value focuses qty without saving',
-      (tester) async {
+  testWidgets('enter on rate with normal value focuses qty without saving', (
+    tester,
+  ) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
@@ -142,8 +210,9 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate with 777 and empty table does not save',
-      (tester) async {
+  testWidgets('enter on rate with 777 and empty table does not save', (
+    tester,
+  ) async {
     await pumpBillScreen(tester);
 
     await tester.tap(rateField);
@@ -185,11 +254,8 @@ void main() {
       billSaved: false,
     );
 
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: SalesBillScreen(),
-      ),
-    );
+    useDesktopSurface(tester);
+    await tester.pumpWidget(const MaterialApp(home: SalesBillScreen()));
 
     for (var i = 0; i < 80; i++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -210,49 +276,52 @@ void main() {
     await tearDownBillScreen(tester);
   });
 
-  testWidgets('enter on rate with 777 triggers print without changing table lines',
-      (tester) async {
-    var printTriggered = false;
+  testWidgets(
+    'enter on rate with 777 triggers print without changing table lines',
+    (tester) async {
+      var printTriggered = false;
 
-    await SessionService.saveBillSession(
-      location: AppConfig.displayLocationName,
-      billNo: 1,
-      billDate: DateTime.now(),
-      paymentMode: 'CASH',
-      customerName: '',
-      mobile: '',
-      items: [BillItem(qty: 4, rate: 23)],
-      billSaved: false,
-    );
+      await SessionService.saveBillSession(
+        location: AppConfig.displayLocationName,
+        billNo: 1,
+        billDate: DateTime.now(),
+        paymentMode: 'CASH',
+        customerName: '',
+        mobile: '',
+        items: [BillItem(qty: 4, rate: 23)],
+        billSaved: false,
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SalesBillScreen(
-          saveBillOverride: () async {
-            printTriggered = true;
-          },
+      useDesktopSurface(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SalesBillScreen(
+            saveBillOverride: () async {
+              printTriggered = true;
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    for (var i = 0; i < 80; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      if (find.byKey(const Key('bill_table_row_0')).evaluate().isNotEmpty) {
-        break;
+      for (var i = 0; i < 80; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.byKey(const Key('bill_table_row_0')).evaluate().isNotEmpty) {
+          break;
+        }
       }
-    }
 
-    await tester.tap(rateField);
-    await tester.enterText(rateField, '777');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pump();
+      await tester.tap(rateField);
+      await tester.enterText(rateField, '777');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
 
-    expect(printTriggered, isTrue);
-    expect(tester.widget<TextField>(rateField).controller?.text, '0');
-    expect(find.byKey(const Key('bill_table_row_0')), findsOneWidget);
+      expect(printTriggered, isTrue);
+      expect(tester.widget<TextField>(rateField).controller?.text, '0');
+      expect(find.byKey(const Key('bill_table_row_0')), findsOneWidget);
 
-    await tearDownBillScreen(tester);
-  });
+      await tearDownBillScreen(tester);
+    },
+  );
 
   testWidgets('invalid rate shows inline error below field', (tester) async {
     await pumpBillScreen(tester);

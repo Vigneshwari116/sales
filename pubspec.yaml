@@ -74,6 +74,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/branding/surabhi_logo.png
     - assets/seed/win1_sales.csv
     - assets/seed/win2_sales.csv
     - assets/seed/win3_sales.csv

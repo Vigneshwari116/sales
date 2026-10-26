@@ -67,8 +67,8 @@ void main() {
     await LocalDb.instance.initialize();
     await LocalDb.instance.getNextBillNumber(AppConfig.displayLocationName);
     SyncService.instance.start(location: AppConfig.displayLocationName);
-    BillRepository.saveBillApiOverride =
-        (bill) async => SalesApiResult.success(bill.billNo);
+    BillRepository.saveBillApiOverride = (bill) async =>
+        SalesApiResult.success(bill.billNo);
   });
 
   tearDown(() async {
@@ -79,21 +79,33 @@ void main() {
     await AppConfig.clearLocation();
   });
 
-  Future<void> pumpBillScreen(WidgetTester tester) async {
+  Future<void> pumpBillScreen(
+    WidgetTester tester, {
+    bool restoreSession = false,
+  }) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: SalesBillScreen(initialBillNo: 1),
+      MaterialApp(
+        home: restoreSession
+            ? const SalesBillScreen()
+            : const SalesBillScreen(initialBillNo: 1),
       ),
     );
 
     for (var i = 0; i < 80; i++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (find.byKey(const Key('bill_today_sales_button')).evaluate().isNotEmpty) {
+      final billReady = find
+          .byKey(const Key('bill_today_sales_button'))
+          .evaluate()
+          .isNotEmpty;
+      final sessionReady =
+          !restoreSession ||
+          find.byKey(const Key('bill_table_row_0')).evaluate().isNotEmpty;
+      if (billReady && sessionReady) {
         break;
       }
     }
@@ -104,12 +116,15 @@ void main() {
       BillItem(qty: 2, rate: 100, cgstPct: 2.5, sgstPct: 2.5),
       BillItem(qty: 1, rate: 50, cgstPct: 2.5, sgstPct: 2.5),
     ];
-    final expectedGrand =
-        items.fold<double>(0, (sum, item) => sum + item.netAmt);
-    final expectedPcs =
-        items.fold<double>(0, (sum, item) => sum + item.qty);
-    final expectedDisplayAmount =
-        items.fold<double>(0, (sum, item) => sum + item.grossAmt);
+    final expectedGrand = items.fold<double>(
+      0,
+      (sum, item) => sum + item.netAmt,
+    );
+    final expectedPcs = items.fold<double>(0, (sum, item) => sum + item.qty);
+    final expectedDisplayAmount = items.fold<double>(
+      0,
+      (sum, item) => sum + item.grossAmt,
+    );
 
     await SessionService.saveBillSession(
       location: AppConfig.displayLocationName,
@@ -122,7 +137,7 @@ void main() {
       billSaved: false,
     );
 
-    await pumpBillScreen(tester);
+    await pumpBillScreen(tester, restoreSession: true);
 
     expect(find.text('CGST %'), findsNothing);
     expect(find.text('IGST'), findsNothing);
@@ -133,10 +148,11 @@ void main() {
     expect(find.text(expectedDisplayAmount.toStringAsFixed(0)), findsWidgets);
     expect(find.text(expectedGrand.toStringAsFixed(2)), findsOneWidget);
 
-    final expectedTaxable =
-        items.fold<double>(0, (sum, item) => sum + item.amount);
-    final expectedCgst =
-        items.fold<double>(0, (sum, item) => sum + item.cgst);
+    final expectedTaxable = items.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+    final expectedCgst = items.fold<double>(0, (sum, item) => sum + item.cgst);
     expect(expectedTaxable, greaterThan(0));
     expect(expectedCgst, greaterThan(0));
   });
