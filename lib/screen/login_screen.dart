@@ -86,7 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: LoginScreen.adminHomeBuilder ??
+            builder:
+                LoginScreen.adminHomeBuilder ??
                 (_) => const AdminDashboardScreen(),
           ),
         );
@@ -95,13 +96,17 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (isSummaryViewer) {
-        await SessionService.saveLogin(username, role: SessionRole.summaryViewer);
+        await SessionService.saveLogin(
+          username,
+          role: SessionRole.summaryViewer,
+        );
 
         if (!mounted) return;
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: LoginScreen.summaryHomeBuilder ??
+            builder:
+                LoginScreen.summaryHomeBuilder ??
                 (_) => const SummaryViewerDashboardScreen(),
           ),
         );
@@ -117,7 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: LoginScreen.staffHomeBuilder ??
+          builder:
+              LoginScreen.staffHomeBuilder ??
               (_) => const StaffDashboardScreen(),
         ),
       );
@@ -160,14 +166,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(
-                      Icons.storefront,
-                      size: 48,
-                      color: AppColors.navy,
+                    Center(
+                      child: Image.asset(
+                        'assets/branding/surabhi_logo.png',
+                        height: 168,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        isAntiAlias: true,
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     const Text(
-                      'Sales Bill Login',
+                      'Login',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
@@ -215,7 +225,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _error!,
-                        style: const TextStyle(color: AppColors.danger, fontSize: 12),
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 20),
