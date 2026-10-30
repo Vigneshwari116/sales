@@ -13,6 +13,8 @@ import 'package:sales/services/sync_service.dart';
 class AutoSyncService with WidgetsBindingObserver {
   static AutoSyncService? _instance;
   static const Duration _retryInterval = Duration(seconds: 30);
+  static const List<String> _allStaffLocations = ['Win1', 'Win2', 'Win3'];
+
   AutoSyncService._();
   static AutoSyncService get instance {
     _instance ??= AutoSyncService._();
@@ -22,6 +24,7 @@ class AutoSyncService with WidgetsBindingObserver {
   String? _location;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _timer;
+
   void start({required String location}) {
     if (_location != null) {
       return;
@@ -61,24 +64,29 @@ class AutoSyncService with WidgetsBindingObserver {
 
   /// Safe to call from anywhere; does nothing when not started.
   void trigger() {
-    final location = _location;
-    if (location == null) {
+    if (_location == null) {
       return;
     }
-    unawaited(_run(location));
+    unawaited(_run());
   }
 
   bool _running = false;
-  Future<void> _run(String location) async {
+
+  Future<void> _run() async {
     if (_running) {
       return;
     }
     _running = true;
     try {
       // Push first so local bills are on the server before admin edits are
-      // pulled (admin wins on conflict).
-      await SyncService.instance.autoPush(location);
-      await SyncService.instance.autoPull(location);
+      // pulled (admin wins on conflict). Sync every counter location on this
+      // device so server-side deletes and admin edits apply everywhere.
+      for (final loc in _allStaffLocations) {
+        await SyncService.instance.autoPush(loc);
+      }
+      for (final loc in _allStaffLocations) {
+        await SyncService.instance.autoPull(loc);
+      }
     } finally {
       _running = false;
     }
