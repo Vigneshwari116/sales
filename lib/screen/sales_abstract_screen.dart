@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sales/repositories/abstract_repository.dart';
+import 'package:sales/screen/sales_month_wise_abstract_screen.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/compact_layout.dart';
 
@@ -119,6 +120,18 @@ class _SalesAbstractScreenState extends State<SalesAbstractScreen> {
                       OutlinedButton(
                         onPressed: _setToday,
                         child: const Text('TODAY'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => SalesMonthWiseAbstractScreen(
+                                location: widget.location,
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('MONTH WISE'),
                       ),
                     ],
                   ),
