@@ -33,6 +33,7 @@ class SalesBillToolbar extends StatelessWidget {
   final VoidCallback? onTodaySales;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final VoidCallback? onNew;
   final VoidCallback? onSave;
   final bool busy;
 
@@ -41,6 +42,7 @@ class SalesBillToolbar extends StatelessWidget {
     required this.onTodaySales,
     required this.onPrevious,
     required this.onNext,
+    required this.onNew,
     required this.onSave,
     this.busy = false,
   });
@@ -65,6 +67,11 @@ class SalesBillToolbar extends StatelessWidget {
           key: const Key('bill_next_button'),
           label: 'NEXT',
           onPressed: busy ? null : onNext,
+        ),
+        _SalesBillToolbarButton(
+          key: const Key('bill_new_button'),
+          label: 'NEW',
+          onPressed: busy ? null : onNew,
         ),
         _SalesBillToolbarButton(
           key: const Key('bill_save_sale_button'),
