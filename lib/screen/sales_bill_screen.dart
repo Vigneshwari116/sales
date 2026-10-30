@@ -84,6 +84,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // Whether the bill has been saved/completed.
   bool _billSaved = false;
 
+  /// True when PREVIOUS/NEXT loaded an existing saved bill from the DB.
+  bool _isViewingSavedBill = false;
+
   bool _busy = false;
   bool _manualPushInProgress = false;
   String? _currentBillLocalId;
@@ -381,6 +384,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _passwordError = null;
       _editingIndex = null;
       _billSaved = true;
+      _isViewingSavedBill = true;
       _currentBillLocalId = localId;
       _rateController.text = '0';
       _qtyController.text = '0';
@@ -433,9 +437,28 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     setState(() {
       _billNo = nextBillNo;
+      _isViewingSavedBill = false;
       _clearCurrentBill();
     });
     await _persistSession();
+  }
+
+  Future<void> _startNewBill() async {
+    if (_busy) return;
+
+    setState(() {
+      _isViewingSavedBill = false;
+      _clearCurrentBill();
+    });
+
+    await _loadBillNumber();
+    if (!mounted) return;
+
+    await _persistSession();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusRate();
+    });
   }
 
   Future<void> _openTodaySales() async {
@@ -731,6 +754,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     _editingIndex = null;
 
     _billSaved = false;
+    _isViewingSavedBill = false;
     _currentBillLocalId = null;
   }
 
@@ -797,6 +821,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
       setState(() {
         _billSaved = true;
+        _isViewingSavedBill = false;
         _clearCurrentBill();
       });
 
@@ -1167,7 +1192,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             onTodaySales: _openTodaySales,
             onPrevious: _goToPreviousBill,
             onNext: _goToNextBill,
-            onSave: _saveBill,
+            onNew: _startNewBill,
+            onSave: _isViewingSavedBill ? null : _saveBill,
             busy: _busy,
           ),
           const SizedBox(height: 10),
