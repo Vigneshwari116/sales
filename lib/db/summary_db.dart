@@ -413,6 +413,23 @@ class SummaryDb {
     return total;
   }
 
+  /// Removes cached day/month totals for one location (abstract/dashboard).
+  Future<void> clearSummariesForLocation(String location) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'day_summary',
+        where: 'location = ?',
+        whereArgs: [location],
+      );
+      await txn.delete(
+        'month_summary',
+        where: 'location = ?',
+        whereArgs: [location],
+      );
+    });
+  }
+
 
   static String _dayKey(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'

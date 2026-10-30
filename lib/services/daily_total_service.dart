@@ -68,6 +68,30 @@ class DailyTotalService {
     await prefs.setStringList(_pendingKey, remaining);
   }
 
+  /// Drops queued server daily-total deltas for [locationCode].
+  static Future<void> clearPendingForLocationCode(String locationCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_pendingKey) ?? const [];
+    if (raw.isEmpty) {
+      return;
+    }
+
+    final remaining = <String>[];
+    for (final entry in raw) {
+      try {
+        final decoded = jsonDecode(entry) as Map<String, dynamic>;
+        if (decoded['location'] == locationCode) {
+          continue;
+        }
+        remaining.add(entry);
+      } catch (_) {
+        remaining.add(entry);
+      }
+    }
+
+    await prefs.setStringList(_pendingKey, remaining);
+  }
+
   static Future<void> _pushDelta({
     required String locationCode,
     required String date,

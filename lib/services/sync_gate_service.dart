@@ -107,6 +107,75 @@ class SyncGateService {
     return confirmed ?? false;
   }
 
+  static Future<bool> confirmDeleteAllBills(BuildContext context) async {
+    final controller = TextEditingController();
+    String? error;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Delete all bills?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'This permanently deletes every saved bill for this location '
+                    'on this device, resets bill numbers to 1, and clears local '
+                    'totals and pending sync.\n\n'
+                    'Users, GST settings, and printer settings are not changed.\n\n'
+                    'Type DELETE to confirm.',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: 'Confirmation',
+                      errorText: error,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (_) {
+                      if (error != null) {
+                        setState(() => error = null);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('CANCEL'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (controller.text.trim() == 'DELETE') {
+                      Navigator.pop(dialogContext, true);
+                    } else {
+                      setState(
+                        () => error = 'Type DELETE exactly to continue',
+                      );
+                    }
+                  },
+                  child: const Text('DELETE ALL BILLS'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+    return ok ?? false;
+  }
+
   static Future<bool> _promptPassword(
     BuildContext context, {
     required String title,

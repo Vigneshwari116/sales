@@ -327,8 +327,13 @@ class LocalDb {
     );
   }
 
-  /// Deletes all bills for [location] and resets the next bill number to 1.
-  Future<void> resetLocationSalesData(String location) async {
+  /// Deletes all bills for [location], resets next bill number to 1, and
+  /// anchors incremental pulls so older server bills are not re-imported.
+  Future<void> resetLocationSalesData(
+    String location, {
+    DateTime? pullAnchorUtc,
+  }) async {
+    final anchor = pullAnchorUtc ?? DateTime.now().toUtc();
     final db = await database;
     await db.transaction((txn) async {
       await txn.delete(
@@ -344,6 +349,7 @@ class LocalDb {
       await txn.insert('location_meta', {
         'location': location,
         'next_bill_no': 1,
+        'last_pull_at': anchor.toIso8601String(),
       });
     });
   }
