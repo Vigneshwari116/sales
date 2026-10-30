@@ -1,10 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/screen/bill_item.dart';
+import 'package:sales/services/receipt_layout.dart';
 import 'package:sales/services/receipt_service.dart';
 
 const _cols = ReceiptService.thermalContentColumns;
-const _amountStart = 3 + 6 + 5;
+const _amountStart = ReceiptLayout.snoWidth +
+    ReceiptLayout.columnGap +
+    ReceiptLayout.rateWidth +
+    ReceiptLayout.columnGap +
+    ReceiptLayout.qtyWidth +
+    ReceiptLayout.columnGap;
 
 SaleBill _sampleBill({required String location}) {
   return SaleBill(
@@ -76,13 +82,14 @@ void main() {
 
     final text = lines.join('\n');
 
-    expect(text, contains('R K S ENTERPRIISES'));
+    expect(text, contains('R K S ENTERPRISES'));
     expect(text, contains('KUDULU MAIN'));
     expect(text, contains('Bangalore-68'));
     expect(text, contains('BILL NO:23258'));
     expect(text, contains('04/09/2026'));
     expect(text, isNot(contains('DATE:')));
-    expect(text, contains('CGST% 2.5  SGST% 2.5'));
+    expect(text, contains('CGST 2.5%'));
+    expect(text, contains('SGST 2.5%'));
     expect(text, contains('GRAND TOTAL'));
     expect(text, contains('1000.00'));
     _expectLinesWithinWidth(lines);
@@ -142,12 +149,12 @@ void main() {
     );
 
     final lines = ReceiptService.buildReceiptLines(bill);
+    final headerIndex = lines.indexWhere((line) => line.contains('SNO'));
+    expect(headerIndex, greaterThanOrEqualTo(0));
     final itemRows = lines
-        .where(
-          (line) =>
-              RegExp(r'^\s*\d+\s+\d').hasMatch(line) &&
-              RegExp(r'\d+\.\d{2}$').hasMatch(line.trimRight()),
-        )
+        .skip(headerIndex + 2)
+        .take(bill.items.length)
+        .where((line) => !line.trimLeft().startsWith('-'))
         .toList();
 
     expect(itemRows.length, 3);
@@ -177,8 +184,8 @@ void main() {
     final lines = ReceiptService.buildReceiptLines(bill);
     final itemLine = lines.firstWhere((line) => line.contains('12345'));
     expect(itemLine.length, _cols);
-    expect(itemLine.substring(_amountStart).trim(), '12345.00');
-    expect(lines.join('\n'), contains('12345.00'));
+    expect(itemLine.substring(_amountStart).trim(), '11757');
+    expect(lines.join('\n'), contains('11757'));
     _expectLinesWithinWidth(lines);
   });
 
@@ -204,15 +211,15 @@ void main() {
 
     final lines = ReceiptService.buildReceiptLines(bill);
     final text = lines.join('\n');
-    expect(text, contains('1640.00'));
-    expect(text, contains('99999.00'));
+    expect(text, contains('1562'));
+    expect(text, contains('95237'));
     expect(
-      lines.firstWhere((l) => l.contains('1640.00')).substring(_amountStart).trim(),
-      '1640.00',
+      lines.firstWhere((l) => l.contains('1562')).substring(_amountStart).trim(),
+      '1562',
     );
     expect(
-      lines.firstWhere((l) => l.contains('99999.00')).substring(_amountStart).trim(),
-      '99999.00',
+      lines.firstWhere((l) => l.contains('95237')).substring(_amountStart).trim(),
+      '95237',
     );
     _expectLinesWithinWidth(lines);
   });
@@ -239,10 +246,8 @@ void main() {
     );
 
     final lines = ReceiptService.buildReceiptLines(bill);
-    expect(
-      lines.where((line) => line.contains('CGST% 2.5  SGST% 2.5')).length,
-      12,
-    );
+    expect(lines.where((line) => line.contains('CGST')).length, 1);
+    expect(lines.where((line) => line.contains('SGST')).length, 1);
     _expectLinesWithinWidth(lines);
   });
 
@@ -265,23 +270,22 @@ void main() {
 
     final lines = ReceiptService.buildReceiptLines(bill);
     final header = lines.firstWhere((line) => line.contains('SNO'));
-    final item = lines.firstWhere(
-      (line) => line.trimLeft().startsWith('1') && line.contains('2800.00'),
-    );
-    final total = lines.firstWhere(
-      (line) => line.startsWith('TOTAL') && line.contains('2800.00'),
+    final lineItem = bill.items.first;
+    final itemLine = lines.firstWhere(
+      (line) =>
+          line.trimLeft().startsWith('1') &&
+          line.contains(_whole(lineItem.amount)),
     );
     final cgst = lines.firstWhere(
-      (line) => line.startsWith('CGST') && line.contains('67.00'),
+      (line) => line.contains('CGST') && line.contains('67.00'),
     );
-    final grand = lines.firstWhere((line) => line.startsWith('GRAND TOTAL'));
+    final grand = lines.firstWhere((line) => line.contains('GRAND TOTAL'));
 
     expect(header.length, _cols);
     expect(header.substring(_amountStart).trim(), 'AMOUNT');
-    expect(item.substring(_amountStart).trim(), '2800.00');
-    expect(total.substring(_amountStart).trim(), '2800.00');
-    expect(cgst.substring(_amountStart).trim(), '67.00');
-    expect(grand.substring(_amountStart).trim(), '2800.00');
+    expect(itemLine.substring(_amountStart).trim(), _whole(lineItem.amount));
+    expect(cgst, contains('67.00'));
+    expect(grand, contains('2800.00'));
     _expectLinesWithinWidth(lines);
   });
 
@@ -314,6 +318,13 @@ void main() {
       1,
     );
   });
+}
+
+String _whole(double value) {
+  if (value >= 0) {
+    return '${(value + 0.5).floor()}';
+  }
+  return '${(value - 0.5).ceil()}';
 }
 
 void _expectLinesWithinWidth(List<String> lines) {

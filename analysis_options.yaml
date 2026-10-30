@@ -10,6 +10,7 @@
 analyzer:
   exclude:
     - build/**
+    - incoming_changes/**
     - android/**
     - ios/**
     - web/**

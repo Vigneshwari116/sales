@@ -39,7 +39,7 @@ void main() {
 
   test('fetchLiveTotals returns null when server is unreachable', () async {
     SalesApi.clientOverride = MockClient((request) async {
-      throw const http.ClientException('offline');
+      throw http.ClientException('offline');
     });
 
     final totals = await DailyTotalRepository.fetchLiveTotals();

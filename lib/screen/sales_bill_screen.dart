@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,15 +13,19 @@ import 'package:sales/services/bill_print_service.dart';
 import 'package:sales/services/session_service.dart';
 
 import 'bill_item.dart';
+
 import 'package:intl/intl.dart';
 import 'package:sales/screen/admin_day_bills_screen.dart';
 import 'package:sales/screen/number%20to%20words.dart';
+
 import 'login_screen.dart';
 import 'sales_ledger_screen.dart';
+
 import 'package:sales/services/printer_settings_service.dart';
 import 'package:sales/services/gst_config_service.dart';
 import 'package:sales/services/sync_service.dart';
 import 'package:sales/theme/app_theme.dart';
+import 'package:sales/widgets/compact_layout.dart';
 import 'package:sales/widgets/sales_bill_focus_field.dart';
 import 'package:sales/widgets/sales_bill_toolbar.dart';
 
@@ -104,34 +107,29 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   String _paymentMode = 'CASH';
 
-  final List<String> _paymentModes = const [
-    'CASH',
-    'CARD',
-    'UPI',
-  ];
+  final List<String> _paymentModes = const ['CASH', 'CARD', 'UPI'];
 
   // ============================================================
   // CUSTOMER
   // ============================================================
 
-  final TextEditingController _customerNameController =
-  TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
 
-  final TextEditingController _mobileController =
-  TextEditingController();
+  final TextEditingController _mobileController = TextEditingController();
 
   // ============================================================
   // RATE / QTY
   // ============================================================
 
-  final TextEditingController _rateController =
-  TextEditingController(text: '0');
+  final TextEditingController _rateController = TextEditingController(
+    text: '0',
+  );
 
-  final TextEditingController _qtyController =
-  TextEditingController(text: '0');
+  final TextEditingController _qtyController = TextEditingController(text: '0');
 
-  final TextEditingController _amountController =
-  TextEditingController(text: '0');
+  final TextEditingController _amountController = TextEditingController(
+    text: '0',
+  );
 
   final FocusNode _rateFocus = FocusNode();
 
@@ -263,8 +261,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void _onManualPushChanged() {
     if (!mounted) return;
     setState(() {
-      _manualPushInProgress =
-          SyncService.instance.manualPushInProgress.value;
+      _manualPushInProgress = SyncService.instance.manualPushInProgress.value;
     });
   }
 
@@ -281,8 +278,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   }
 
   Future<void> _syncNow() async {
-    final result =
-        await SyncService.instance.manualPush(_selectedLocation);
+    final result = await SyncService.instance.manualPush(_selectedLocation);
 
     if (!mounted) return;
 
@@ -343,8 +339,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   Future<void> _loadBillNumber() async {
-    var nextBillNo =
-        await BillRepository.getNextBillNumber(_selectedLocation);
+    var nextBillNo = await BillRepository.getNextBillNumber(_selectedLocation);
 
     if (!mounted) return;
 
@@ -389,6 +384,25 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     await _persistSession();
   }
 
+  Future<void> _startNewBill() async {
+    if (_busy) return;
+
+    final nextBillNo = await BillRepository.getNextBillNumber(
+      _selectedLocation,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _billNo = nextBillNo;
+      _clearCurrentBill();
+      _billSaved = false;
+    });
+    await _persistSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusRate();
+    });
+  }
+
   Future<void> _goToPreviousBill() async {
     if (_busy) return;
 
@@ -422,8 +436,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       return;
     }
 
-    final nextBillNo =
-        await BillRepository.getNextBillNumber(_selectedLocation);
+    final nextBillNo = await BillRepository.getNextBillNumber(
+      _selectedLocation,
+    );
     if (!mounted) return;
 
     if (_billNo >= nextBillNo) {
@@ -572,6 +587,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       _rateController.text = '0';
       if (_items.isEmpty) {
         _showMessage('Add items before printing');
+        return;
+      }
+      if (_billSaved) {
+        _showMessage('Cannot save while viewing a saved bill — tap NEW first');
         return;
       }
       final save = widget.saveBillOverride ?? _saveBill;
@@ -741,6 +760,11 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Future<void> _saveBill() async {
     if (_busy) return;
 
+    if (_billSaved) {
+      _showMessage('Cannot save while viewing a saved bill — tap NEW first');
+      return;
+    }
+
     if (_items.isEmpty) {
       _showMessage('Add at least one item before saving');
       return;
@@ -763,7 +787,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
       }
 
       try {
-        _currentBillLocalId = await LocalDb.instance.findLocalIdByBillNo(
+        _currentBillLocalId =
+            await LocalDb.instance.findLocalIdByBillNo(
               location: _selectedLocation,
               billNo: _billNo,
             ) ??
@@ -776,7 +801,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
       final defaultPrinter =
           await PrinterSettingsService.getDefaultPrinter(PrinterType.thermal) ??
-              '';
+          '';
 
       try {
         await BillPrintService.printReceipt(
@@ -819,7 +844,8 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void _openLedger() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => widget.ledgerScreenBuilder?.call(_selectedLocation) ??
+        builder: (_) =>
+            widget.ledgerScreenBuilder?.call(_selectedLocation) ??
             SalesLedgerScreen(location: _selectedLocation),
       ),
     );
@@ -866,10 +892,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _totalQty {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.qty,
-    );
+    return _items.fold(0, (sum, item) => sum + item.qty);
   }
 
   // ============================================================
@@ -877,10 +900,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _totalAmount {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.amount,
-    );
+    return _items.fold(0, (sum, item) => sum + item.amount);
   }
 
   // ============================================================
@@ -888,10 +908,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _totalCgst {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.cgst,
-    );
+    return _items.fold(0, (sum, item) => sum + item.cgst);
   }
 
   // ============================================================
@@ -899,10 +916,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _totalSgst {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.sgst,
-    );
+    return _items.fold(0, (sum, item) => sum + item.sgst);
   }
 
   // ============================================================
@@ -910,10 +924,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _totalIgst {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.igst,
-    );
+    return _items.fold(0, (sum, item) => sum + item.igst);
   }
 
   // ============================================================
@@ -923,10 +934,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _grandTotal {
-    return _items.fold(
-      0,
-          (sum, item) => sum + item.netAmt,
-    );
+    return _items.fold(0, (sum, item) => sum + item.netAmt);
   }
 
   /// Sum of visible AMOUNT column (qty × rate / grossAmt).
@@ -939,17 +947,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   // ============================================================
 
   double get _currentAmount {
-    final double rate =
-        double.tryParse(
-          _rateController.text,
-        ) ??
-            0;
+    final double rate = double.tryParse(_rateController.text) ?? 0;
 
-    final double qty =
-        double.tryParse(
-          _qtyController.text,
-        ) ??
-            0;
+    final double qty = double.tryParse(_qtyController.text) ?? 0;
 
     return rate * qty;
   }
@@ -984,15 +984,10 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration:
-        const Duration(seconds: 1),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -1060,9 +1055,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: Drawer(
-        child: _buildMenuPanel(
-          onClose: () => Navigator.pop(context),
-        ),
+        child: _buildMenuPanel(onClose: () => Navigator.pop(context)),
       ),
       appBar: _buildAppBar(
         mobileBillLayout: mobileBillLayout,
@@ -1075,10 +1068,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
   Widget _buildLockedBody(Widget child) {
     return Stack(
       children: [
-        AbsorbPointer(
-          absorbing: _isEntryLocked,
-          child: child,
-        ),
+        AbsorbPointer(absorbing: _isEntryLocked, child: child),
         if (_manualPushInProgress)
           Positioned.fill(
             child: ColoredBox(
@@ -1165,10 +1155,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         children: [
           SalesBillToolbar(
             onTodaySales: _openTodaySales,
+            onNew: _startNewBill,
             onPrevious: _goToPreviousBill,
             onNext: _goToNextBill,
             onSave: _saveBill,
             busy: _busy,
+            saveEnabled: !_billSaved,
           ),
           const SizedBox(height: 10),
           if (compact) ...[
@@ -1218,15 +1210,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              flex: 4,
-              child: _buildBillDetails(),
-            ),
+            Expanded(flex: 4, child: _buildBillDetails()),
             const SizedBox(width: 10),
-            Expanded(
-              flex: 6,
-              child: _buildCustomerDetails(),
-            ),
+            Expanded(flex: 6, child: _buildCustomerDetails()),
           ],
         );
       },
@@ -1282,18 +1268,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildBillDetails({bool mobile = false}) {
     return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.border,
-        ),
-      ),
+      decoration: BoxDecoration(border: Border.all(color: AppColors.border)),
 
-      padding:
-      const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(5),
 
       child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
 
         children: [
@@ -1301,23 +1281,17 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             children: [
               const SizedBox(
                 width: 58,
-                child: Text(
-                  'BILL NO:',
-                  style: TextStyle(
-                    fontSize: 10,
-                  ),
-                ),
+                child: Text('BILL NO:', style: TextStyle(fontSize: 10)),
               ),
 
               // ==================================================
               // FIXED BILL NUMBER
               // ==================================================
-
               Container(
                 width: SalesBillLayout.billNoBoxWidth,
                 height: SalesBillLayout.billNoBoxHeight,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: SalesBillLayout.billNoFill,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: AppColors.border),
@@ -1351,26 +1325,14 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                         vertical: 4,
                       ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Colors.black),
 
-                    items:
-                    _paymentModes.map(
-                          (item) {
-                        return DropdownMenuItem(
-                          value: item,
-                          child: Text(
-                            item,
-                            style:
-                            const TextStyle(
-                              fontSize: 10,
-                            ),
-                          ),
-                        );
-                      },
-                    ).toList(),
+                    items: _paymentModes.map((item) {
+                      return DropdownMenuItem(
+                        value: item,
+                        child: Text(item, style: const TextStyle(fontSize: 10)),
+                      );
+                    }).toList(),
 
                     onChanged: (value) {
                       if (value == null) {
@@ -1395,12 +1357,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             children: [
               const SizedBox(
                 width: 58,
-                child: Text(
-                  'BILL DATE:',
-                  style: TextStyle(
-                    fontSize: 10,
-                  ),
-                ),
+                child: Text('BILL DATE:', style: TextStyle(fontSize: 10)),
               ),
 
               InkWell(
@@ -1416,12 +1373,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                   ),
                   child: Text(
                     '${_billDate.day.toString().padLeft(2, '0')}/'
-                        '${_billDate.month.toString().padLeft(2, '0')}/'
-                        '${_billDate.year}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
+                    '${_billDate.month.toString().padLeft(2, '0')}/'
+                    '${_billDate.year}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
                   ),
                 ),
               ),
@@ -1440,9 +1394,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   Widget _buildCustomerDetails({bool compact = false}) {
     return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: BoxDecoration(border: Border.all(color: AppColors.border)),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1483,10 +1435,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               children: [
                 const SizedBox(
                   width: 52,
-                  child: Text(
-                    'Password',
-                    style: TextStyle(fontSize: 10),
-                  ),
+                  child: Text('Password', style: TextStyle(fontSize: 10)),
                 ),
                 SizedBox(
                   width: 110,
@@ -1530,10 +1479,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   _passwordError!,
-                  style: const TextStyle(
-                    color: AppColors.danger,
-                    fontSize: 9,
-                  ),
+                  style: const TextStyle(color: AppColors.danger, fontSize: 9),
                 ),
               ),
           ],
@@ -1542,10 +1488,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
               padding: EdgeInsets.only(top: 4),
               child: Text(
                 'Edit mode — tap a line to correct rate/qty.',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: AppColors.success,
-                ),
+                style: TextStyle(fontSize: 9, color: AppColors.success),
               ),
             ),
         ],
@@ -1593,16 +1536,12 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
         focusNode: focusNode,
         textInputAction: textInputAction,
         onSubmitted: onSubmitted,
-        keyboardType:
-            number ? TextInputType.phone : TextInputType.text,
+        keyboardType: number ? TextInputType.phone : TextInputType.text,
         inputFormatters: number
             ? [FilteringTextInputFormatter.digitsOnly]
             : null,
         textAlign: TextAlign.left,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
-        ),
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -1652,20 +1591,13 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             readOnly: readOnly,
             blockTabTraversal: blockTabTraversal,
             textAlign: TextAlign.center,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: textInputAction,
             inputFormatters: readOnly
                 ? null
-                : [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d*'),
-                    ),
-                  ],
+                : [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
             onChanged: onChanged,
-            onSubmitted: onSubmitted == null
-                ? null
-                : (_) => onSubmitted(),
+            onSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
             style: const TextStyle(
               fontSize: SalesBillLayout.entryFieldFontSize,
               height: 1.1,
@@ -1747,8 +1679,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          mobile ? CrossAxisAlignment.start : CrossAxisAlignment.start,
+      crossAxisAlignment: mobile
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.start,
       children: [
         fields,
         if (_rateError != null) ...[
@@ -1871,15 +1804,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
             style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(width: 10),
-          _buildEditLineField(
-            label: 'Rate',
-            controller: _editRateController,
-          ),
+          _buildEditLineField(label: 'Rate', controller: _editRateController),
           const SizedBox(width: 10),
-          _buildEditLineField(
-            label: 'Qty',
-            controller: _editQtyController,
-          ),
+          _buildEditLineField(label: 'Qty', controller: _editQtyController),
           const SizedBox(width: 10),
           SizedBox(
             height: _entryBoxHeight,
@@ -1921,8 +1848,7 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
           height: _entryBoxHeight,
           child: SalesBillFocusTextField(
             controller: controller,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
             ],
@@ -2141,8 +2067,9 @@ class _SalesBillScreenState extends State<SalesBillScreen> {
 
   @override
   void dispose() {
-    SyncService.instance.manualPushInProgress
-        .removeListener(_onManualPushChanged);
+    SyncService.instance.manualPushInProgress.removeListener(
+      _onManualPushChanged,
+    );
     _persistSession();
 
     _customerNameController.dispose();

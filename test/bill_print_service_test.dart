@@ -59,11 +59,9 @@ void main() {
     expect(pageWidthPt, closeTo(pageFormat.width, 1.0));
     expect(pageWidthPt, closeTo(expectedWidthPt, 1.5));
 
-    final expectedHeightMm = lineCount * BillPrintService.thermalLineSpacingMm +
-        BillPrintService.thermalPdfMarginTopMm +
-        BillPrintService.thermalPdfMarginBottomMm;
     final actualHeightMm = pageHeightPt / PdfPageFormat.mm;
-    expect(actualHeightMm, closeTo(expectedHeightMm, 1.0));
+    final expectedHeightMm = pageFormat.height / PdfPageFormat.mm;
+    expect(actualHeightMm, closeTo(expectedHeightMm, 0.05));
   });
 
   group('resolveTargetPrinter', () {

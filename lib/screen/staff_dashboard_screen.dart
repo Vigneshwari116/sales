@@ -13,28 +13,20 @@ import 'package:sales/services/location_reset_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 import 'package:sales/widgets/compact_layout.dart';
+import 'package:sales/widgets/sync_status_chip.dart';
 
-enum _StaffSection {
-  dashboard,
-  bill,
-  abstract,
-  ledger,
-  printer,
-  sync,
-}
+enum _StaffSection { dashboard, bill, abstract, ledger, printer, sync }
 
 /// Staff shell with collapsible navy sidebar (icon-only or icon + label row).
 class StaffDashboardScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String location)? ledgerScreenBuilder;
 
-  const StaffDashboardScreen({
-    super.key,
-    this.ledgerScreenBuilder,
-  });
+  const StaffDashboardScreen({super.key, this.ledgerScreenBuilder});
 
   @override
   State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
@@ -44,6 +36,23 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   _StaffSection _selectedSection = _StaffSection.bill;
   bool _sidebarExpanded = false;
   int _refreshGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    UiRefreshService.generation.addListener(_onBillSavedRefresh);
+  }
+
+  @override
+  void dispose() {
+    UiRefreshService.generation.removeListener(_onBillSavedRefresh);
+    super.dispose();
+  }
+
+  void _onBillSavedRefresh() {
+    if (!mounted) return;
+    setState(() => _refreshGeneration++);
+  }
 
   String get _location => AppConfig.displayLocationName;
 
@@ -163,7 +172,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
           CollapsibleSidebar(
             key: const Key('staff_collapsible_sidebar'),
             expanded: _sidebarExpanded,
-            onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+            onToggle: () =>
+                setState(() => _sidebarExpanded = !_sidebarExpanded),
             header: _sidebarExpanded
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -275,8 +285,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
             '${LocationResetService.resetWipesLocalAndServerMessage} '
             'Local data cleared. Server wipe queued — run SYNC when online.';
       } else if (result.serverCleared) {
-        _message =
-            'Local and server sales data cleared. Next bill will be #1.';
+        _message = 'Local and server sales data cleared. Next bill will be #1.';
       } else {
         _message =
             '${LocationResetService.resetWipesLocalAndServerMessage} '
@@ -289,9 +298,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: sectionHeaderAppBar(
-        'SYNC',
-      ),
+      appBar: sectionHeaderAppBar('SYNC'),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -302,10 +309,12 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: SyncStatusChip()),
+                  const SizedBox(height: 12),
                   const Text(
-                    'Push pending bills and pull admin updates. '
-                    'If you reset while offline, run SYNC when back online '
-                    'before creating new bills.',
+                    'Everything syncs automatically: bills upload and admin '
+                    'updates download on their own whenever the internet is '
+                    'available. SYNC NOW is only needed to force a sync.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: AppTextSizes.fieldText),
                   ),
@@ -334,7 +343,9 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                     height: 46,
                     child: OutlinedButton.icon(
                       key: const Key('staff_reset_button'),
-                      onPressed: (_syncing || _resetting) ? null : _resetLocation,
+                      onPressed: (_syncing || _resetting)
+                          ? null
+                          : _resetLocation,
                       icon: _resetting
                           ? const SizedBox(
                               width: 18,
@@ -343,6 +354,7 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                             )
                           : const Icon(Icons.delete_forever_outlined),
                       label: Text(_resetting ? 'RESETTING...' : 'RESET'),
+
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.danger,
                         side: const BorderSide(color: AppColors.danger),

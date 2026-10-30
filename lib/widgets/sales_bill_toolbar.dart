@@ -24,25 +24,28 @@ class SalesBillLayout {
   static const Color focusFill = Color(0xFF7FE8E8);
   static const Color dateBoxFill = Color(0xFFF3F3F3);
 
-  static double get inputRowWidth =>
-      entryFieldWidth * 3 + entryFieldGap * 2;
+  static double get inputRowWidth => entryFieldWidth * 3 + entryFieldGap * 2;
 }
 
 /// Large maroon / black action buttons for the bill screen (not shared app-wide).
 class SalesBillToolbar extends StatelessWidget {
   final VoidCallback? onTodaySales;
+  final VoidCallback? onNew;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onSave;
   final bool busy;
+  final bool saveEnabled;
 
   const SalesBillToolbar({
     super.key,
     required this.onTodaySales,
+    required this.onNew,
     required this.onPrevious,
     required this.onNext,
     required this.onSave,
     this.busy = false,
+    this.saveEnabled = true,
   });
 
   @override
@@ -57,6 +60,11 @@ class SalesBillToolbar extends StatelessWidget {
           onPressed: busy ? null : onTodaySales,
         ),
         _SalesBillToolbarButton(
+          key: const Key('bill_new_button'),
+          label: 'NEW',
+          onPressed: busy ? null : onNew,
+        ),
+        _SalesBillToolbarButton(
           key: const Key('bill_previous_button'),
           label: 'PREVIOUS',
           onPressed: busy ? null : onPrevious,
@@ -69,7 +77,7 @@ class SalesBillToolbar extends StatelessWidget {
         _SalesBillToolbarButton(
           key: const Key('bill_save_sale_button'),
           label: 'SAVE SALE',
-          onPressed: busy ? null : onSave,
+          onPressed: (busy || !saveEnabled) ? null : onSave,
           backgroundColor: AppColors.navy,
         ),
       ],
@@ -106,19 +114,14 @@ class _SalesBillToolbarButton extends StatelessWidget {
             SalesBillLayout.actionButtonHeight,
           ),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           textStyle: const TextStyle(
             fontSize: SalesBillLayout.actionButtonFontSize,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
           ),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(label),
-        ),
+        child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       ),
     );
   }

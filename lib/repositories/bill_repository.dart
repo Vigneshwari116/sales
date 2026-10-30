@@ -2,14 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/auto_sync_service.dart';
 import 'package:sales/services/daily_total_service.dart';
 import 'package:sales/services/summary_update_service.dart';
+import 'package:sales/services/sync_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 
 class BillRepository {
   /// When set (tests only), replaces [SalesApi.saveBill] for faster, offline saves.
   @visibleForTesting
   static Future<SalesApiResult<int>> Function(SaleBill bill)?
-      saveBillApiOverride;
+  saveBillApiOverride;
 
   static Future<int> getNextBillNumber(String location) async {
     return LocalDb.instance.getNextBillNumber(location);
@@ -52,6 +55,18 @@ class BillRepository {
     SaleBill bill, {
     String? updateLocalId,
   }) async {
+    SyncService.instance.beginLocalSave();
+    try {
+      return await _saveBillImpl(bill, updateLocalId: updateLocalId);
+    } finally {
+      SyncService.instance.endLocalSave();
+    }
+  }
+
+  static Future<SalesApiResult<int>> _saveBillImpl(
+    SaleBill bill, {
+    String? updateLocalId,
+  }) async {
     final saveApi = saveBillApiOverride ?? SalesApi.saveBill;
     final apiResult = await saveApi(bill);
     final syncStatus = apiResult.ok ? 'synced' : 'pending';
@@ -78,6 +93,9 @@ class BillRepository {
 
       await SummaryUpdateService.onBillSaved(previous: previous, current: bill);
       DailyTotalService.pushBillDelta(current: bill, previous: previous);
+      await SyncService.instance.refreshPendingCount(bill.location);
+      UiRefreshService.notifyBillSaved();
+      AutoSyncService.instance.trigger();
       return SalesApiResult.success(bill.billNo);
     } catch (_) {
       if (apiResult.ok) {

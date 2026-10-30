@@ -8,22 +8,23 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:sales/models/sale_bill.dart';
 import 'package:sales/services/printer_settings_service.dart';
+import 'package:sales/services/receipt_layout.dart';
 import 'package:sales/services/receipt_service.dart';
 
 class BillPrintService {
-  /// Thermal PDF tuning (3-inch / RP3200 roll) — adjust here only.
-  static const double thermalPdfPageWidthMm = 66.0;
-  static const double thermalPdfMarginRightMm = 6.0;
+  /// Thermal PDF tuning (3-inch / RP3200 roll) — same values as Surabhi.
+  static const double thermalPdfPageWidthMm = ReceiptLayout.pageWidthMm;
+  static const double thermalPdfMarginRightMm = ReceiptLayout.marginRightMm;
 
-  static const double thermalPdfMarginLeftMm = 2.0;
+  static const double thermalPdfMarginLeftMm = ReceiptLayout.marginLeftMm;
   static const double thermalPdfMarginTopMm = 2.5;
   static const double thermalPdfMarginBottomMm = 4.0;
-  static const double thermalPrintableWidthMm = thermalPdfPageWidthMm -
-      thermalPdfMarginLeftMm -
-      thermalPdfMarginRightMm;
+  static const double thermalPrintableWidthMm = ReceiptLayout.contentWidthMm;
 
-  static const double thermalFontSizePt = 9.0;
+  static double thermalFontSizePt() => ReceiptLayout.bodyFontSizePt();
   static const double thermalLineSpacingMm = 4.25;
+  static const double thermalHeaderLineSpacingMm = 6.0;
+  static const double thermalGrandTotalLineSpacingMm = 5.25;
 
   static Future<String> saveReceiptToDesktop(SaleBill bill) async {
     final text = ReceiptService.buildReceiptText(bill);
@@ -58,8 +59,9 @@ class BillPrintService {
     String clean(String value) =>
         value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-    var available =
-        printers.where((printer) => printer.isAvailable != false).toList();
+    var available = printers
+        .where((printer) => printer.isAvailable != false)
+        .toList();
     if (available.isEmpty) {
       available = printers;
     }
@@ -178,17 +180,18 @@ class BillPrintService {
     List<String> lines, {
     required PrinterType type,
   }) {
-    final fontSize = type == PrinterType.thermal ? thermalFontSizePt : 7.0;
-    final lineHeightMm =
-        type == PrinterType.thermal ? thermalLineSpacingMm : 4.25;
+    final fontSize = type == PrinterType.thermal ? thermalFontSizePt() : 7.0;
+    final lineHeightMm = type == PrinterType.thermal
+        ? thermalLineSpacingMm
+        : 4.25;
     const lineHeightFactor = 1.0;
 
     if (type == PrinterType.thermal) {
       final contentHeightMm = lines.isEmpty
           ? thermalPdfMarginTopMm + thermalPdfMarginBottomMm
-          : lines.length * lineHeightMm +
-              thermalPdfMarginTopMm +
-              thermalPdfMarginBottomMm;
+          : _sumLineHeights(lines, lineHeightMm) +
+                thermalPdfMarginTopMm +
+                thermalPdfMarginBottomMm;
 
       final pageFormat = PdfPageFormat(
         thermalPdfPageWidthMm * PdfPageFormat.mm,
@@ -218,8 +221,8 @@ class BillPrintService {
     final contentHeightMm = lines.isEmpty
         ? legacyVerticalMarginMm * 2 + legacyBottomBufferMm
         : lines.length * lineHeightMm +
-            legacyVerticalMarginMm * 2 +
-            legacyBottomBufferMm;
+              legacyVerticalMarginMm * 2 +
+              legacyBottomBufferMm;
 
     final pageFormat = PdfPageFormat(
       legacyPageWidthMm * PdfPageFormat.mm,
@@ -240,11 +243,61 @@ class BillPrintService {
     );
   }
 
+  static double _sumLineHeights(List<String> lines, double baseLineHeightMm) {
+    var total = 0.0;
+    for (final line in lines) {
+      total += _lineHeightMmFor(line, baseLineHeightMm);
+    }
+    return total;
+  }
+
+  static double _lineHeightMmFor(String line, double baseLineHeightMm) {
+    final trimmed = line.trim();
+    if (trimmed == ReceiptService.businessName) {
+      return thermalHeaderLineSpacingMm;
+    }
+    if (trimmed.startsWith('GRAND TOTAL')) {
+      return thermalGrandTotalLineSpacingMm;
+    }
+    return baseLineHeightMm;
+  }
+
+  static String? _grandTotalAmount(String line) {
+    return ReceiptService.footerAmountAfterLabel(line, 'GRAND TOTAL');
+  }
+
+  /// PDF grand-total row font sizes and amount for layout tests.
+  @visibleForTesting
+  static ({double labelPt, double amountPt, String amountText})
+  grandTotalPdfLayoutForBill(SaleBill bill) {
+    final line = ReceiptService.buildReceiptLines(bill)
+        .firstWhere((l) => l.trimLeft().startsWith('GRAND TOTAL'));
+    final amountText = _grandTotalAmount(line)!;
+
+    final fonts = ReceiptLayout.grandTotalFontSizes(amountText);
+    return (
+      labelPt: fonts.labelPt,
+      amountPt: fonts.amountPt,
+      amountText: amountText,
+    );
+  }
+
+  @visibleForTesting
+  static double grandTotalPdfLineWidthMm(
+    String amountText,
+    double labelPt,
+    double amountPt,
+  ) {
+    return ReceiptLayout.textWidthMm('GRAND TOTAL', labelPt) +
+        ReceiptLayout.grandTotalLabelAmountGapMm +
+        ReceiptLayout.textWidthMm(amountText, amountPt);
+  }
+
   static Future<Uint8List> _buildPdfBytesFromLayout(
     _ReceiptPdfLayout layout,
   ) async {
     final doc = pw.Document();
-    final style = pw.TextStyle(
+    final baseStyle = pw.TextStyle(
       font: pw.Font.courierBold(),
       fontSize: layout.fontSize,
       lineSpacing: 0,
@@ -262,9 +315,9 @@ class BillPrintService {
             for (final line in layout.lines)
               _thermalLineWidget(
                 line: line,
-                style: style,
+                baseStyle: baseStyle,
                 printableWidthMm: layout.printableWidthMm,
-                lineHeightMm: layout.lineHeightMm,
+                lineHeightMm: _lineHeightMmFor(line, layout.lineHeightMm),
               ),
           ],
         ),
@@ -276,20 +329,116 @@ class BillPrintService {
 
   static pw.Widget _thermalLineWidget({
     required String line,
-    required pw.TextStyle style,
+    required pw.TextStyle baseStyle,
     required double printableWidthMm,
     required double lineHeightMm,
   }) {
-    final text = line.isEmpty ? ' ' : line;
+    final trimmed = line.trim();
+    final boxWidth = printableWidthMm * PdfPageFormat.mm;
+    final boxHeight = lineHeightMm * PdfPageFormat.mm;
+
+    if (trimmed == ReceiptService.businessName) {
+      final fontSize = ReceiptLayout.shopNameFontSizePt(
+        ReceiptService.businessName,
+      );
+      return pw.SizedBox(
+        width: boxWidth,
+        height: boxHeight,
+        child: pw.Center(
+          child: pw.Text(
+            trimmed,
+            style: baseStyle.copyWith(fontSize: fontSize),
+            maxLines: 1,
+            softWrap: false,
+            overflow: pw.TextOverflow.clip,
+          ),
+        ),
+      );
+    }
+
+    final grandTotalAmount = _grandTotalAmount(line);
+    if (grandTotalAmount != null) {
+      final fonts = ReceiptLayout.grandTotalFontSizes(grandTotalAmount);
+      final lineWidthMm = grandTotalPdfLineWidthMm(
+        grandTotalAmount,
+        fonts.labelPt,
+        fonts.amountPt,
+      );
+      final useTwoLines = lineWidthMm > printableWidthMm;
+      if (useTwoLines) {
+        return pw.SizedBox(
+          width: boxWidth,
+          height: boxHeight,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Text(
+                'GRAND TOTAL',
+                style: baseStyle.copyWith(fontSize: fonts.labelPt),
+                maxLines: 1,
+                softWrap: false,
+              ),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  grandTotalAmount,
+                  style: baseStyle.copyWith(fontSize: fonts.amountPt),
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return pw.SizedBox(
+        width: boxWidth,
+        height: boxHeight,
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Flexible(
+              child: pw.Text(
+                'GRAND TOTAL',
+                style: baseStyle.copyWith(fontSize: fonts.labelPt),
+                maxLines: 1,
+                softWrap: false,
+              ),
+            ),
+            pw.SizedBox(
+              width:
+                  ReceiptLayout.grandTotalLabelAmountGapMm * PdfPageFormat.mm,
+            ),
+            pw.Flexible(
+              child: pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  grandTotalAmount,
+                  style: baseStyle.copyWith(fontSize: fonts.amountPt),
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final thankYou = trimmed.contains('THANK YOU VISIT AGAIN');
+    final text = thankYou ? trimmed : (line.isEmpty ? ' ' : line);
 
     return pw.SizedBox(
-      width: printableWidthMm * PdfPageFormat.mm,
-      height: lineHeightMm * PdfPageFormat.mm,
+      width: boxWidth,
+      height: boxHeight,
       child: pw.Align(
-        alignment: pw.Alignment.centerLeft,
+        alignment: thankYou ? pw.Alignment.center : pw.Alignment.centerLeft,
         child: pw.Text(
           text,
-          style: style,
+          style: baseStyle,
           maxLines: 1,
           softWrap: false,
           overflow: pw.TextOverflow.clip,
@@ -316,7 +465,6 @@ class BillPrintService {
         return '$userProfile\\Desktop';
       }
     }
-
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       final downloads = await getDownloadsDirectory();
       if (downloads != null) {

@@ -9,7 +9,9 @@ import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/auto_sync_service.dart';
 import 'package:sales/services/location_reset_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 
 class ManualPushResult {
   final bool ok;
@@ -34,9 +36,7 @@ class ManualPushResult {
     }
 
     if (failedCount == 0) {
-      return syncedCount == 1
-          ? '1 bill synced'
-          : '$syncedCount bills synced';
+      return syncedCount == 1 ? '1 bill synced' : '$syncedCount bills synced';
     }
 
     return '$syncedCount synced, $failedCount failed';
@@ -48,11 +48,7 @@ class PullResult {
   final int pulledCount;
   final String? error;
 
-  const PullResult({
-    required this.ok,
-    required this.pulledCount,
-    this.error,
-  });
+  const PullResult({required this.ok, required this.pulledCount, this.error});
 }
 
 class ManualSyncResult {
@@ -115,9 +111,19 @@ class SyncService with WidgetsBindingObserver {
 
   bool _started = false;
   bool _autoPullInProgress = false;
+  bool _autoPushInProgress = false;
+  DateTime? _lastGstPullAt;
+  static const Duration _gstPullInterval = Duration(minutes: 5);
+  int _localSavesInFlight = 0;
   String? _location;
 
   final ValueNotifier<bool> manualPushInProgress = ValueNotifier(false);
+
+  /// Number of bills saved on this device but not yet confirmed by the server.
+  final ValueNotifier<int> pendingCount = ValueNotifier(0);
+
+  /// Last known connectivity (updated by every auto-sync check).
+  final ValueNotifier<bool> online = ValueNotifier(true);
 
   @visibleForTesting
   Future<SalesApiResult<int>> Function(SaleBill bill)? saveBillOverride;
@@ -126,11 +132,9 @@ class SyncService with WidgetsBindingObserver {
   Future<bool> Function()? isOnlineOverride;
 
   @visibleForTesting
-  Future<
-      SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>> Function({
-    required String location,
-    required DateTime since,
-  })? getBillUpdatesSinceOverride;
+  Future<SalesApiResult<({List<SaleBill> bills, DateTime serverTime})>>
+  Function({required String location, required DateTime since})?
+  getBillUpdatesSinceOverride;
 
   SyncService._();
 
@@ -148,11 +152,15 @@ class SyncService with WidgetsBindingObserver {
       current.isOnlineOverride = null;
       current.getBillUpdatesSinceOverride = null;
       current.manualPushInProgress.value = false;
+      current.pendingCount.value = 0;
+      current.online.value = true;
     }
+    AutoSyncService.resetForTesting();
     _instance = null;
   }
 
-  /// Registers the active staff location — no periodic sync (event-driven only).
+  /// Registers the active staff location and starts [AutoSyncService]
+  /// (automatic push of pending bills + automatic pull of admin edits).
   void start({required String location}) {
     if (_started) {
       return;
@@ -161,6 +169,7 @@ class SyncService with WidgetsBindingObserver {
     _started = true;
     _location = location;
     WidgetsBinding.instance.addObserver(this);
+    AutoSyncService.instance.start(location: location);
   }
 
   void stop() {
@@ -171,11 +180,12 @@ class SyncService with WidgetsBindingObserver {
     _started = false;
     _location = null;
     WidgetsBinding.instance.removeObserver(this);
+    AutoSyncService.instance.stop();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Event-driven sync only — no background pulls.
+    // Resume-triggered sync is handled by AutoSyncService.
   }
 
   /// Pull admin edits from the server (admin always wins on conflict).
@@ -230,11 +240,7 @@ class SyncService with WidgetsBindingObserver {
 
       return PullResult(ok: true, pulledCount: pulledCount);
     } catch (e) {
-      return PullResult(
-        ok: false,
-        pulledCount: 0,
-        error: 'Pull failed: $e',
-      );
+      return PullResult(ok: false, pulledCount: 0, error: 'Pull failed: $e');
     } finally {
       _autoPullInProgress = false;
     }
@@ -255,6 +261,7 @@ class SyncService with WidgetsBindingObserver {
     if (!await (isOnlineOverride?.call() ?? _isOnline())) {
       return const ManualSyncResult(
         ok: false,
+
         pushedCount: 0,
         pushFailedCount: 0,
         pulledCount: 0,
@@ -316,6 +323,118 @@ class SyncService with WidgetsBindingObserver {
     }
   }
 
+  /// Called by BillRepository around a local save so a background push never
+  /// overwrites a bill that is being saved at that moment.
+  void beginLocalSave() => _localSavesInFlight++;
+
+  void endLocalSave() {
+    if (_localSavesInFlight > 0) {
+      _localSavesInFlight--;
+    }
+  }
+
+  Future<void> refreshPendingCount(String location) async {
+    try {
+      final pending = await LocalDb.instance.getBillsBySyncStatus(
+        'pending',
+        location: location,
+      );
+      pendingCount.value = pending.length;
+    } catch (_) {
+      // Keep the previous count if the local database is unavailable.
+    }
+  }
+
+  /// Silent background push of pending bills (no password, no UI lock).
+  /// Returns null when there was nothing to do or the push was skipped.
+  Future<ManualPushResult?> autoPush(String location) async {
+    if (_autoPushInProgress ||
+        manualPushInProgress.value ||
+        _localSavesInFlight > 0) {
+      return null;
+    }
+    _autoPushInProgress = true;
+
+    try {
+      final isOnline = await (isOnlineOverride?.call() ?? _isOnline());
+      online.value = isOnline;
+
+      final pending = await LocalDb.instance.getBillsBySyncStatus(
+        'pending',
+        location: location,
+      );
+      pendingCount.value = pending.length;
+
+      if (pending.isEmpty || !isOnline) {
+        return null;
+      }
+
+      final resetBlock = await LocationResetService.ensureServerResetBeforeSync(
+        location,
+      );
+      if (resetBlock != null) {
+        return null;
+      }
+
+      final result = await _executePush(location, stopOnFirstFailure: true);
+      await refreshPendingCount(location);
+      return result;
+    } catch (_) {
+      return null;
+    } finally {
+      _autoPushInProgress = false;
+    }
+  }
+
+  /// Silent background pull of admin edits (+ GST config, throttled).
+  /// Never runs while local bills are unsent, so admin data can't overwrite
+  /// an offline bill before it reaches the server.
+  Future<void> autoPull(String location) async {
+    if (_autoPullInProgress ||
+        _autoPushInProgress ||
+        manualPushInProgress.value ||
+        _localSavesInFlight > 0) {
+      return;
+    }
+
+    try {
+      final isOnline = await (isOnlineOverride?.call() ?? _isOnline());
+      online.value = isOnline;
+      if (!isOnline) {
+        return;
+      }
+
+      final pending = await LocalDb.instance.getBillsBySyncStatus(
+        'pending',
+        location: location,
+      );
+      pendingCount.value = pending.length;
+      if (pending.isNotEmpty) {
+        return;
+      }
+
+      final result = await pullAdminUpdates(location);
+      if (result.ok && result.pulledCount > 0) {
+        UiRefreshService.notifyBillSaved();
+      }
+
+      final now = DateTime.now();
+      final lastGst = _lastGstPullAt;
+      if (lastGst == null || now.difference(lastGst) >= _gstPullInterval) {
+        _lastGstPullAt = now;
+        try {
+          await SalesApi.pullGstMasterData(
+            _locationCodeFromDisplayName(location),
+          );
+        } catch (_) {
+          // Retried on the next interval.
+        }
+      }
+    } catch (_) {
+      // Silent: the next trigger retries.
+    }
+  }
+
   /// Push pending local bills only.
   Future<ManualPushResult> manualPush(String location) async {
     if (manualPushInProgress.value) {
@@ -357,7 +476,10 @@ class SyncService with WidgetsBindingObserver {
     }
   }
 
-  Future<ManualPushResult> _executePush(String location) async {
+  Future<ManualPushResult> _executePush(
+    String location, {
+    bool stopOnFirstFailure = false,
+  }) async {
     var syncedCount = 0;
     var failedCount = 0;
 
@@ -370,6 +492,10 @@ class SyncService with WidgetsBindingObserver {
       final saveBill = saveBillOverride ?? SalesApi.saveBill;
 
       for (final stored in pending) {
+        if (stopOnFirstFailure && _localSavesInFlight > 0) {
+          break;
+        }
+
         final result = await saveBill(stored.bill);
 
         if (result.ok) {
@@ -377,6 +503,10 @@ class SyncService with WidgetsBindingObserver {
           syncedCount++;
         } else {
           failedCount++;
+          if (stopOnFirstFailure) {
+            // Server unreachable: stop, keep bill order, retry on next trigger.
+            break;
+          }
         }
       }
 
