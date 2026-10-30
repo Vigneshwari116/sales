@@ -7,8 +7,10 @@ import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 import 'package:sales/api/sales_api.dart';
 import 'package:sales/config/app_config.dart';
+import 'package:sales/config/location_codes.dart';
 import 'package:sales/db/local_db.dart';
 import 'package:sales/models/sale_bill.dart';
+import 'package:sales/services/delete_all_bills_service.dart';
 import 'package:sales/services/location_reset_service.dart';
 
 class ManualPushResult {
@@ -119,6 +121,9 @@ class SyncService with WidgetsBindingObserver {
 
   final ValueNotifier<bool> manualPushInProgress = ValueNotifier(false);
 
+  /// Pending bills for the active location (updated after save/delete/sync).
+  final ValueNotifier<int> pendingBillCount = ValueNotifier(0);
+
   @visibleForTesting
   Future<SalesApiResult<int>> Function(SaleBill bill)? saveBillOverride;
 
@@ -148,8 +153,22 @@ class SyncService with WidgetsBindingObserver {
       current.isOnlineOverride = null;
       current.getBillUpdatesSinceOverride = null;
       current.manualPushInProgress.value = false;
+      current.pendingBillCount.value = 0;
     }
     _instance = null;
+  }
+
+  Future<void> refreshPendingBillCount(String location) async {
+    try {
+      await LocalDb.instance.initialize();
+      final pending = await LocalDb.instance.getBillsBySyncStatus(
+        'pending',
+        location: location,
+      );
+      pendingBillCount.value = pending.length;
+    } catch (_) {
+      pendingBillCount.value = 0;
+    }
   }
 
   /// Registers the active staff location — no periodic sync (event-driven only).
@@ -161,6 +180,7 @@ class SyncService with WidgetsBindingObserver {
     _started = true;
     _location = location;
     WidgetsBinding.instance.addObserver(this);
+    unawaited(refreshPendingBillCount(location));
   }
 
   void stop() {
@@ -206,8 +226,15 @@ class SyncService with WidgetsBindingObserver {
     _autoPullInProgress = true;
     try {
       final lastPull = await LocalDb.instance.getLastPullAt(location);
-      final since =
+      var since =
           lastPull ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+      final locationCode = locationCodeFromDisplayName(location);
+      final wipeAnchor =
+          await DeleteAllBillsService.pullAnchorForLocationCode(locationCode);
+      if (wipeAnchor != null && wipeAnchor.isAfter(since)) {
+        since = wipeAnchor;
+      }
 
       final fetch = getBillUpdatesSinceOverride ?? SalesApi.getBillUpdatesSince;
       final result = await fetch(location: location, since: since);
@@ -393,6 +420,8 @@ class SyncService with WidgetsBindingObserver {
         failedCount: failedCount,
         error: 'Could not sync bills: $e',
       );
+    } finally {
+      await refreshPendingBillCount(location);
     }
   }
 

@@ -9,10 +9,12 @@ import 'package:sales/screen/sales_ledger_screen.dart';
 import 'package:sales/screen/staff_sales_dashboard_screen.dart';
 import 'package:sales/screen/staff_thermal_printer_screen.dart';
 import 'package:sales/services/app_session_service.dart';
+import 'package:sales/services/delete_all_bills_service.dart';
 import 'package:sales/services/location_reset_service.dart';
 import 'package:sales/services/session_service.dart';
 import 'package:sales/services/sync_gate_service.dart';
 import 'package:sales/services/sync_service.dart';
+import 'package:sales/services/ui_refresh_service.dart';
 import 'package:sales/theme/app_theme.dart';
 import 'package:sales/widgets/collapsible_sidebar.dart';
 import 'package:sales/widgets/compact_layout.dart';
@@ -48,6 +50,24 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   String get _location => AppConfig.displayLocationName;
 
   int get _selectedIndex => _selectedSection.index;
+
+  @override
+  void initState() {
+    super.initState();
+    UiRefreshService.instance.billDataGeneration.addListener(_onBillDataRefresh);
+  }
+
+  @override
+  void dispose() {
+    UiRefreshService.instance.billDataGeneration
+        .removeListener(_onBillDataRefresh);
+    super.dispose();
+  }
+
+  void _onBillDataRefresh() {
+    if (!mounted) return;
+    setState(() => _refreshGeneration++);
+  }
 
   void _selectSection(_StaffSection section) {
     setState(() {
@@ -219,6 +239,7 @@ class _StaffSyncPanel extends StatefulWidget {
 class _StaffSyncPanelState extends State<_StaffSyncPanel> {
   bool _syncing = false;
   bool _resetting = false;
+  bool _deletingAll = false;
   String? _message;
   bool? _lastSyncOk;
 
@@ -285,6 +306,31 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
     });
   }
 
+  Future<void> _deleteAllBills() async {
+    final allowed = await SyncGateService.confirmDeleteAllBills(context);
+    if (!allowed || !mounted) return;
+
+    setState(() {
+      _deletingAll = true;
+      _message = null;
+      _lastSyncOk = null;
+    });
+
+    final result = await DeleteAllBillsService.deleteAllForLocation(
+      AppConfig.displayLocationName,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _deletingAll = false;
+      _lastSyncOk = result.ok;
+      _message = result.ok
+          ? 'All bills deleted for this location. Next bill will be #1.'
+          : (result.error ?? 'Delete all bills failed');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -314,7 +360,9 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                     height: 46,
                     child: ElevatedButton.icon(
                       key: const Key('staff_sync_now_button'),
-                      onPressed: (_syncing || _resetting) ? null : _syncNow,
+                      onPressed: (_syncing || _resetting || _deletingAll)
+                          ? null
+                          : _syncNow,
                       icon: _syncing
                           ? const SizedBox(
                               width: 18,
@@ -334,7 +382,9 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                     height: 46,
                     child: OutlinedButton.icon(
                       key: const Key('staff_reset_button'),
-                      onPressed: (_syncing || _resetting) ? null : _resetLocation,
+                      onPressed: (_syncing || _resetting || _deletingAll)
+                          ? null
+                          : _resetLocation,
                       icon: _resetting
                           ? const SizedBox(
                               width: 18,
@@ -343,6 +393,30 @@ class _StaffSyncPanelState extends State<_StaffSyncPanel> {
                             )
                           : const Icon(Icons.delete_forever_outlined),
                       label: Text(_resetting ? 'RESETTING...' : 'RESET'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: const BorderSide(color: AppColors.danger),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      key: const Key('staff_delete_all_bills_button'),
+                      onPressed: (_syncing || _resetting || _deletingAll)
+                          ? null
+                          : _deleteAllBills,
+                      icon: _deletingAll
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_sweep_outlined),
+                      label: Text(
+                        _deletingAll ? 'DELETING...' : 'DELETE ALL BILLS',
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.danger,
                         side: const BorderSide(color: AppColors.danger),
